@@ -13,7 +13,7 @@ from frps_deploy.services import (
     all_remote_ports, http_domains, http_remote_ports, http_services,
     local_ip, local_port, remote_port, tcp_remote_ports, tcp_services,
 )
-from frps_deploy.utils import current_uid_gid, safe_alias, toml_str
+from frps_deploy.utils import safe_alias, toml_str
 
 
 # re-export safe_alias so generator.py's callers don't need to import utils directly
@@ -84,7 +84,6 @@ def generate_frpc_toml(ctx: DeployContext) -> None:
 
 
 def generate_frps_compose(ctx: DeployContext) -> None:
-    uid_gid = current_uid_gid()
     port_lines = [
         f'      - "{ctx.bind_port}:{ctx.bind_port}/tcp"',
         f'      - "127.0.0.1:{ctx.dashboard_port}:{ctx.dashboard_port}/tcp"',
@@ -99,7 +98,6 @@ def generate_frps_compose(ctx: DeployContext) -> None:
   frps:
     image: fatedier/frps:{ctx.frp_version}
     container_name: frps_{ctx.suffix}
-    user: "{uid_gid}"
     restart: unless-stopped
     volumes:
       - ./frps.toml:/etc/frp/frps.toml:ro
@@ -130,7 +128,6 @@ def generate_frps_compose(ctx: DeployContext) -> None:
   certbot:
     image: certbot/certbot:latest
     container_name: certbot_{ctx.suffix}
-    user: "{uid_gid}"
     restart: unless-stopped
     volumes:
       - ./certbot/www:/var/www/certbot
@@ -146,12 +143,10 @@ def generate_frps_compose(ctx: DeployContext) -> None:
 
 
 def generate_frpc_compose(ctx: DeployContext) -> None:
-    uid_gid = current_uid_gid()
     compose = f"""services:
   frpc:
     image: fatedier/frpc:{ctx.frp_version}
     container_name: frpc_{ctx.suffix}
-    user: "{uid_gid}"
     restart: unless-stopped
     network_mode: host
     volumes:
@@ -296,7 +291,6 @@ def write_generated_info(ctx: DeployContext) -> None:
         f"FRPS_TOKEN={ctx.token}",
         f"FRPS_DASHBOARD_PASSWORD={ctx.dashboard_password}",
         f"CONTAINER_SUFFIX={ctx.suffix}",
-        f"DOCKER_USER={current_uid_gid()}",
         f"FRPS_DIR={BASE_DIR}",
         f"FRPC_DIR={_FRPC}",
         "",
@@ -320,7 +314,6 @@ def write_status_app_env(ctx: DeployContext) -> None:
     STATUS_APP_DIR.mkdir(parents=True, exist_ok=True)
     STATUS_APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"DOCKER_USER={current_uid_gid()}",
         f"LISTEN=127.0.0.1:{ctx.status_port}",
         "DB_PATH=/data/frps-status.sqlite",
         "FRPS_HOST=127.0.0.1",

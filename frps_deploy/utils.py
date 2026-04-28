@@ -29,10 +29,6 @@ def command_exists(name: str) -> bool:
     return shutil.which(name) is not None
 
 
-def current_uid_gid() -> str:
-    return f"{os.getuid()}:{os.getgid()}"
-
-
 def toml_str(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 

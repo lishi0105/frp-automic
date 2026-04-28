@@ -6,7 +6,6 @@ services:
     container_name: frps_status
     restart: unless-stopped
     network_mode: host
-    user: "${DOCKER_USER:-1000:1000}"
     environment:
       LISTEN: "${LISTEN:-127.0.0.1:28080}"
       DB_PATH: "${DB_PATH:-/data/frps-status.sqlite}"
