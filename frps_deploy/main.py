@@ -98,7 +98,15 @@ def build_context(root_domain: str, email: str) -> DeployContext:
         bind_port = random_free_port_excluding(generated_ports)
 
     dashboard_port = random_free_port_excluding(generated_ports)
-    status_port    = random_free_port_excluding(generated_ports)
+    if not config.STATUS_APP_ENABLED:
+        status_port = 0
+    elif config.STATUS_APP_PORT >= 1000:
+        if config.STATUS_APP_PORT in generated_ports:
+            raise ValueError(f"status_app_port 与已使用端口冲突：{config.STATUS_APP_PORT}")
+        status_port = config.STATUS_APP_PORT
+        generated_ports.add(status_port)
+    else:
+        status_port = random_free_port_excluding(generated_ports)
     return DeployContext(
         root_domain=root_domain,
         email=email,
@@ -125,8 +133,9 @@ def generate_files(ctx: DeployContext) -> None:
     generate_frpc_compose(ctx)
     print("写入部署信息记录...")
     write_generated_info(ctx)
-    print("写入 frps-status-app/.env...")
-    write_status_app_env(ctx)
+    if config.STATUS_APP_ENABLED:
+        print("写入 frps-status-app/.env...")
+        write_status_app_env(ctx)
     print("\n生成临时 HTTP challenge 配置...")
     remove_https_confs()
     generate_http_challenge_conf(ctx)
@@ -197,7 +206,8 @@ def main() -> None:
     print("\n启动 certbot 自动续期容器...")
     docker_compose_up_all()
 
-    print("\n编译并启动状态服务工程...")
-    docker_compose_up_status_app()
+    if config.STATUS_APP_ENABLED:
+        print("\n编译并启动状态服务工程...")
+        docker_compose_up_status_app()
 
     print_result(ctx)

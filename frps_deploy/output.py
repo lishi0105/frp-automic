@@ -47,9 +47,11 @@ def print_result(ctx: DeployContext) -> None:
         print("\nHTTPS 反代访问地址：")
         for item in http_services():
             print(f"  https://{item['alias']}.{ctx.root_domain}    # {item.get('comment', '')}")
-        print("\n状态页：")
-        for item in http_services():
-            print(f"  https://{item['alias']}.{ctx.root_domain}/_frps-status/")
+        if config.STATUS_APP_ENABLED:
+            print("\n状态页：")
+            print(f"  http://127.0.0.1:{ctx.status_port}")
+            for item in http_services():
+                print(f"  https://{item['alias']}.{ctx.root_domain}/_frps-status/")
 
     if tcp_services():
         print("\nTCP 直通端口：")
@@ -72,8 +74,9 @@ def print_result(ctx: DeployContext) -> None:
     print("  docker compose restart nginx")
     print(f"  cd {FRPC_BASE_DIR}")
     print("  docker compose up -d")
-    print(f"  cd {STATUS_APP_DIR}")
-    print("  docker compose build && docker compose up -d")
+    if config.STATUS_APP_ENABLED:
+        print(f"  cd {STATUS_APP_DIR}")
+        print("  docker compose build && docker compose up -d")
     print_frpc_config(ctx)
     print("\n注意：")
     print("1. http 模式服务只在 Docker 内部 expose 给 nginx，外网不能直接用 IP:端口访问。")
@@ -90,13 +93,16 @@ def print_generate_only_result(ctx: DeployContext) -> None:
     print(f"frps 配置：{FRPS_TOML_FILE}")
     print(f"Docker Compose：{COMPOSE_FILE}")
     print(f"Nginx 配置目录：{NGINX_CONF_DIR}")
-    print(f"状态服务工程：{STATUS_APP_DIR}")
-    print(f"状态服务环境：{STATUS_APP_ENV_FILE}")
+    if config.STATUS_APP_ENABLED:
+        print(f"状态服务工程：{STATUS_APP_DIR}")
+        print(f"状态服务环境：{STATUS_APP_ENV_FILE}")
+        print(f"状态页本机 HTTP：http://127.0.0.1:{ctx.status_port}")
     print(f"frpc 配置：{FRPC_TOML_FILE}")
     print(f"frpc Docker Compose：{FRPC_COMPOSE_FILE}")
     print("\n本次未执行启动、证书申请。")
-    if http_services():
+    if config.STATUS_APP_ENABLED and http_services():
         print("状态页部署后访问：")
+        print(f"  http://127.0.0.1:{ctx.status_port}")
         for item in http_services():
             print(f"  https://{item['alias']}.{ctx.root_domain}/_frps-status/")
     print(f"需要继续执行部署启动时，请重新运行：")

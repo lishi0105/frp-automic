@@ -23,6 +23,8 @@ ROOT_DOMAIN = ""
 CERT_EMAIL  = ""
 FRPS_SERVER_PORT = 0
 FRPS_TOKEN = ""
+STATUS_APP_ENABLED = True
+STATUS_APP_PORT = 0
 
 
 def clone_default_config() -> Dict[str, Any]:
@@ -59,8 +61,18 @@ def load_config_file() -> Dict[str, Any]:
     return data
 
 
+def _bool_config(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
+
+
 def load_runtime_config() -> None:
-    global CONFIG, SERVICES, ROOT_DOMAIN, CERT_EMAIL, FRPS_SERVER_PORT, FRPS_TOKEN
+    global CONFIG, SERVICES, ROOT_DOMAIN, CERT_EMAIL, FRPS_SERVER_PORT, FRPS_TOKEN, STATUS_APP_ENABLED, STATUS_APP_PORT
 
     CONFIG = load_config_file()
 
@@ -78,3 +90,10 @@ def load_runtime_config() -> None:
         FRPS_SERVER_PORT = int(raw_server_port or 0)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"frps_server_port 必须是整数：{raw_server_port!r}") from exc
+
+    STATUS_APP_ENABLED = _bool_config(CONFIG.get("status_app_enabled", True), default=True)
+    raw_status_port = CONFIG.get("status_app_port", CONFIG.get("status_port", 0))
+    try:
+        STATUS_APP_PORT = int(raw_status_port or 0)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"status_app_port 必须是整数：{raw_status_port!r}") from exc

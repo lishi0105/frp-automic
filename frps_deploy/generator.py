@@ -29,8 +29,28 @@ def ensure_dirs() -> None:
     NGINX_CONF_DIR.mkdir(parents=True, exist_ok=True)
     CERTBOT_CONF_DIR.mkdir(parents=True, exist_ok=True)
     CERTBOT_WWW_DIR.mkdir(parents=True, exist_ok=True)
-    STATUS_APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if config.STATUS_APP_ENABLED:
+        STATUS_APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
     FRPC_BASE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def status_nginx_location(ctx: DeployContext, forwarded_proto: str) -> str:
+    if not config.STATUS_APP_ENABLED:
+        return ""
+    return f"""
+    location = /_frps-status {{
+        return 301 /_frps-status/;
+    }}
+
+    location /_frps-status/ {{
+        proxy_pass http://host.docker.internal:{ctx.status_port}/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto {forwarded_proto};
+    }}
+"""
 
 
 def generate_frps_toml(ctx: DeployContext) -> None:
@@ -172,18 +192,7 @@ def generate_http_challenge_conf(ctx: DeployContext) -> None:
         root /var/www/certbot;
     }}
 
-    location = /_frps-status {{
-        return 301 /_frps-status/;
-    }}
-
-    location /_frps-status/ {{
-        proxy_pass http://host.docker.internal:{ctx.status_port}/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }}
+{status_nginx_location(ctx, "$scheme")}
 
     location / {{
         return 200 "certbot challenge server is running\\n";
@@ -209,18 +218,7 @@ server {{
         root /var/www/certbot;
     }}
 
-    location = /_frps-status {{
-        return 301 /_frps-status/;
-    }}
-
-    location /_frps-status/ {{
-        proxy_pass http://host.docker.internal:{ctx.status_port}/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }}
+{status_nginx_location(ctx, "$scheme")}
 
     location / {{
         return 301 https://$host$request_uri;
@@ -239,18 +237,7 @@ server {{
 
     client_max_body_size 0;
 
-    location = /_frps-status {{
-        return 301 /_frps-status/;
-    }}
-
-    location /_frps-status/ {{
-        proxy_pass http://host.docker.internal:{ctx.status_port}/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-    }}
+{status_nginx_location(ctx, "https")}
 
     location / {{
         proxy_pass http://frps:{port};
@@ -287,8 +274,6 @@ def write_generated_info(ctx: DeployContext) -> None:
         f"FRP_VERSION={ctx.frp_version}",
         f"FRPS_BIND_PORT={ctx.bind_port}",
         f"FRPS_DASHBOARD_PORT={ctx.dashboard_port}",
-        f"STATUS_PORT={ctx.status_port}",
-        f"STATUS_LOCAL_URL=http://127.0.0.1:{ctx.status_port}",
         f"FRPS_TOKEN={ctx.token}",
         f"FRPS_DASHBOARD_PASSWORD={ctx.dashboard_password}",
         f"CONTAINER_SUFFIX={ctx.suffix}",
@@ -297,6 +282,11 @@ def write_generated_info(ctx: DeployContext) -> None:
         "",
         "# HTTP services",
     ]
+    if config.STATUS_APP_ENABLED:
+        lines[5:5] = [
+            f"STATUS_PORT={ctx.status_port}",
+            f"STATUS_LOCAL_URL=http://127.0.0.1:{ctx.status_port}",
+        ]
     for item in http_services():
         lines.append(
             f"HTTP_{item['alias'].upper()}=https://{item['alias']}.{ctx.root_domain} "
@@ -312,6 +302,8 @@ def write_generated_info(ctx: DeployContext) -> None:
 
 
 def write_status_app_env(ctx: DeployContext) -> None:
+    if not config.STATUS_APP_ENABLED:
+        return
     STATUS_APP_DIR.mkdir(parents=True, exist_ok=True)
     STATUS_APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
     lines = [

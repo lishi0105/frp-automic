@@ -26,6 +26,8 @@ cp frps-config.json.example frps-config.json   # 若不存在，首次运行脚�
 | `cert_email` | Certbot 注册邮箱 |
 | `frps_server_port` | frps serverPort；小于 `1000` 或留空时随机生成 |
 | `frps_token` | frps 认证 token；留空时随机生成 |
+| `status_app_enabled` | 是否启用状态面板与 `/_frps-status/` 反代，默认启用 |
+| `status_app_port` | 状态面板本机监听端口；小于 `1000` 或留空时随机生成 |
 | `dns_provider` | DNS 解析方式：`manual` 或 `cloudflare` |
 | `cf_api_token` | Cloudflare API Token（仅 cloudflare 模式需要） |
 | `services` | 服务列表，见下方说明 |
