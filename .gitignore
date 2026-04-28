@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 配置文件（含敏感信息）
+frps-config.json
+
+# IDE / 工具
+.vscode/
+.idea/
+.claude/
+.codex
+*.swp
+*.swo
+
+frps/
+frpc/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ── frps-status-app ──────────────────────────────
+
+# 环境变量
+frps-status-app/.env
+frps-status-app/.env.local
+
+# 数据目录
+frps-status-app/data/
+
+# Go 编译产物
+frps-status-app/frps-status
+
+# Node
+frps-status-app/frontend/node_modules/
+
+# Vite 构建输出（由 Docker 构建生成）
+frps-status-app/web/assets/
+frps-status-app/web/index.html

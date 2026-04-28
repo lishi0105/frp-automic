@@ -1,0 +1,25 @@
+services:
+  frps-status:
+    build:
+      context: .
+    image: frps-status:local
+    container_name: frps_status
+    restart: unless-stopped
+    network_mode: host
+    user: "${DOCKER_USER:-1000:1000}"
+    environment:
+      LISTEN: "${LISTEN:-127.0.0.1:28080}"
+      DB_PATH: "${DB_PATH:-/data/frps-status.sqlite}"
+      FRPS_HOST: "${FRPS_HOST:-127.0.0.1}"
+      FRPS_BIND_PORT: "${FRPS_BIND_PORT:-7000}"
+      FRPS_DASHBOARD_PORT: "${FRPS_DASHBOARD_PORT:-7500}"
+      FRPS_DASHBOARD_USER: "${FRPS_DASHBOARD_USER:-admin}"
+      FRPS_DASHBOARD_PASSWORD: "${FRPS_DASHBOARD_PASSWORD:-}"
+      STATUS_DOMAINS: "${STATUS_DOMAINS:-}"
+      STATUS_USER: "${STATUS_USER:-admin}"
+      STATUS_PASSWORD: "${STATUS_PASSWORD:-}"
+      CERT_DIR: "${CERT_DIR:-/etc/letsencrypt/live}"
+      POLL_SECONDS: "${POLL_SECONDS:-60}"
+    volumes:
+      - ./data:/data
+      - ${FRPS_CERTBOT_CONF_DIR:-../frps/certbot/conf}:/etc/letsencrypt:ro
