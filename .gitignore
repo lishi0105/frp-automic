@@ -14,8 +14,8 @@ frps-config.json
 *.swp
 *.swo
 
-frps/
-frpc/
+/frps/
+/frpc/
 
 # OS
 .DS_Store
