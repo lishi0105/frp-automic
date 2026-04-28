@@ -22,6 +22,15 @@ def local_ip(item: Dict[str, Any]) -> str:
     return str(item.get("local_ip", "127.0.0.1"))
 
 
+def expose_http_port(item: Dict[str, Any]) -> bool:
+    value = item.get("expose_http_port", False)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
+
+
 def http_services() -> List[Dict[str, Any]]:
     return [s for s in config.SERVICES if mode_of(s) == "http"]
 
@@ -36,6 +45,10 @@ def all_remote_ports() -> List[int]:
 
 def http_remote_ports() -> List[int]:
     return sorted({remote_port(s) for s in http_services()})
+
+
+def exposed_http_remote_ports() -> List[int]:
+    return sorted({remote_port(s) for s in http_services() if expose_http_port(s)})
 
 
 def tcp_remote_ports() -> List[int]:

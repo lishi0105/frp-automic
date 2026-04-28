@@ -41,7 +41,8 @@ cp frps-config.json.example frps-config.json   # 若不存在，首次运行脚�
       "mode": "http",      // http = Nginx HTTPS 反代；tcp = 直接暴露端口
       "port": 7096,        // frps 侧端口（frpc remotePort）
       "local_port": 8096,  // 内网真实端口（缺省等于 port）
-      "local_ip": "127.0.0.1"
+      "local_ip": "127.0.0.1",
+      "expose_http_port": false // http 模式下是否额外开放 VPS_IP:port，默认 false
     }
   ]
 }

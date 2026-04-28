@@ -10,7 +10,7 @@ from frps_deploy.constants import (
 )
 from frps_deploy.models import DeployContext
 from frps_deploy.services import (
-    all_remote_ports, http_domains, http_remote_ports, http_services,
+    all_remote_ports, exposed_http_remote_ports, http_domains, http_remote_ports, http_services,
     local_ip, local_port, remote_port, tcp_remote_ports, tcp_services,
 )
 from frps_deploy.utils import safe_alias, toml_str
@@ -88,6 +88,9 @@ def generate_frps_compose(ctx: DeployContext) -> None:
         f'      - "{ctx.bind_port}:{ctx.bind_port}/tcp"',
         f'      - "127.0.0.1:{ctx.dashboard_port}:{ctx.dashboard_port}/tcp"',
     ] + [f'      - "{p}:{p}/tcp"' for p in tcp_remote_ports()]
+
+    for p in exposed_http_remote_ports():
+        port_lines.append(f'      - "{p}:{p}/tcp"')
 
     expose_section = ""
     if http_remote_ports():
