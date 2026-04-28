@@ -1,0 +1,92 @@
+"""Docker 环境检查、frp 版本获取、公网 IP 获取。"""
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import urllib.request
+
+from frps_deploy import config
+from frps_deploy.console import print, eprint, prompt_input
+from frps_deploy.constants import DEFAULT_FRP_VERSION
+from frps_deploy.utils import command_exists, is_port_free, validate_ipv4
+
+
+def check_docker_compose() -> None:
+    if not command_exists("docker"):
+        eprint("错误：未找到 docker 命令，请先安装 Docker。")
+        sys.exit(1)
+    ret = subprocess.run(
+        ["docker", "compose", "version"],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    if ret.returncode != 0:
+        eprint("错误：当前 Docker 不支持 docker compose 插件。")
+        eprint("请先安装 docker-compose-plugin。")
+        eprint(ret.stderr.strip())
+        sys.exit(1)
+    print(ret.stdout.strip())
+
+
+def check_docker_permission() -> None:
+    ret = subprocess.run(
+        ["docker", "info"],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    if ret.returncode != 0:
+        eprint("错误：当前用户没有 Docker 权限，或者 Docker 未启动。")
+        eprint("可尝试：")
+        eprint("  sudo systemctl enable --now docker")
+        eprint("  sudo usermod -aG docker $USER")
+        eprint("然后重新登录 SSH。")
+        eprint(ret.stderr.strip())
+        sys.exit(1)
+    print("Docker 权限检查通过。")
+
+
+def check_required_ports() -> None:
+    for p in (80, 443):
+        if not is_port_free(p, host="127.0.0.1"):
+            eprint(f"警告：本机端口 {p} 可能已被占用，后续 docker compose 可能启动失败。")
+            eprint("如果你已经有宝塔/Nginx/Caddy 占用 80/443，需要先停掉，或改成接入现有反代。")
+
+
+def get_latest_frp_version() -> str:
+    url = "https://api.github.com/repos/fatedier/frp/releases/latest"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "frp-stack-deploy-script"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            tag = data.get("tag_name")
+            if isinstance(tag, str) and tag.startswith("v"):
+                print(f"检测到 frp 最新版本：{tag}")
+                return tag
+    except Exception as exc:
+        print(f"获取 frp 最新版本失败，使用默认版本 {DEFAULT_FRP_VERSION}，原因：{exc}")
+    return DEFAULT_FRP_VERSION
+
+
+def get_public_ip() -> str:
+    configured_ip = config.VPS_PUBLIC_IP.strip()
+    if configured_ip:
+        return validate_ipv4(configured_ip)
+
+    for url in ["https://api.ipify.org?format=json", "https://ifconfig.co/json"]:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "frp-stack-deploy-script"})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                ip = str(data.get("ip") or data.get("ip_addr") or "").strip()
+                if ip:
+                    ip = validate_ipv4(ip)
+                    print(f"检测到当前 VPS 公网 IP：{ip}")
+                    answer = prompt_input("VPS_PUBLIC_IP 为空，是否使用该公网 IP 继续？[Y/n]：").strip().lower()
+                    if answer and answer not in {"y", "yes"}:
+                        print("用户取消部署。")
+                        sys.exit(0)
+                    return ip
+        except Exception:
+            pass
+
+    ip = prompt_input("自动获取公网 IP 失败，请手动输入 VPS 公网 IPv4：").strip()
+    return validate_ipv4(ip)
