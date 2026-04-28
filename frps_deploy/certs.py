@@ -35,8 +35,8 @@ def verify_http_challenge(domain: str) -> None:
         try:
             local_body = _read_url(local_url, host_header=domain, timeout=8)
         except Exception as exc:
-            ps = capture(["docker", "compose", "ps"], check=False)
-            logs = capture(["docker", "compose", "logs", "--tail", "80", "nginx"], check=False)
+            ps = capture(["docker", "compose", "ps"], cwd=BASE_DIR, check=False)
+            logs = capture(["docker", "compose", "logs", "--tail", "80", "nginx"], cwd=BASE_DIR, check=False)
             detail = [
                 f"本机 Nginx HTTP-01 自检失败：无法访问 {local_url}，Host={domain}，原因：{exc}",
                 "这通常表示 nginx 容器未启动、80 端口未映射成功，或 nginx 配置加载失败。",
@@ -103,9 +103,9 @@ def issue_certs(ctx: DeployContext) -> None:
 def docker_compose_up_initial() -> None:
     run(["docker", "compose", "up", "-d", "frps", "nginx"], cwd=BASE_DIR)
     time.sleep(2)
-    ret = capture(["docker", "compose", "ps", "nginx"], check=False)
+    ret = capture(["docker", "compose", "ps", "nginx"], cwd=BASE_DIR, check=False)
     if ret.returncode != 0:
-        logs = capture(["docker", "compose", "logs", "--tail", "80", "nginx"], check=False)
+        logs = capture(["docker", "compose", "logs", "--tail", "80", "nginx"], cwd=BASE_DIR, check=False)
         raise RuntimeError(
             "nginx 容器启动后状态检查失败。\n"
             f"[docker compose ps nginx]\n{ret.stdout}{ret.stderr}\n"

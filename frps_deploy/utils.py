@@ -21,8 +21,15 @@ def run(cmd: List[str], check: bool = True, cwd: Path | None = None) -> subproce
     return subprocess.run(cmd, check=check, cwd=str(cwd) if cwd else None, text=True)
 
 
-def capture(cmd: List[str], check: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, check=check, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+def capture(cmd: List[str], check: bool = True, cwd: Path | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        cmd,
+        check=check,
+        cwd=str(cwd) if cwd else None,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
 
 
 def command_exists(name: str) -> bool:
