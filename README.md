@@ -56,8 +56,17 @@ cp frps-config.json.example frps-config.json   # 若不存在，首次运行脚�
 # 仅生成配置文件，不启动
 python3 vps-install-frps.py
 
-# 生成配置 + 申请证书 + 启动所有容器
-python3 vps-install-frps.py --run
+# 生成配置 + 申请证书 + 启动所有容器（等价：--run）
+python3 vps-install-frps.py -r
+
+# 仅编译 frps-status-app 镜像（等价：--build）
+python3 vps-install-frps.py -b
+
+# 清理脚本生成的容器、镜像和目录
+python3 vps-install-frps.py --clean
+
+# 指定配置文件
+python3 vps-install-frps.py -c /path/to/frps-config.json -r
 ```
 
 脚本会在当前目录生成：
@@ -66,13 +75,45 @@ python3 vps-install-frps.py --run
 frps/
   docker-compose.yml
   frps.toml
+  nginx/conf.d/
   certbot/
 frpc/
   docker-compose.yml
   frpc.toml
+frps-status-app/.env
+frps-status-app/data/
 ```
 
 将 `frpc/` 目录复制到内网机器，运行 `docker compose up -d` 即可连接。
+
+### 3. 访问方式
+
+HTTP 模式默认只通过 Nginx 域名入口访问：
+
+```text
+https://<alias>.<root_domain>
+```
+
+如果某个 HTTP 服务配置了 `"expose_http_port": true`，脚本会额外开放调试入口：
+
+```text
+<VPS_IP>:<services[].port>
+```
+
+TCP 模式服务始终开放：
+
+```text
+<VPS_IP>:<services[].port>
+```
+
+状态面板启用时，部署完成后会输出两类地址：
+
+```text
+http://127.0.0.1:<status_app_port>
+https://<alias>.<root_domain>/_frps-status/
+```
+
+`status_app_enabled: false` 时不会生成 Nginx 状态面板反代，也不会启动 `frps-status-app`。
 
 ---
 
@@ -112,6 +153,8 @@ cp .env.example .env
 | `POLL_SECONDS` | `60` | 数据轮询间隔（秒） |
 
 ### Docker 部署（推荐）
+
+通常由 `vps-install-frps.py --run` 自动写入 `.env` 并启动。单独部署时：
 
 ```bash
 cd frps-status-app
