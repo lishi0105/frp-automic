@@ -24,6 +24,8 @@ cp frps-config.json.example frps-config.json   # 若不存在，首次运行脚�
 | `root_domain` | 根域名，如 `example.com` |
 | `vps_public_ip` | VPS 公网 IP（留空则自动获取） |
 | `cert_email` | Certbot 注册邮箱 |
+| `frps_server_port` | frps serverPort；小于 `1000` 或留空时随机生成 |
+| `frps_token` | frps 认证 token；留空时随机生成 |
 | `dns_provider` | DNS 解析方式：`manual` 或 `cloudflare` |
 | `cf_api_token` | Cloudflare API Token（仅 cloudflare 模式需要） |
 | `services` | 服务列表，见下方说明 |

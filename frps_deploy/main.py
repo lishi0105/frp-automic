@@ -89,7 +89,14 @@ def prompt_user() -> tuple[str, str]:
 
 def build_context(root_domain: str, email: str) -> DeployContext:
     generated_ports: set = set(all_remote_ports())
-    bind_port      = random_free_port_excluding(generated_ports)
+    if config.FRPS_SERVER_PORT >= 1000:
+        if config.FRPS_SERVER_PORT in generated_ports:
+            raise ValueError(f"frps_server_port 与 services port 冲突：{config.FRPS_SERVER_PORT}")
+        bind_port = config.FRPS_SERVER_PORT
+        generated_ports.add(bind_port)
+    else:
+        bind_port = random_free_port_excluding(generated_ports)
+
     dashboard_port = random_free_port_excluding(generated_ports)
     status_port    = random_free_port_excluding(generated_ports)
     return DeployContext(
@@ -99,7 +106,7 @@ def build_context(root_domain: str, email: str) -> DeployContext:
         bind_port=bind_port,
         dashboard_port=dashboard_port,
         status_port=status_port,
-        token=random_password(32),
+        token=config.FRPS_TOKEN or random_password(32),
         dashboard_user="admin",
         dashboard_password=random_password(16),
         suffix=random_letters(16),

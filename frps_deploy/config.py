@@ -21,6 +21,8 @@ CONFIG: Dict[str, Any] = {}
 SERVICES: List[Dict[str, Any]] = []
 ROOT_DOMAIN = ""
 CERT_EMAIL  = ""
+FRPS_SERVER_PORT = 0
+FRPS_TOKEN = ""
 
 
 def clone_default_config() -> Dict[str, Any]:
@@ -58,7 +60,7 @@ def load_config_file() -> Dict[str, Any]:
 
 
 def load_runtime_config() -> None:
-    global CONFIG, SERVICES, ROOT_DOMAIN, CERT_EMAIL
+    global CONFIG, SERVICES, ROOT_DOMAIN, CERT_EMAIL, FRPS_SERVER_PORT, FRPS_TOKEN
 
     CONFIG = load_config_file()
 
@@ -69,3 +71,10 @@ def load_runtime_config() -> None:
     SERVICES    = services
     ROOT_DOMAIN = str(CONFIG.get("root_domain") or CONFIG.get("domain") or "").strip().lower()
     CERT_EMAIL  = str(CONFIG.get("cert_email") or CONFIG.get("certificate_email") or CONFIG.get("email") or "").strip()
+    FRPS_TOKEN  = str(CONFIG.get("frps_token") or CONFIG.get("token") or "").strip()
+
+    raw_server_port = CONFIG.get("frps_server_port", CONFIG.get("server_port", CONFIG.get("bind_port", 0)))
+    try:
+        FRPS_SERVER_PORT = int(raw_server_port or 0)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"frps_server_port 必须是整数：{raw_server_port!r}") from exc
