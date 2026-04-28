@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"frps-status-app/src/model"
+	"frps-status-app.local/status/src/model"
 )
 
 func Send(settings model.PublicSettings, password, subject, body string) error {

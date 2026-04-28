@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"frps-status-app/src/model"
+	"frps-status-app.local/status/src/model"
 )
 
 type Store struct {

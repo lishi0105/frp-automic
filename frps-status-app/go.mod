@@ -1,4 +1,4 @@
-module frps-status-app
+module frps-status-app.local/status
 
 go 1.22
 

@@ -11,10 +11,10 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"frps-status-app/src/config"
-	"frps-status-app/src/frps"
-	"frps-status-app/src/server"
-	"frps-status-app/src/store"
+	"frps-status-app.local/status/src/config"
+	"frps-status-app.local/status/src/frps"
+	"frps-status-app.local/status/src/server"
+	"frps-status-app.local/status/src/store"
 )
 
 func main() {

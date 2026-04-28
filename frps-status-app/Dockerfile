@@ -7,6 +7,8 @@ RUN npm run build
 # outDir: '../web' -> /workspace/web
 
 FROM golang:1.22-alpine AS go-build
+ENV GO111MODULE=on
+ENV GOPROXY=https://goproxy.cn,direct
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download

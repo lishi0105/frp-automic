@@ -18,11 +18,11 @@ import (
 	"sync"
 	"time"
 
-	"frps-status-app/src/config"
-	"frps-status-app/src/frps"
-	"frps-status-app/src/mail"
-	"frps-status-app/src/model"
-	"frps-status-app/src/store"
+	"frps-status-app.local/status/src/config"
+	"frps-status-app.local/status/src/frps"
+	"frps-status-app.local/status/src/mail"
+	"frps-status-app.local/status/src/model"
+	"frps-status-app.local/status/src/store"
 )
 
 type App struct {
