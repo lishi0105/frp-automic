@@ -27,10 +27,6 @@ STATUS_APP_DIR      = SCRIPT_DIR / "frps-status-app"
 STATUS_APP_ENV_FILE = STATUS_APP_DIR / ".env"
 STATUS_APP_DATA_DIR = STATUS_APP_DIR / "data"
 
-DNS_PROVIDER_MANUAL     = "manual"
-DNS_PROVIDER_CLOUDFLARE = "cloudflare"
-SUPPORTED_DNS_PROVIDERS = {DNS_PROVIDER_MANUAL, DNS_PROVIDER_CLOUDFLARE}
-
 DEFAULT_SERVICES: List[Dict[str, Any]] = [
     {"alias": "emby",      "comment": "Emby 媒体服务", "mode": "http", "port": 7096, "local_port": 7096, "local_ip": "127.0.0.1"},
     {"alias": "gitlab",    "comment": "GitLab 服务",   "mode": "http", "port": 5080},
@@ -41,9 +37,5 @@ DEFAULT_SERVICES: List[Dict[str, Any]] = [
 DEFAULT_CONFIG: Dict[str, Any] = {
     "root_domain": "",
     "cert_email": "",
-    "dns_provider": "",
-    "cf_api_token": "",
-    "cf_zone_id": "",
-    "vps_public_ip": "",
     "services": DEFAULT_SERVICES,
 }

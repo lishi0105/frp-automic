@@ -4,12 +4,21 @@ from __future__ import annotations
 import secrets
 import time
 import urllib.request
+from typing import Optional
 
 from frps_deploy.console import print
 from frps_deploy.constants import BASE_DIR, CERTBOT_WWW_DIR, STATUS_APP_DIR
 from frps_deploy.models import DeployContext
 from frps_deploy.services import http_services
-from frps_deploy.utils import run
+from frps_deploy.utils import capture, run
+
+
+def _read_url(url: str, host_header: Optional[str] = None, timeout: int = 15) -> str:
+    req = urllib.request.Request(url)
+    if host_header:
+        req.add_header("Host", host_header)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8", errors="replace").strip()
 
 
 def verify_http_challenge(domain: str) -> None:
@@ -19,12 +28,43 @@ def verify_http_challenge(domain: str) -> None:
     token_file = token_dir / token
     token_file.write_text(token, encoding="utf-8")
 
-    url = f"http://{domain}/.well-known/acme-challenge/{token}"
+    path = f"/.well-known/acme-challenge/{token}"
+    local_url = f"http://127.0.0.1{path}"
+    public_url = f"http://{domain}{path}"
     try:
-        with urllib.request.urlopen(url, timeout=15) as resp:
-            body = resp.read().decode("utf-8", errors="replace").strip()
+        try:
+            local_body = _read_url(local_url, host_header=domain, timeout=8)
+        except Exception as exc:
+            ps = capture(["docker", "compose", "ps"], check=False)
+            logs = capture(["docker", "compose", "logs", "--tail", "80", "nginx"], check=False)
+            detail = [
+                f"本机 Nginx HTTP-01 自检失败：无法访问 {local_url}，Host={domain}，原因：{exc}",
+                "这通常表示 nginx 容器未启动、80 端口未映射成功，或 nginx 配置加载失败。",
+            ]
+            if ps.stdout.strip():
+                detail.append("\n[docker compose ps]\n" + ps.stdout.strip())
+            if ps.stderr.strip():
+                detail.append("\n[docker compose ps stderr]\n" + ps.stderr.strip())
+            if logs.stdout.strip():
+                detail.append("\n[nginx logs]\n" + logs.stdout.strip())
+            if logs.stderr.strip():
+                detail.append("\n[nginx logs stderr]\n" + logs.stderr.strip())
+            raise RuntimeError("\n".join(detail)) from exc
+
+        if local_body != token:
+            raise RuntimeError(
+                f"本机 Nginx HTTP-01 自检失败：{local_url} 返回内容不匹配，"
+                f"Host={domain}，实际返回：{local_body[:120]!r}"
+            )
+
+        body = _read_url(public_url, timeout=15)
     except Exception as exc:
-        raise RuntimeError(f"HTTP-01 自检失败：无法访问 {url}，原因：{exc}") from exc
+        if isinstance(exc, RuntimeError):
+            raise
+        raise RuntimeError(
+            f"HTTP-01 公网自检失败：无法访问 {public_url}，原因：{exc}\n"
+            "请检查：域名 A 记录是否指向当前 VPS、公网 80 端口是否放行、云厂商安全组/防火墙是否允许 TCP 80。"
+        ) from exc
     finally:
         try:
             token_file.unlink()
@@ -32,7 +72,7 @@ def verify_http_challenge(domain: str) -> None:
             pass
 
     if body != token:
-        raise RuntimeError(f"HTTP-01 自检失败：{url} 返回内容不匹配，实际返回：{body[:120]!r}")
+        raise RuntimeError(f"HTTP-01 公网自检失败：{public_url} 返回内容不匹配，实际返回：{body[:120]!r}")
 
 
 def issue_certs(ctx: DeployContext) -> None:
@@ -62,6 +102,15 @@ def issue_certs(ctx: DeployContext) -> None:
 
 def docker_compose_up_initial() -> None:
     run(["docker", "compose", "up", "-d", "frps", "nginx"], cwd=BASE_DIR)
+    time.sleep(2)
+    ret = capture(["docker", "compose", "ps", "nginx"], check=False)
+    if ret.returncode != 0:
+        logs = capture(["docker", "compose", "logs", "--tail", "80", "nginx"], check=False)
+        raise RuntimeError(
+            "nginx 容器启动后状态检查失败。\n"
+            f"[docker compose ps nginx]\n{ret.stdout}{ret.stderr}\n"
+            f"[nginx logs]\n{logs.stdout}{logs.stderr}"
+        )
 
 
 def docker_compose_restart_nginx() -> None:

@@ -14,25 +14,16 @@ FRPS + Nginx + Certbot 一体化部署脚本
 6. 支持 local_port：
    - port       表示 VPS/frps 侧端口，也就是 frpc 的 remotePort；
    - local_port 表示内网真实服务端口，缺失时默认等于 port；
-7. 支持 DNS 自动解析：
-   - manual     ：手动解析；
-   - cloudflare ：通过 Cloudflare API 自动创建/更新 A 记录；
-8. 分别生成 frps/docker-compose.yml、frps/frps.toml、nginx 配置，以及 frpc/docker-compose.yml、frpc/frpc.toml；
-9. 使用 certbot webroot 模式申请证书，并启动自动续期容器；
-10. 容器名格式：服务名 + '_' + 16 位随机英文大小写后缀。
+7. 分别生成 frps/docker-compose.yml、frps/frps.toml、nginx 配置，以及 frpc/docker-compose.yml、frpc/frpc.toml；
+8. 使用 certbot webroot 模式申请证书，并启动自动续期容器；
+9. 容器名格式：服务名 + '_' + 16 位随机英文大小写后缀。
 
 使用前提：
 - 当前机器已经安装 Docker Engine 和 docker compose 插件；
 - 当前用户可以执行 docker 命令；
 - VPS 的 80/443 端口可公网访问；
-- HTTP 模式服务的域名已经解析到当前 VPS 公网 IP；
-- frpc 客户端需要使用脚本输出的 bindPort 和 token。
-
-Cloudflare 自动解析用法：
-- 推荐使用 API Token，不要使用 Global API Key；
-- Token 至少需要：Zone:Read、DNS:Edit；
-- 将 cf_api_token 填入 frps-config.json；
-- 可选：将 vps_public_ip 填入 frps-config.json，留空则自动获取后确认。
+- HTTP 模式服务的域名请自行将 A 记录解析到 VPS 公网 IP（DNS 由外部自行管理）；
+- frpc 客户端需要使用脚本输出的 bindPort 和 token，将 serverAddr 替换为实际 VPS 公网 IP。
 
 配置文件：
 - 默认读取脚本同目录 frps-config.json；

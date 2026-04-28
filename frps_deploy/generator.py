@@ -59,7 +59,7 @@ def generate_frps_toml(ctx: DeployContext) -> None:
 
 def generate_frpc_toml(ctx: DeployContext) -> None:
     lines = [
-        f'serverAddr = "{ctx.public_ip}"',
+        'serverAddr = "<你的VPS公网IP>"',
         f"serverPort = {ctx.bind_port}",
         "",
         "[auth]",
@@ -281,8 +281,6 @@ def write_generated_info(ctx: DeployContext) -> None:
     lines = [
         f"ROOT_DOMAIN={ctx.root_domain}",
         f"EMAIL={ctx.email}",
-        f"DNS_PROVIDER={ctx.dns_provider}",
-        f"VPS_PUBLIC_IP={ctx.public_ip}",
         f"FRP_VERSION={ctx.frp_version}",
         f"FRPS_BIND_PORT={ctx.bind_port}",
         f"FRPS_DASHBOARD_PORT={ctx.dashboard_port}",
@@ -304,7 +302,7 @@ def write_generated_info(ctx: DeployContext) -> None:
     lines += ["", "# TCP services"]
     for item in tcp_services():
         lines.append(
-            f"TCP_{str(item['alias']).upper()}={ctx.public_ip}:{remote_port(item)} "
+            f"TCP_{str(item['alias']).upper()}=<VPS_IP>:{remote_port(item)} "
             f"local={local_ip(item)}:{local_port(item)}"
         )
     GENERATED_INFO_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")

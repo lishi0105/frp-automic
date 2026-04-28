@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
@@ -12,16 +11,13 @@ from frps_deploy.certs import (
     docker_compose_up_status_app, docker_compose_restart_nginx,
     issue_certs,
 )
+from frps_deploy.clean import clean_all
 from frps_deploy.config import ConfigFileCreated, load_runtime_config
-from frps_deploy.console import print, eprint
-from frps_deploy.constants import (
-    DEFAULT_CONFIG_FILE, DNS_PROVIDER_CLOUDFLARE, DNS_PROVIDER_MANUAL,
-    STATUS_APP_DIR, SUPPORTED_DNS_PROVIDERS,
-)
-from frps_deploy.dns import setup_dns
+from frps_deploy.console import print, eprint, prompt_input
+from frps_deploy.constants import DEFAULT_CONFIG_FILE, STATUS_APP_DIR
 from frps_deploy.docker_env import (
     check_docker_compose, check_docker_permission, check_required_ports,
-    get_latest_frp_version, get_public_ip,
+    get_latest_frp_version,
 )
 from frps_deploy.generator import (
     ensure_dirs, generate_frpc_compose, generate_frpc_toml,
@@ -31,12 +27,10 @@ from frps_deploy.generator import (
 )
 from frps_deploy.models import DeployContext
 from frps_deploy.output import print_generate_only_result, print_result
-from frps_deploy.services import all_remote_ports, http_services, validate_services
+from frps_deploy.services import all_remote_ports, validate_services
 from frps_deploy.utils import (
     random_free_port_excluding, random_letters, random_password, run,
 )
-from frps_deploy.clean import clean_all
-from frps_deploy.console import prompt_input
 
 
 def parse_args() -> argparse.Namespace:
@@ -49,7 +43,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-r", "--run",
         action="store_true",
-        help="生成相关文件后继续执行 DNS 检查、证书申请和容器启动；默认只生成文件",
+        help="生成相关文件后继续执行证书申请和容器启动；默认只生成文件",
     )
     parser.add_argument(
         "-b", "--build",
@@ -71,7 +65,7 @@ def set_config_file(path_text: str) -> None:
     config.CONFIG_FILE = path.resolve()
 
 
-def prompt_user():
+def prompt_user() -> tuple[str, str]:
     root_domain = config.ROOT_DOMAIN
     if root_domain:
         print(f"使用配置文件中的主域名：{root_domain}")
@@ -90,38 +84,10 @@ def prompt_user():
         eprint("邮箱格式不正确。")
         sys.exit(1)
 
-    configured_default_provider = DNS_PROVIDER_CLOUDFLARE if config.CF_API_TOKEN.strip() else DNS_PROVIDER_MANUAL
-    configured_provider = str(config.CONFIG.get("dns_provider") or "").strip().lower()
-    default_provider = (
-        configured_provider
-        or os.getenv("DNS_PROVIDER", configured_default_provider).strip().lower()
-        or configured_default_provider
-    )
-    if default_provider not in SUPPORTED_DNS_PROVIDERS:
-        default_provider = DNS_PROVIDER_MANUAL
-
-    if configured_provider:
-        provider = default_provider
-        print(f"使用配置文件中的 DNS 解析方式：{provider}")
-    else:
-        provider = (
-            prompt_input(
-                f"请选择 DNS 解析方式 [{DNS_PROVIDER_MANUAL}/{DNS_PROVIDER_CLOUDFLARE}]，默认 {default_provider}："
-            ).strip().lower() or default_provider
-        )
-
-    if provider not in SUPPORTED_DNS_PROVIDERS:
-        eprint(f"不支持的 DNS 解析方式：{provider}")
-        sys.exit(1)
-
-    return root_domain, email, provider
+    return root_domain, email
 
 
-def build_context(root_domain: str, email: str, dns_provider: str) -> DeployContext:
-    public_ip = (
-        get_public_ip() if http_services()
-        else (config.VPS_PUBLIC_IP.strip() or os.getenv("VPS_PUBLIC_IP", "你的VPS公网IP"))
-    )
+def build_context(root_domain: str, email: str) -> DeployContext:
     generated_ports: set = set(all_remote_ports())
     bind_port      = random_free_port_excluding(generated_ports)
     dashboard_port = random_free_port_excluding(generated_ports)
@@ -129,8 +95,6 @@ def build_context(root_domain: str, email: str, dns_provider: str) -> DeployCont
     return DeployContext(
         root_domain=root_domain,
         email=email,
-        dns_provider=dns_provider,
-        public_ip=public_ip,
         frp_version=get_latest_frp_version(),
         bind_port=bind_port,
         dashboard_port=dashboard_port,
@@ -199,8 +163,8 @@ def main() -> None:
         eprint(f"配置错误：{exc}")
         sys.exit(1)
 
-    root_domain, email, dns_provider = prompt_user()
-    ctx = build_context(root_domain, email, dns_provider)
+    root_domain, email = prompt_user()
+    ctx = build_context(root_domain, email)
     generate_files(ctx)
 
     if not args.run:
@@ -210,8 +174,6 @@ def main() -> None:
     check_docker_compose()
     check_docker_permission()
     check_required_ports()
-
-    setup_dns(ctx)
 
     print("\n启动 frps + nginx，用于证书 HTTP 验证...")
     docker_compose_up_initial()

@@ -1,4 +1,4 @@
-"""Docker 环境检查、frp 版本获取、公网 IP 获取。"""
+"""Docker 环境检查、frp 版本获取。"""
 from __future__ import annotations
 
 import json
@@ -6,10 +6,9 @@ import subprocess
 import sys
 import urllib.request
 
-from frps_deploy import config
-from frps_deploy.console import print, eprint, prompt_input
+from frps_deploy.console import print, eprint
 from frps_deploy.constants import DEFAULT_FRP_VERSION
-from frps_deploy.utils import command_exists, is_port_free, validate_ipv4
+from frps_deploy.utils import command_exists, is_port_free
 
 
 def check_docker_compose() -> None:
@@ -64,29 +63,3 @@ def get_latest_frp_version() -> str:
     except Exception as exc:
         print(f"获取 frp 最新版本失败，使用默认版本 {DEFAULT_FRP_VERSION}，原因：{exc}")
     return DEFAULT_FRP_VERSION
-
-
-def get_public_ip() -> str:
-    configured_ip = config.VPS_PUBLIC_IP.strip()
-    if configured_ip:
-        return validate_ipv4(configured_ip)
-
-    for url in ["https://api.ipify.org?format=json", "https://ifconfig.co/json"]:
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "frp-stack-deploy-script"})
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                ip = str(data.get("ip") or data.get("ip_addr") or "").strip()
-                if ip:
-                    ip = validate_ipv4(ip)
-                    print(f"检测到当前 VPS 公网 IP：{ip}")
-                    answer = prompt_input("VPS_PUBLIC_IP 为空，是否使用该公网 IP 继续？[Y/n]：").strip().lower()
-                    if answer and answer not in {"y", "yes"}:
-                        print("用户取消部署。")
-                        sys.exit(0)
-                    return ip
-        except Exception:
-            pass
-
-    ip = prompt_input("自动获取公网 IP 失败，请手动输入 VPS 公网 IPv4：").strip()
-    return validate_ipv4(ip)
