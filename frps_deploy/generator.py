@@ -104,9 +104,10 @@ def generate_frpc_toml(ctx: DeployContext) -> None:
 
 
 def generate_frps_compose(ctx: DeployContext) -> None:
+    dashboard_bind = "" if config.FRPS_DASHBOARD_HTTP else "127.0.0.1:"
     port_lines = [
         f'      - "{ctx.bind_port}:{ctx.bind_port}/tcp"',
-        f'      - "127.0.0.1:{ctx.dashboard_port}:{ctx.dashboard_port}/tcp"',
+        f'      - "{dashboard_bind}{ctx.dashboard_port}:{ctx.dashboard_port}/tcp"',
     ] + [f'      - "{p}:{p}/tcp"' for p in tcp_remote_ports()]
 
     for p in exposed_http_remote_ports():
@@ -307,7 +308,7 @@ def write_status_app_env(ctx: DeployContext) -> None:
     STATUS_APP_DIR.mkdir(parents=True, exist_ok=True)
     STATUS_APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"LISTEN=127.0.0.1:{ctx.status_port}",
+        f"LISTEN={'0.0.0.0' if config.STATUS_APP_HTTP else '127.0.0.1'}:{ctx.status_port}",
         "DB_PATH=/data/frps-status.sqlite",
         "FRPS_HOST=127.0.0.1",
         f"FRPS_BIND_PORT={ctx.bind_port}",

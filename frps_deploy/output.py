@@ -49,7 +49,10 @@ def print_result(ctx: DeployContext) -> None:
             print(f"  https://{item['alias']}.{ctx.root_domain}    # {item.get('comment', '')}")
         if config.STATUS_APP_ENABLED:
             print("\n状态页：")
-            print(f"  http://127.0.0.1:{ctx.status_port}")
+            if config.STATUS_APP_HTTP:
+                print(f"  http://<VPS_IP>:{ctx.status_port}  （已开放公网，注意防火墙）")
+            else:
+                print(f"  http://127.0.0.1:{ctx.status_port}  （仅本机）")
             for item in http_services():
                 print(f"  https://{item['alias']}.{ctx.root_domain}/_frps-status/")
 
@@ -62,7 +65,10 @@ def print_result(ctx: DeployContext) -> None:
     print(f"  serverPort = {ctx.bind_port}")
     print(f"  auth.token = {ctx.token}")
     print("\nfrps dashboard：")
-    print(f"  仅 VPS 本机访问：http://127.0.0.1:{ctx.dashboard_port}")
+    if config.FRPS_DASHBOARD_HTTP:
+        print(f"  http://<VPS_IP>:{ctx.dashboard_port}  （已开放公网，注意防火墙）")
+    else:
+        print(f"  仅 VPS 本机访问：http://127.0.0.1:{ctx.dashboard_port}")
     print(f"  user     = {ctx.dashboard_user}")
     print(f"  password = {ctx.dashboard_password}")
     print("\n常用命令：")

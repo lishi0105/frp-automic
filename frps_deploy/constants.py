@@ -39,7 +39,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "cert_email": "",
     "frps_server_port": 0,
     "frps_token": "",
+    "frps_dashboard_http": False,
     "status_app_enabled": True,
     "status_app_port": 0,
+    "status_app_http": False,
     "services": DEFAULT_SERVICES,
 }
