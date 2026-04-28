@@ -59,6 +59,21 @@ def http_domains(root_domain: str) -> List[str]:
     return [f"{s['alias']}.{root_domain}" for s in http_services()]
 
 
+def dashboard_domain(root_domain: str) -> str:
+    return f"frps.{root_domain}"
+
+
+def status_domain(root_domain: str) -> str:
+    return f"status.{root_domain}"
+
+
+def managed_domains(root_domain: str) -> List[str]:
+    domains = http_domains(root_domain) + [dashboard_domain(root_domain)]
+    if config.STATUS_APP_ENABLED:
+        domains.append(status_domain(root_domain))
+    return domains
+
+
 def validate_services() -> None:
     aliases: set = set()
     ports: set = set()
@@ -69,6 +84,8 @@ def validate_services() -> None:
             raise ValueError("SERVICES 中存在空 alias")
         if alias in aliases:
             raise ValueError(f"SERVICES 中 alias 重复：{alias}")
+        if alias in {"frps", "status"}:
+            raise ValueError(f"SERVICES 中 alias 不能使用保留子域名：{alias}")
         aliases.add(alias)
 
         mode = mode_of(item)

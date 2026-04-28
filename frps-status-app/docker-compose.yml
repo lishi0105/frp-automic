@@ -5,11 +5,12 @@ services:
     image: frps-status:local
     container_name: frps_status
     restart: unless-stopped
-    network_mode: host
+    ports:
+      - "${STATUS_APP_BIND:-127.0.0.1}:${STATUS_APP_PORT:-28080}:8080"
     environment:
-      LISTEN: "${LISTEN:-127.0.0.1:28080}"
+      LISTEN: "${LISTEN:-0.0.0.0:8080}"
       DB_PATH: "${DB_PATH:-/data/frps-status.sqlite}"
-      FRPS_HOST: "${FRPS_HOST:-127.0.0.1}"
+      FRPS_HOST: "${FRPS_HOST:-frps}"
       FRPS_BIND_PORT: "${FRPS_BIND_PORT:-7000}"
       FRPS_DASHBOARD_PORT: "${FRPS_DASHBOARD_PORT:-7500}"
       FRPS_DASHBOARD_USER: "${FRPS_DASHBOARD_USER:-admin}"
@@ -22,3 +23,10 @@ services:
     volumes:
       - ./data:/data
       - ${FRPS_CERTBOT_CONF_DIR:-../frps/certbot/conf}:/etc/letsencrypt:ro
+    networks:
+      - frps_net
+
+networks:
+  frps_net:
+    external: true
+    name: frps_default

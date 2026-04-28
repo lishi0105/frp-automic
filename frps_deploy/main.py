@@ -14,10 +14,10 @@ from frps_deploy.certs import (
 from frps_deploy.clean import clean_all
 from frps_deploy.config import ConfigFileCreated, load_runtime_config
 from frps_deploy.console import print, eprint, prompt_input
-from frps_deploy.constants import DEFAULT_CONFIG_FILE, STATUS_APP_DIR
+from frps_deploy.constants import STATUS_APP_DIR
 from frps_deploy.docker_env import (
     check_docker_compose, check_docker_permission, check_required_ports,
-    get_latest_frp_version,
+    get_latest_frp_version, get_public_ip,
 )
 from frps_deploy.generator import (
     ensure_dirs, generate_frpc_compose, generate_frpc_toml,
@@ -30,6 +30,7 @@ from frps_deploy.output import print_generate_only_result, print_result
 from frps_deploy.services import all_remote_ports, validate_services
 from frps_deploy.utils import (
     random_free_port_excluding, random_letters, random_password, run,
+    validate_ipv4,
 )
 
 
@@ -37,8 +38,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="FRPS + Nginx + Certbot 自动部署脚本")
     parser.add_argument(
         "-c", "--config",
-        default=str(DEFAULT_CONFIG_FILE),
-        help=f"JSON 配置文件路径，默认：{DEFAULT_CONFIG_FILE}",
+        default=None,
+        help="JSON 配置文件路径，默认读取当前目录的 frps-config.json",
     )
     parser.add_argument(
         "-r", "--run",
@@ -58,8 +59,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def set_config_file(path_text: str) -> None:
-    path = Path(path_text).expanduser()
+def set_config_file(path_text: str | None) -> None:
+    path = Path(path_text).expanduser() if path_text else Path.cwd() / "frps-config.json"
     if not path.is_absolute():
         path = Path.cwd() / path
     config.CONFIG_FILE = path.resolve()
@@ -91,7 +92,7 @@ def build_context(root_domain: str, email: str) -> DeployContext:
     generated_ports: set = set(all_remote_ports())
     if config.FRPS_SERVER_PORT >= 1000:
         if config.FRPS_SERVER_PORT in generated_ports:
-            raise ValueError(f"frps_server_port 与 services port 冲突：{config.FRPS_SERVER_PORT}")
+            raise ValueError(f"frps.server_port 与 services port 冲突：{config.FRPS_SERVER_PORT}")
         bind_port = config.FRPS_SERVER_PORT
         generated_ports.add(bind_port)
     else:
@@ -102,14 +103,17 @@ def build_context(root_domain: str, email: str) -> DeployContext:
         status_port = 0
     elif config.STATUS_APP_PORT >= 1000:
         if config.STATUS_APP_PORT in generated_ports:
-            raise ValueError(f"status_app_port 与已使用端口冲突：{config.STATUS_APP_PORT}")
+            raise ValueError(f"status.port 与已使用端口冲突：{config.STATUS_APP_PORT}")
         status_port = config.STATUS_APP_PORT
         generated_ports.add(status_port)
     else:
         status_port = random_free_port_excluding(generated_ports)
+    vps_public_ip = validate_ipv4(config.VPS_PUBLIC_IP) if config.VPS_PUBLIC_IP else validate_ipv4(get_public_ip())
+
     return DeployContext(
         root_domain=root_domain,
         email=email,
+        vps_public_ip=vps_public_ip,
         frp_version=get_latest_frp_version(),
         bind_port=bind_port,
         dashboard_port=dashboard_port,
@@ -168,6 +172,10 @@ def main() -> None:
     print("=== FRPS + Nginx + Certbot 自动部署脚本 ===")
     set_config_file(args.config)
     print(f"使用配置文件：{config.CONFIG_FILE}")
+    if args.config is None and not config.CONFIG_FILE.exists():
+        eprint(f"配置文件不存在：{config.CONFIG_FILE}")
+        eprint("请先创建 frps-config.json，或使用 -c/--config 指定配置文件。")
+        sys.exit(1)
 
     try:
         load_runtime_config()
@@ -180,7 +188,11 @@ def main() -> None:
         sys.exit(1)
 
     root_domain, email = prompt_user()
-    ctx = build_context(root_domain, email)
+    try:
+        ctx = build_context(root_domain, email)
+    except Exception as exc:
+        eprint(f"配置错误：{exc}")
+        sys.exit(1)
     generate_files(ctx)
 
     if not args.run:
@@ -200,14 +212,14 @@ def main() -> None:
     print("\n生成正式 HTTPS Nginx 反代配置...")
     generate_https_nginx_confs(ctx)
 
+    if config.STATUS_APP_ENABLED:
+        print("\n编译并启动状态服务工程...")
+        docker_compose_up_status_app()
+
     print("\n重启 Nginx 应用 HTTPS 配置...")
     docker_compose_restart_nginx()
 
     print("\n启动 certbot 自动续期容器...")
     docker_compose_up_all()
-
-    if config.STATUS_APP_ENABLED:
-        print("\n编译并启动状态服务工程...")
-        docker_compose_up_status_app()
 
     print_result(ctx)

@@ -10,14 +10,15 @@ from frps_deploy.constants import (
 )
 from frps_deploy.models import DeployContext
 from frps_deploy.services import (
-    http_services, local_ip, local_port, remote_port, tcp_services,
+    dashboard_domain, http_services, local_ip, local_port, remote_port,
+    status_domain, tcp_services,
 )
 from frps_deploy.utils import toml_str
 
 
 def print_frpc_config(ctx: DeployContext) -> None:
     print("\n================ frpc.toml 示例 ================")
-    print('serverAddr = "<你的VPS公网IP>"')
+    print(f"serverAddr = {toml_str(ctx.vps_public_ip)}")
     print(f"serverPort = {ctx.bind_port}")
     print("")
     print('auth.method = "token"')
@@ -47,28 +48,29 @@ def print_result(ctx: DeployContext) -> None:
         print("\nHTTPS 反代访问地址：")
         for item in http_services():
             print(f"  https://{item['alias']}.{ctx.root_domain}    # {item.get('comment', '')}")
-        if config.STATUS_APP_ENABLED:
-            print("\n状态页：")
-            if config.STATUS_APP_HTTP:
-                print(f"  http://<VPS_IP>:{ctx.status_port}  （已开放公网，注意防火墙）")
-            else:
-                print(f"  http://127.0.0.1:{ctx.status_port}  （仅本机）")
-            for item in http_services():
-                print(f"  https://{item['alias']}.{ctx.root_domain}/_frps-status/")
+
+    if config.STATUS_APP_ENABLED:
+        print("\n状态页：")
+        if config.STATUS_APP_HTTP:
+            print(f"  http://{ctx.vps_public_ip}:{ctx.status_port}  （已开放公网，注意防火墙）")
+        else:
+            print(f"  http://127.0.0.1:{ctx.status_port}  （仅本机）")
+        print(f"  https://{status_domain(ctx.root_domain)}")
 
     if tcp_services():
         print("\nTCP 直通端口：")
         for item in tcp_services():
-            print(f"  {item.get('comment', item['alias'])}: <VPS_IP>:{remote_port(item)} -> {local_ip(item)}:{local_port(item)}")
+            print(f"  {item.get('comment', item['alias'])}: {ctx.vps_public_ip}:{remote_port(item)} -> {local_ip(item)}:{local_port(item)}")
 
     print("\nfrps 客户端连接信息：")
     print(f"  serverPort = {ctx.bind_port}")
     print(f"  auth.token = {ctx.token}")
     print("\nfrps dashboard：")
     if config.FRPS_DASHBOARD_HTTP:
-        print(f"  http://<VPS_IP>:{ctx.dashboard_port}  （已开放公网，注意防火墙）")
+        print(f"  http://{ctx.vps_public_ip}:{ctx.dashboard_port}  （已开放公网，注意防火墙）")
     else:
         print(f"  仅 VPS 本机访问：http://127.0.0.1:{ctx.dashboard_port}")
+    print(f"  https://{dashboard_domain(ctx.root_domain)}")
     print(f"  user     = {ctx.dashboard_user}")
     print(f"  password = {ctx.dashboard_password}")
     print("\n常用命令：")
@@ -102,15 +104,26 @@ def print_generate_only_result(ctx: DeployContext) -> None:
     if config.STATUS_APP_ENABLED:
         print(f"状态服务工程：{STATUS_APP_DIR}")
         print(f"状态服务环境：{STATUS_APP_ENV_FILE}")
-        print(f"状态页本机 HTTP：http://127.0.0.1:{ctx.status_port}")
+        if config.STATUS_APP_HTTP:
+            print(f"状态页 HTTP：http://{ctx.vps_public_ip}:{ctx.status_port}")
+        else:
+            print(f"状态页本机 HTTP：http://127.0.0.1:{ctx.status_port}")
     print(f"frpc 配置：{FRPC_TOML_FILE}")
     print(f"frpc Docker Compose：{FRPC_COMPOSE_FILE}")
     print("\n本次未执行启动、证书申请。")
-    if config.STATUS_APP_ENABLED and http_services():
+    print("frps dashboard 部署后访问：")
+    print(f"  https://{dashboard_domain(ctx.root_domain)}")
+    if config.FRPS_DASHBOARD_HTTP:
+        print(f"  http://{ctx.vps_public_ip}:{ctx.dashboard_port}")
+    else:
+        print(f"  http://127.0.0.1:{ctx.dashboard_port}")
+    if config.STATUS_APP_ENABLED:
         print("状态页部署后访问：")
-        print(f"  http://127.0.0.1:{ctx.status_port}")
-        for item in http_services():
-            print(f"  https://{item['alias']}.{ctx.root_domain}/_frps-status/")
+        print(f"  https://{status_domain(ctx.root_domain)}")
+        if config.STATUS_APP_HTTP:
+            print(f"  http://{ctx.vps_public_ip}:{ctx.status_port}")
+        else:
+            print(f"  http://127.0.0.1:{ctx.status_port}")
     print(f"需要继续执行部署启动时，请重新运行：")
     print(f"  vps-install-frps.py -c {config.CONFIG_FILE} -r")
     print_frpc_config(ctx)

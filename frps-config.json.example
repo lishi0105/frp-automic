@@ -1,0 +1,51 @@
+{
+  "root_domain": "",
+  "cert_email": "",
+  "vps_public_ip": "",
+  "frps": {
+    "server_port": 0,
+    "token": "",
+    "dashboard_http": false
+  },
+  "status": {
+    "enabled": true,
+    "port": 0,
+    "http": false
+  },
+  "dns_provider": "",
+  "cf_api_token": "",
+  "cf_zone_id": "",
+  "services": [
+    {
+      "alias": "emby",
+      "comment": "Emby 媒体服务",
+      "mode": "http",
+      "port": 7096,
+      "local_port": 8096,
+      "local_ip": "127.0.0.1",
+      "expose_http_port": false
+    },
+    {
+      "alias": "gitlab",
+      "comment": "GitLab 服务",
+      "mode": "http",
+      "port": 5080,
+      "expose_http_port": false
+    },
+    {
+      "alias": "speedtest",
+      "comment": "Speedtest 服务",
+      "mode": "http",
+      "port": 3010,
+      "expose_http_port": false
+    },
+    {
+      "alias": "gitlab_ssh",
+      "comment": "GitLab SSH",
+      "mode": "tcp",
+      "port": 5022,
+      "local_port": 22,
+      "local_ip": "127.0.0.1"
+    }
+  ]
+}

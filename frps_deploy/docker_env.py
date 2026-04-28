@@ -63,3 +63,22 @@ def get_latest_frp_version() -> str:
     except Exception as exc:
         print(f"获取 frp 最新版本失败，使用默认版本 {DEFAULT_FRP_VERSION}，原因：{exc}")
     return DEFAULT_FRP_VERSION
+
+
+def get_public_ip() -> str:
+    urls = [
+        "https://api.ipify.org",
+        "https://ifconfig.me/ip",
+        "https://ipv4.icanhazip.com",
+    ]
+    for url in urls:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "frp-stack-deploy-script"})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                ip = resp.read().decode("utf-8", errors="replace").strip()
+            if ip:
+                print(f"检测到 VPS 公网 IP：{ip}")
+                return ip
+        except Exception:
+            continue
+    raise RuntimeError("无法自动获取 VPS 公网 IP，请在 frps-config.json 中填写 vps_public_ip")

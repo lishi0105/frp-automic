@@ -14,28 +14,44 @@ FRP 服务端一体化部署与监控工具集。包含两个组件：
 复制并编辑配置文件：
 
 ```bash
-cp frps-config.json.example frps-config.json   # 若不存在，首次运行脚本会自动生成
+cp frps-config.json.example frps-config.json
 ```
+
+未指定 `-c/--config` 时，脚本读取当前目录的 `frps-config.json`；如果该文件不存在会直接报错。需要使用其他路径时通过 `-c/--config` 指定。
 
 `frps-config.json` 主要字段：
 
 | 字段 | 说明 |
 |------|------|
 | `root_domain` | 根域名，如 `example.com` |
-| `vps_public_ip` | VPS 公网 IP（留空则自动获取） |
+| `vps_public_ip` | VPS 公网 IP；留空时自动获取，并写入生成的 `frpc/frpc.toml` |
 | `cert_email` | Certbot 注册邮箱 |
-| `frps_server_port` | frps serverPort；小于 `1000` 或留空时随机生成 |
-| `frps_token` | frps 认证 token；留空时随机生成 |
-| `status_app_enabled` | 是否启用状态面板与 `/_frps-status/` 反代，默认启用 |
-| `status_app_port` | 状态面板本机监听端口；小于 `1000` 或留空时随机生成 |
+| `frps.server_port` | frps serverPort；小于 `1000` 或留空时随机生成 |
+| `frps.token` | frps 认证 token；留空时随机生成 |
+| `frps.dashboard_http` | 是否允许 frps dashboard 通过 `VPS_IP:dashboardPort` 公网直通，默认关闭 |
+| `status.enabled` | 是否启用状态面板与 `status.<root_domain>` 反代，默认启用 |
+| `status.port` | 状态面板本机 HTTP 端口；小于 `1000` 或留空时随机生成 |
+| `status.http` | 是否允许状态面板通过 `VPS_IP:status.port` 公网直通，默认关闭 |
 | `dns_provider` | DNS 解析方式：`manual` 或 `cloudflare` |
 | `cf_api_token` | Cloudflare API Token（仅 cloudflare 模式需要） |
 | `services` | 服务列表，见下方说明 |
+
+需要将所有 HTTP 服务域名，以及 `frps.<root_domain>`、`status.<root_domain>` 的 A 记录解析到 VPS 公网 IP。禁用 `status.enabled` 时不需要配置 `status.<root_domain>`。
 
 服务列表示例：
 
 ```jsonc
 {
+  "frps": {
+    "server_port": 0,
+    "token": "",
+    "dashboard_http": false
+  },
+  "status": {
+    "enabled": true,
+    "port": 0,
+    "http": false
+  },
   "services": [
     {
       "alias": "emby",
@@ -109,11 +125,19 @@ TCP 模式服务始终开放：
 状态面板启用时，部署完成后会输出两类地址：
 
 ```text
-http://127.0.0.1:<status_app_port>
-https://<alias>.<root_domain>/_frps-status/
+http://127.0.0.1:<status.port>
+https://status.<root_domain>
 ```
 
-`status_app_enabled: false` 时不会生成 Nginx 状态面板反代，也不会启动 `frps-status-app`。
+frps dashboard 始终生成 HTTPS 反代：
+
+```text
+https://frps.<root_domain>
+```
+
+`frps.dashboard_http: false` 时 dashboard 端口只绑定 `127.0.0.1`，不能通过 `VPS_IP:dashboardPort` 直接访问。`status.http: false` 时状态面板 HTTP 端口只绑定 `127.0.0.1`，公网通过 `status.<root_domain>` 的 HTTPS 反代访问。
+
+`status.enabled: false` 时不会生成状态面板反代，也不会启动 `frps-status-app`。
 
 ---
 
@@ -139,9 +163,11 @@ cp .env.example .env
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `LISTEN` | `127.0.0.1:28080` | 监听地址 |
+| `LISTEN` | `0.0.0.0:8080` | 容器内监听地址 |
+| `STATUS_APP_BIND` | `127.0.0.1` | 映射到宿主机的绑定地址；设为 `0.0.0.0` 才允许公网直通 |
+| `STATUS_APP_PORT` | `28080` | 映射到宿主机的 HTTP 端口 |
 | `DB_PATH` | `/data/frps-status.sqlite` | SQLite 数据库路径 |
-| `FRPS_HOST` | `127.0.0.1` | frps 所在主机 |
+| `FRPS_HOST` | `frps` | frps 所在主机 |
 | `FRPS_BIND_PORT` | `7000` | frps 服务端口 |
 | `FRPS_DASHBOARD_PORT` | `7500` | frps Dashboard 端口 |
 | `FRPS_DASHBOARD_USER` | — | Dashboard 用户名 |
@@ -154,7 +180,9 @@ cp .env.example .env
 
 ### Docker 部署（推荐）
 
-通常由 `vps-install-frps.py --run` 自动写入 `.env` 并启动。单独部署时：
+通常由 `vps-install-frps.py --run` 自动写入 `.env` 并启动。状态服务默认加入 `frps_default` Docker 网络，供 Nginx 通过容器内网反代；单独部署前需确保 frps 侧 compose 已启动并创建该网络。
+
+单独部署时：
 
 ```bash
 cd frps-status-app

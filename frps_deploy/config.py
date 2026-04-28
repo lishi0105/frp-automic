@@ -21,6 +21,7 @@ CONFIG: Dict[str, Any] = {}
 SERVICES: List[Dict[str, Any]] = []
 ROOT_DOMAIN = ""
 CERT_EMAIL  = ""
+VPS_PUBLIC_IP = ""
 FRPS_SERVER_PORT   = 0
 FRPS_TOKEN         = ""
 FRPS_DASHBOARD_HTTP = False
@@ -74,7 +75,7 @@ def _bool_config(value: Any, default: bool = False) -> bool:
 
 
 def load_runtime_config() -> None:
-    global CONFIG, SERVICES, ROOT_DOMAIN, CERT_EMAIL, FRPS_SERVER_PORT, FRPS_TOKEN, FRPS_DASHBOARD_HTTP, STATUS_APP_ENABLED, STATUS_APP_PORT, STATUS_APP_HTTP
+    global CONFIG, SERVICES, ROOT_DOMAIN, CERT_EMAIL, VPS_PUBLIC_IP, FRPS_SERVER_PORT, FRPS_TOKEN, FRPS_DASHBOARD_HTTP, STATUS_APP_ENABLED, STATUS_APP_PORT, STATUS_APP_HTTP
 
     CONFIG = load_config_file()
 
@@ -85,20 +86,29 @@ def load_runtime_config() -> None:
     SERVICES    = services
     ROOT_DOMAIN = str(CONFIG.get("root_domain") or CONFIG.get("domain") or "").strip().lower()
     CERT_EMAIL  = str(CONFIG.get("cert_email") or CONFIG.get("certificate_email") or CONFIG.get("email") or "").strip()
-    FRPS_TOKEN  = str(CONFIG.get("frps_token") or CONFIG.get("token") or "").strip()
+    VPS_PUBLIC_IP = str(CONFIG.get("vps_public_ip") or CONFIG.get("public_ip") or "").strip()
 
-    raw_server_port = CONFIG.get("frps_server_port", CONFIG.get("server_port", CONFIG.get("bind_port", 0)))
+    frps_config = CONFIG.get("frps")
+    if not isinstance(frps_config, dict):
+        raise ValueError("配置项 frps 必须是 object")
+    FRPS_TOKEN = str(frps_config.get("token") or "").strip()
+
+    raw_server_port = frps_config.get("server_port", 0)
     try:
         FRPS_SERVER_PORT = int(raw_server_port or 0)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"frps_server_port 必须是整数：{raw_server_port!r}") from exc
+        raise ValueError(f"frps.server_port 必须是整数：{raw_server_port!r}") from exc
 
-    FRPS_DASHBOARD_HTTP = _bool_config(CONFIG.get("frps_dashboard_http", False), default=False)
+    FRPS_DASHBOARD_HTTP = _bool_config(frps_config.get("dashboard_http", False), default=False)
 
-    STATUS_APP_ENABLED = _bool_config(CONFIG.get("status_app_enabled", True), default=True)
-    raw_status_port = CONFIG.get("status_app_port", CONFIG.get("status_port", 0))
+    status_config = CONFIG.get("status")
+    if not isinstance(status_config, dict):
+        raise ValueError("配置项 status 必须是 object")
+
+    STATUS_APP_ENABLED = _bool_config(status_config.get("enabled", True), default=True)
+    raw_status_port = status_config.get("port", 0)
     try:
         STATUS_APP_PORT = int(raw_status_port or 0)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"status_app_port 必须是整数：{raw_status_port!r}") from exc
-    STATUS_APP_HTTP = _bool_config(CONFIG.get("status_app_http", False), default=False)
+        raise ValueError(f"status.port 必须是整数：{raw_status_port!r}") from exc
+    STATUS_APP_HTTP = _bool_config(status_config.get("http", False), default=False)

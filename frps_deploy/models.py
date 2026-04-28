@@ -8,6 +8,7 @@ from dataclasses import dataclass
 class DeployContext:
     root_domain: str
     email: str
+    vps_public_ip: str
     frp_version: str
     bind_port: int
     dashboard_port: int

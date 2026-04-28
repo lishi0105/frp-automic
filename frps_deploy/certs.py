@@ -9,7 +9,7 @@ from typing import Optional
 from frps_deploy.console import print
 from frps_deploy.constants import BASE_DIR, CERTBOT_WWW_DIR, STATUS_APP_DIR
 from frps_deploy.models import DeployContext
-from frps_deploy.services import http_services
+from frps_deploy.services import managed_domains
 from frps_deploy.utils import capture, run
 
 
@@ -76,12 +76,12 @@ def verify_http_challenge(domain: str) -> None:
 
 
 def issue_certs(ctx: DeployContext) -> None:
-    if not http_services():
-        print("没有 http 模式服务，跳过证书申请。")
+    domains = managed_domains(ctx.root_domain)
+    if not domains:
+        print("没有需要申请证书的域名，跳过证书申请。")
         return
 
-    for item in http_services():
-        domain = f"{item['alias']}.{ctx.root_domain}"
+    for domain in domains:
         print(f"\n开始申请证书：{domain}")
         verify_http_challenge(domain)
         certbot_cmd = [

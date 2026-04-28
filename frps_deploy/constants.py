@@ -37,11 +37,16 @@ DEFAULT_SERVICES: List[Dict[str, Any]] = [
 DEFAULT_CONFIG: Dict[str, Any] = {
     "root_domain": "",
     "cert_email": "",
-    "frps_server_port": 0,
-    "frps_token": "",
-    "frps_dashboard_http": False,
-    "status_app_enabled": True,
-    "status_app_port": 0,
-    "status_app_http": False,
+    "vps_public_ip": "",
+    "frps": {
+        "server_port": 0,
+        "token": "",
+        "dashboard_http": False,
+    },
+    "status": {
+        "enabled": True,
+        "port": 0,
+        "http": False,
+    },
     "services": DEFAULT_SERVICES,
 }

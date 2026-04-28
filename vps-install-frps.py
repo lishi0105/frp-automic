@@ -22,13 +22,14 @@ FRPS + Nginx + Certbot 一体化部署脚本
 - 当前机器已经安装 Docker Engine 和 docker compose 插件；
 - 当前用户可以执行 docker 命令；
 - VPS 的 80/443 端口可公网访问；
-- HTTP 模式服务的域名请自行将 A 记录解析到 VPS 公网 IP（DNS 由外部自行管理）；
-- frpc 客户端需要使用脚本输出的 bindPort 和 token，将 serverAddr 替换为实际 VPS 公网 IP。
+- HTTP 模式服务、frps.root_domain、status.root_domain 请自行将 A 记录解析到 VPS 公网 IP；
+- frpc 客户端配置会直接写入 vps_public_ip，留空则自动获取当前 VPS 公网 IP。
 
 配置文件：
-- 默认读取脚本同目录 frps-config.json；
+- 默认读取当前目录 frps-config.json；
 - 可用 -c/--config 指定配置文件路径；
-- 配置文件不存在时只生成默认配置文件，然后退出。
+- 未指定 -c/--config 且当前目录 frps-config.json 不存在时直接报错；
+- 指定 -c/--config 且配置文件不存在时只生成默认配置文件，然后退出。
 - 默认只生成相关配置文件，不启动容器、不申请证书；加 -r/--run 才执行部署启动流程。
 - 使用 -b/--build 时只编译 frps-status-app 的 Docker 镜像，不执行其他部署步骤。
 - 使用 --clean 时停止并删除所有生成的容器（status-app 本地镜像一并删除），先通过 docker alpine
