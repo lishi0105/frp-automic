@@ -14,6 +14,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY main.go ./main.go
 COPY src ./src
+RUN test -f ./src/frps/frps.go && go list ./...
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/frps-status .
 
 FROM alpine:3.20
