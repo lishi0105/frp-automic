@@ -35,6 +35,7 @@ from frps_deploy.services import all_remote_ports, http_services, validate_servi
 from frps_deploy.utils import (
     random_free_port_excluding, random_letters, random_password, run,
 )
+from frps_deploy.clean import clean_all
 from frps_deploy.console import prompt_input
 
 
@@ -54,6 +55,11 @@ def parse_args() -> argparse.Namespace:
         "-b", "--build",
         action="store_true",
         help="只编译 frps-status-app 的 Docker 镜像，不执行其他部署步骤",
+    )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="清理生成的容器、本地镜像和文件夹（先通过 docker 修正权限再删除）",
     )
     return parser.parse_args()
 
@@ -170,6 +176,10 @@ def build_status_app() -> None:
 
 def main() -> None:
     args = parse_args()
+
+    if args.clean:
+        clean_all()
+        return
 
     if args.build:
         build_status_app()

@@ -40,6 +40,8 @@ Cloudflare 自动解析用法：
 - 配置文件不存在时只生成默认配置文件，然后退出。
 - 默认只生成相关配置文件，不启动容器、不申请证书；加 -r/--run 才执行部署启动流程。
 - 使用 -b/--build 时只编译 frps-status-app 的 Docker 镜像，不执行其他部署步骤。
+- 使用 --clean 时停止并删除所有生成的容器（status-app 本地镜像一并删除），先通过 docker alpine
+  容器将 frps/、frpc/、frps-status-app/data/ 的权限修改为 777，再删除这些目录以及 frps-status-app/.env。
 """
 
 from frps_deploy.main import main
