@@ -29,13 +29,14 @@ type ProxyTraffic struct {
 type PublicSettings struct {
 	AlertInGB       float64 `json:"alert_in_gb"`
 	AlertOutGB      float64 `json:"alert_out_gb"`
+	AlertTotalGB    float64 `json:"alert_total_gb"`
 	SMTPHost        string  `json:"smtp_host"`
 	SMTPPort        int     `json:"smtp_port"`
 	SMTPUser        string  `json:"smtp_user"`
 	SMTPFrom        string  `json:"smtp_from"`
 	SMTPTo          string  `json:"smtp_to"`
 	SMTPEnabled     bool    `json:"smtp_enabled"`
-	SMTPPasswordSet bool    `json:"smtp_password_set"`
+	SMTPAuthCode    string  `json:"smtp_auth_code"`
 }
 
 type Snapshot struct {

@@ -32,7 +32,7 @@ func (s *Store) InitDB() error {
 			return err
 		}
 	}
-	defaults := map[string]string{"alert_in_gb": "0", "alert_out_gb": "0", "smtp_port": "587", "smtp_enabled": "false"}
+	defaults := map[string]string{"alert_in_gb": "0", "alert_out_gb": "0", "alert_total_gb": "0", "smtp_port": "465", "smtp_enabled": "false"}
 	for k, v := range defaults {
 		if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)`, k, v); err != nil {
 			return err
@@ -56,13 +56,14 @@ func (s *Store) PublicSettings() (model.PublicSettings, error) {
 	return model.PublicSettings{
 		AlertInGB:       parseFloat(s.Setting("alert_in_gb")),
 		AlertOutGB:      parseFloat(s.Setting("alert_out_gb")),
+		AlertTotalGB:    parseFloat(s.Setting("alert_total_gb")),
 		SMTPHost:        s.Setting("smtp_host"),
-		SMTPPort:        int(parseFloatDefault(s.Setting("smtp_port"), 587)),
+		SMTPPort:        int(parseFloatDefault(s.Setting("smtp_port"), 465)),
 		SMTPUser:        s.Setting("smtp_user"),
 		SMTPFrom:        s.Setting("smtp_from"),
 		SMTPTo:          s.Setting("smtp_to"),
 		SMTPEnabled:     strings.EqualFold(s.Setting("smtp_enabled"), "true"),
-		SMTPPasswordSet: s.Setting("smtp_password") != "",
+		SMTPAuthCode:    s.Setting("smtp_auth_code"),
 	}, nil
 }
 

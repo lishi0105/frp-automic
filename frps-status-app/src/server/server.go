@@ -2,9 +2,13 @@ package server
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,16 +33,24 @@ type App struct {
 	cfg    config.Config
 	store  *store.Store
 	frps   *frps.Client
+	secret []byte
 	mu     sync.RWMutex
 	latest model.Snapshot
 }
 
 func New(cfg config.Config, st *store.Store, fc *frps.Client) *App {
-	return &App{cfg: cfg, store: st, frps: fc}
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		secret = []byte(cfg.StatusUser + ":" + cfg.StatusPassword + ":" + cfg.Listen)
+	}
+	return &App{cfg: cfg, store: st, frps: fc, secret: secret}
 }
 
 func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/login", a.handleLogin)
+	mux.HandleFunc("/api/logout", a.handleLogout)
+	mux.HandleFunc("/api/session", a.handleSession)
 	mux.HandleFunc("/api/status", a.withAuth(a.handleStatus))
 	mux.HandleFunc("/api/daily", a.withAuth(a.handleDaily))
 	mux.HandleFunc("/api/daily/export", a.withAuth(a.handleExportCSV))
@@ -46,7 +58,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/api/settings/test-email", a.withAuth(a.handleTestEmail))
 	mux.HandleFunc("/api/db/vacuum", a.withAuth(a.handleVacuum))
 	mux.HandleFunc("/api/db/purge", a.withAuth(a.handlePurge))
-	mux.HandleFunc("/", a.withAuth(a.serveIndex))
+	mux.HandleFunc("/", a.serveIndex)
 	return mux
 }
 
@@ -102,11 +114,15 @@ func (a *App) checkAlerts(settings model.PublicSettings, month string, monthIn, 
 	if !settings.SMTPEnabled {
 		return nil
 	}
+	total := monthIn + monthOut
 	if settings.AlertInGB > 0 && monthIn >= mail.GBToBytes(settings.AlertInGB) {
 		_ = a.sendAlertOnce(month, "in", monthIn, settings.AlertInGB, settings)
 	}
 	if settings.AlertOutGB > 0 && monthOut >= mail.GBToBytes(settings.AlertOutGB) {
 		_ = a.sendAlertOnce(month, "out", monthOut, settings.AlertOutGB, settings)
+	}
+	if settings.AlertTotalGB > 0 && total >= mail.GBToBytes(settings.AlertTotalGB) {
+		_ = a.sendAlertOnce(month, "total", total, settings.AlertTotalGB, settings)
 	}
 	return nil
 }
@@ -115,13 +131,13 @@ func (a *App) sendAlertOnce(month, direction string, current uint64, thresholdGB
 	if a.store.AlertSent(month, direction) {
 		return nil
 	}
-	password := a.store.Setting("smtp_password")
-	if password == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
+	authCode := a.store.Setting("smtp_auth_code")
+	if authCode == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
 		return nil
 	}
 	subject := fmt.Sprintf("FRPS %s traffic alert %s", strings.ToUpper(direction), month)
 	body := fmt.Sprintf("FRPS monthly %s traffic is %s, threshold is %.2f GB.", direction, mail.HumanBytes(current), thresholdGB)
-	if err := mail.Send(settings, password, subject, body); err != nil {
+	if err := mail.Send(settings, authCode, subject, body); err != nil {
 		return err
 	}
 	return a.store.MarkAlertSent(month, direction)
@@ -133,13 +149,15 @@ func (a *App) withAuth(next http.HandlerFunc) http.HandlerFunc {
 			next(w, r)
 			return
 		}
-		w.Header().Set("WWW-Authenticate", `Basic realm="FRPS Status"`)
 		w.WriteHeader(http.StatusUnauthorized)
 	}
 }
 
 func (a *App) authorized(r *http.Request) bool {
 	if a.cfg.StatusUser == "" && a.cfg.StatusPassword == "" {
+		return true
+	}
+	if a.validSession(r) {
 		return true
 	}
 	header := r.Header.Get("Authorization")
@@ -155,6 +173,106 @@ func (a *App) authorized(r *http.Request) bool {
 		return false
 	}
 	return subtle.ConstantTimeCompare(raw, expected) == 1
+}
+
+func (a *App) checkCredentials(user, password string) bool {
+	expected := []byte(a.cfg.StatusUser + ":" + a.cfg.StatusPassword)
+	actual := []byte(user + ":" + password)
+	if len(actual) != len(expected) {
+		return false
+	}
+	return subtle.ConstantTimeCompare(actual, expected) == 1
+}
+
+func (a *App) validSession(r *http.Request) bool {
+	cookie, err := r.Cookie("frps_status_session")
+	if err != nil || cookie.Value == "" {
+		return false
+	}
+	parts := strings.Split(cookie.Value, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	expiry, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil || time.Now().Unix() > expiry {
+		return false
+	}
+	msg := parts[0] + "." + parts[1]
+	expected := a.signSession(msg)
+	return hmac.Equal([]byte(parts[2]), []byte(expected))
+}
+
+func (a *App) newSessionCookie() *http.Cookie {
+	nonce := make([]byte, 16)
+	if _, err := rand.Read(nonce); err != nil {
+		nonce = []byte(strconv.FormatInt(time.Now().UnixNano(), 10))
+	}
+	expiry := time.Now().Add(12 * time.Hour).Unix()
+	msg := fmt.Sprintf("%d.%s", expiry, hex.EncodeToString(nonce))
+	return &http.Cookie{
+		Name:     "frps_status_session",
+		Value:    msg + "." + a.signSession(msg),
+		Path:     "/",
+		MaxAge:   12 * 60 * 60,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	}
+}
+
+func (a *App) signSession(msg string) string {
+	mac := hmac.New(sha256.New, a.secret)
+	_, _ = mac.Write([]byte(msg))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if a.cfg.StatusUser == "" && a.cfg.StatusPassword == "" {
+		http.SetCookie(w, a.newSessionCookie())
+		writeJSON(w, map[string]any{"ok": true})
+		return
+	}
+	var in struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if !a.checkCredentials(in.Username, in.Password) {
+		writeJSONStatus(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "用户名或密码不正确"})
+		return
+	}
+	http.SetCookie(w, a.newSessionCookie())
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+func (a *App) handleLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "frps_status_session",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+func (a *App) handleSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	writeJSON(w, map[string]any{"authenticated": a.authorized(r)})
 }
 
 func (a *App) serveIndex(w http.ResponseWriter, r *http.Request) {
@@ -215,12 +333,9 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		allowed := map[string]bool{"alert_in_gb": true, "alert_out_gb": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_password": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true}
+		allowed := map[string]bool{"alert_in_gb": true, "alert_out_gb": true, "alert_total_gb": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true}
 		for key, value := range in {
 			if !allowed[key] {
-				continue
-			}
-			if key == "smtp_password" && fmt.Sprint(value) == "" {
 				continue
 			}
 			if err := a.store.SaveSetting(key, fmt.Sprint(value)); err != nil {
@@ -241,12 +356,8 @@ func (a *App) handleTestEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	settings, _ := a.store.PublicSettings()
-	if !settings.SMTPEnabled {
-		writeJSON(w, map[string]any{"ok": false, "error": "SMTP 未启用"})
-		return
-	}
-	password := a.store.Setting("smtp_password")
-	if err := mail.Send(settings, password, "FRPS Status - 测试邮件", "这是一封来自 FRPS Status 的测试邮件，SMTP 配置正常。"); err != nil {
+	authCode := a.store.Setting("smtp_auth_code")
+	if err := mail.Send(settings, authCode, "FRPS Status - 测试邮件", "这是一封来自 FRPS Status 的测试邮件，SMTP 配置正常。"); err != nil {
 		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -314,5 +425,12 @@ func (a *App) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func writeJSONStatus(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
 }

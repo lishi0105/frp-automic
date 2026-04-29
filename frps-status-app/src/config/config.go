@@ -23,18 +23,20 @@ type Config struct {
 }
 
 func Load() Config {
+	frpsUser := env("FRPS_DASHBOARD_USER", "")
+	frpsPass := env("FRPS_DASHBOARD_PASSWORD", "")
 	return Config{
 		Listen:            env("LISTEN", "127.0.0.1:28080"),
 		DBPath:            env("DB_PATH", "/data/frps-status.sqlite"),
 		FRPSHost:          env("FRPS_HOST", "127.0.0.1"),
 		FRPSBindPort:      envInt("FRPS_BIND_PORT", 7000),
 		FRPSDashboardPort: envInt("FRPS_DASHBOARD_PORT", 7500),
-		FRPSDashboardUser: env("FRPS_DASHBOARD_USER", ""),
-		FRPSDashboardPass: env("FRPS_DASHBOARD_PASSWORD", ""),
+		FRPSDashboardUser: frpsUser,
+		FRPSDashboardPass: frpsPass,
 		CertDir:           env("CERT_DIR", "/etc/letsencrypt/live"),
 		Domains:           SplitCSV(os.Getenv("STATUS_DOMAINS")),
-		StatusUser:        env("STATUS_USER", ""),
-		StatusPassword:    env("STATUS_PASSWORD", ""),
+		StatusUser:        env("STATUS_USER", frpsUser),
+		StatusPassword:    env("STATUS_PASSWORD", frpsPass),
 		PollInterval:      time.Duration(envInt("POLL_SECONDS", 60)) * time.Second,
 	}
 }

@@ -3,13 +3,28 @@ import Dashboard from '../views/Dashboard.vue'
 import ProxyList from '../views/ProxyList.vue'
 import Statistics from '../views/Statistics.vue'
 import Settings from '../views/Settings.vue'
+import Login from '../views/Login.vue'
+import { api } from '../api/index.js'
 
-export default createRouter({
+const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     { path: '/', component: Dashboard },
     { path: '/proxies', component: ProxyList },
     { path: '/statistics', component: Statistics },
-    { path: '/settings', component: Settings }
+    { path: '/settings', component: Settings },
+    { path: '/login', component: Login, meta: { public: true } }
   ]
 })
+
+router.beforeEach(async (to) => {
+  if (to.meta.public) return true
+  try {
+    const session = await api.getSession()
+    return session.authenticated ? true : '/login'
+  } catch {
+    return '/login'
+  }
+})
+
+export default router

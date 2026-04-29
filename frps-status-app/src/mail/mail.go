@@ -11,9 +11,9 @@ import (
 	"frps-status-app.local/status/src/model"
 )
 
-func Send(settings model.PublicSettings, password, subject, body string) error {
+func Send(settings model.PublicSettings, authCode, subject, body string) error {
 	addr := net.JoinHostPort(settings.SMTPHost, strconv.Itoa(settings.SMTPPort))
-	auth := smtp.PlainAuth("", settings.SMTPUser, password, settings.SMTPHost)
+	auth := smtp.PlainAuth("", settings.SMTPUser, authCode, settings.SMTPHost)
 	msg := "From: " + settings.SMTPFrom + "\r\n" +
 		"To: " + settings.SMTPTo + "\r\n" +
 		"Subject: " + subject + "\r\n" +

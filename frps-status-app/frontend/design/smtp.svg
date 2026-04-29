@@ -1,0 +1,44 @@
+<svg width="600" height="650" viewBox="0 0 600 650" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="600" height="650" fill="black" fill-opacity="0.4"/>
+  
+  <rect x="50" y="40" width="500" height="570" rx="16" fill="white"/>
+  
+  <text x="74" y="85" font-family="PingFang SC, sans-serif" font-size="18" font-weight="700" fill="#1E293B">配置邮件服务</text>
+  <text x="500" y="85" font-family="Arial" font-size="20" fill="#94A3B8">×</text>
+  <line x1="50" y1="110" x2="550" y2="110" stroke="#F1F5F9"/>
+
+  <g transform="translate(74, 140)">
+    <text y="0" font-family="PingFang SC, sans-serif" font-size="12" font-weight="600" fill="#475569">SMTP 服务器 &amp; 端口</text>
+    <rect y="12" width="310" height="36" rx="6" stroke="#CBD5E1" fill="white"/>
+    <text x="12" y="35" font-family="Arial" font-size="13" fill="#1E293B">smtp.example.com</text>
+    <rect x="325" y="12" width="127" height="36" rx="6" stroke="#CBD5E1" fill="white"/>
+    <text x="337" y="35" font-family="Arial" font-size="13" fill="#1E293B">465</text>
+
+    <text y="75" font-family="PingFang SC, sans-serif" font-size="12" font-weight="600" fill="#475569">发件人邮箱 (SMTP 账号)</text>
+    <rect y="87" width="452" height="36" rx="6" stroke="#CBD5E1" fill="white"/>
+    <text x="12" y="110" font-family="Arial" font-size="13" fill="#1E293B">sender@frps-tool.com</text>
+
+    <text y="150" font-family="PingFang SC, sans-serif" font-size="12" font-weight="600" fill="#475569">邮箱授权码 / 密码</text>
+    <rect y="162" width="452" height="36" rx="6" stroke="#CBD5E1" fill="white"/>
+    <text x="12" y="185" font-family="Arial" font-size="13" fill="#1E293B">••••••••••••••••</text>
+    <text x="420" y="186" font-family="Arial" font-size="16" fill="#94A3B8">👁️</text>
+
+    <text y="225" font-family="PingFang SC, sans-serif" font-size="12" font-weight="600" fill="#475569">接收邮箱列表 (多个用逗号分隔)</text>
+    <rect y="237" width="452" height="70" rx="6" stroke="#CBD5E1" fill="white"/>
+    <text x="12" y="260" font-family="Arial" font-size="13" fill="#1E293B">admin@company.com, tech@company.com</text>
+
+    <text y="340" font-family="PingFang SC, sans-serif" font-size="13" fill="#475569">启用邮件推送服务</text>
+    <rect x="402" y="325" width="50" height="24" rx="12" fill="#10B981"/>
+    <circle cx="440" cy="337" r="9" fill="white"/>
+  </g>
+
+  <rect x="50" y="540" width="500" height="70" rx="0 0 16 16" fill="#F8FAFC"/>
+  <rect x="74" y="560" width="110" height="32" rx="6" stroke="#CBD5E1" fill="white"/>
+  <text x="129" y="581" font-family="PingFang SC, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">发送测试邮件</text>
+  
+  <rect x="350" y="560" width="80" height="32" rx="6" stroke="#CBD5E1" fill="white"/>
+  <text x="390" y="581" font-family="PingFang SC, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">取消</text>
+  
+  <rect x="446" y="560" width="80" height="32" rx="6" fill="#0F172A"/>
+  <text x="486" y="581" font-family="PingFang SC, sans-serif" font-size="12" font-weight="600" fill="white" text-anchor="middle">保存</text>
+</svg>
