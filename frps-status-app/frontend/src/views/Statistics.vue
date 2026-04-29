@@ -64,7 +64,7 @@
         </section>
 
         <section v-else class="card analytics-side-kv">
-          <div class="section-head"><div class="section-title">代理表现</div></div>
+          <div class="section-head"><div class="section-title">代理详情</div></div>
           <div class="kv"><span>代理类型</span><b>{{ proxyType || '-' }}</b></div>
           <div class="kv"><span>在线状态</span><b>{{ proxyOnline ? '在线' : '离线' }}</b></div>
           <div class="kv"><span>当前连接</span><b>{{ proxyCurConns }}</b></div>
@@ -296,7 +296,7 @@ onUnmounted(() => {
 
 <style scoped>
 .stats-overview-fill { width: 72%; }
-.stats-filter-grid { grid-template-columns: 150px 150px minmax(180px, 1fr) auto auto auto; }
+.stats-filter-grid { grid-template-columns: 150px 150px 1fr auto auto auto; }
 .entry-list-bars { margin-top: 8px; display: grid; gap: 10px; }
 .entry-item {
   display: grid;

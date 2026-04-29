@@ -351,10 +351,16 @@ onUnmounted(() => {
 .top5-table tbody tr:hover td {
   background: var(--surface-2);
 }
-.col-rank { width: 60px; }
-.col-type { width: 78px; }
-.col-name { min-width: 150px; }
-.col-num { width: 112px; text-align: right !important; }
+.col-rank { width: 48px; }
+.col-type { width: 56px; }
+.col-name { width: auto; }
+.col-num { width: 86px; text-align: right !important; }
+.top5-table .col-name code {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 @media (max-width: 1200px) {
   .dashboard-page { height: auto; grid-template-rows: auto auto; overflow: visible; padding-bottom: 0; }
   .dashboard-rings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
