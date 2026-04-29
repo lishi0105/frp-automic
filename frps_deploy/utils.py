@@ -50,14 +50,17 @@ def random_letters(n: int = 16) -> str:
 
 
 def random_password(n: int = 16) -> str:
-    chars = string.ascii_letters + string.digits + "!@#$%^&*()-_=+"
+    # Exclude $ to prevent Docker Compose from interpreting the value as a variable
+    # reference when the password is written to .env files.
+    special = "!@#%^&*()-_=+"
+    chars = string.ascii_letters + string.digits + special
     while True:
         pwd = "".join(secrets.choice(chars) for _ in range(n))
         if (
             any(c.islower() for c in pwd)
             and any(c.isupper() for c in pwd)
             and any(c.isdigit() for c in pwd)
-            and any(c in "!@#$%^&*()-_=+" for c in pwd)
+            and any(c in special for c in pwd)
         ):
             return pwd
 

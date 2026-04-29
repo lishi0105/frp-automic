@@ -37,5 +37,6 @@ func main() {
 	}
 	go app.PollLoop()
 	log.Printf("frps status listening on %s", cfg.Listen)
+	log.Printf("status user: %s  password: %s", cfg.StatusUser, cfg.StatusPassword)
 	log.Fatal(http.ListenAndServe(cfg.Listen, app.Routes()))
 }
