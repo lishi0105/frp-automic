@@ -26,6 +26,7 @@ func (s *Store) InitDB() error {
 		`CREATE TABLE IF NOT EXISTS proxy_counters (name TEXT NOT NULL, type TEXT NOT NULL, last_in INTEGER NOT NULL, last_out INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(name,type))`,
 		`CREATE TABLE IF NOT EXISTS daily_traffic (day TEXT NOT NULL, proxy_name TEXT NOT NULL, proxy_type TEXT NOT NULL, in_bytes INTEGER NOT NULL DEFAULT 0, out_bytes INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(day,proxy_name,proxy_type))`,
 		`CREATE TABLE IF NOT EXISTS alert_state (month TEXT NOT NULL, direction TEXT NOT NULL, sent_at TEXT NOT NULL, PRIMARY KEY(month,direction))`,
+		`CREATE TABLE IF NOT EXISTS event_alert_state (key TEXT PRIMARY KEY, sent_at TEXT NOT NULL)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.Exec(stmt); err != nil {
@@ -126,6 +127,22 @@ func (s *Store) AlertSent(month, direction string) bool {
 
 func (s *Store) MarkAlertSent(month, direction string) error {
 	_, err := s.db.Exec(`INSERT OR REPLACE INTO alert_state(month,direction,sent_at) VALUES(?,?,?)`, month, direction, time.Now().UTC().Format(time.RFC3339))
+	return err
+}
+
+func (s *Store) EventAlertSent(key string) bool {
+	var count int
+	_ = s.db.QueryRow(`SELECT COUNT(*) FROM event_alert_state WHERE key=?`, key).Scan(&count)
+	return count > 0
+}
+
+func (s *Store) SetEventAlert(key string) error {
+	_, err := s.db.Exec(`INSERT OR REPLACE INTO event_alert_state(key,sent_at) VALUES(?,?)`, key, time.Now().UTC().Format(time.RFC3339))
+	return err
+}
+
+func (s *Store) ClearEventAlert(key string) error {
+	_, err := s.db.Exec(`DELETE FROM event_alert_state WHERE key=?`, key)
 	return err
 }
 

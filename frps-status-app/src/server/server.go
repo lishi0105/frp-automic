@@ -73,13 +73,13 @@ func (a *App) PollLoop() {
 }
 
 func (a *App) Refresh(ctx context.Context) error {
-	proxies, err := a.frps.FetchProxies(ctx)
-	if err == nil {
+	proxies, fetchErr := a.frps.FetchProxies(ctx)
+	if fetchErr == nil {
 		if err := a.store.RecordTraffic(proxies); err != nil {
 			log.Printf("record traffic failed: %v", err)
 		}
 	} else {
-		log.Printf("fetch frps proxies failed: %v", err)
+		log.Printf("fetch frps proxies failed: %v", fetchErr)
 	}
 	month := time.Now().Format("2006-01")
 	for i := range proxies {
@@ -89,7 +89,12 @@ func (a *App) Refresh(ctx context.Context) error {
 	}
 	settings, _ := a.store.PublicSettings()
 	monthIn, monthOut, _ := a.store.MonthTotals(month)
+	certs := frps.Certificates(a.cfg.CertDir, a.cfg.Domains)
 	_ = a.checkAlerts(settings, month, monthIn, monthOut)
+	if fetchErr == nil {
+		a.checkProxyAlerts(settings, proxies)
+	}
+	a.checkCertAlerts(settings, certs)
 	s := model.Snapshot{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 		FRPS: map[string]any{
@@ -99,7 +104,7 @@ func (a *App) Refresh(ctx context.Context) error {
 			"bind":           frps.CheckTCP(a.cfg.FRPSHost, a.cfg.FRPSBindPort),
 			"dashboard":      frps.CheckTCP(a.cfg.FRPSHost, a.cfg.FRPSDashboardPort),
 		},
-		Certificates: frps.Certificates(a.cfg.CertDir, a.cfg.Domains),
+		Certificates: certs,
 		Proxies:      proxies,
 		MonthTotals:  map[string]uint64{"in": monthIn, "out": monthOut},
 		Settings:     settings,
@@ -107,7 +112,7 @@ func (a *App) Refresh(ctx context.Context) error {
 	a.mu.Lock()
 	a.latest = s
 	a.mu.Unlock()
-	return err
+	return fetchErr
 }
 
 func (a *App) checkAlerts(settings model.PublicSettings, month string, monthIn, monthOut uint64) error {
@@ -141,6 +146,58 @@ func (a *App) sendAlertOnce(month, direction string, current uint64, thresholdGB
 		return err
 	}
 	return a.store.MarkAlertSent(month, direction)
+}
+
+func (a *App) checkProxyAlerts(settings model.PublicSettings, proxies []model.ProxyTraffic) {
+	if !settings.SMTPEnabled {
+		return
+	}
+	authCode := a.store.Setting("smtp_auth_code")
+	if authCode == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
+		return
+	}
+	for _, p := range proxies {
+		key := "proxy_offline:" + p.Type + ":" + p.Name
+		if !p.Online {
+			if !a.store.EventAlertSent(key) {
+				subject := fmt.Sprintf("FRPS 代理离线告警 - %s", p.Name)
+				body := fmt.Sprintf("代理 %s（类型：%s）已离线，请检查客户端连接状态。", p.Name, p.Type)
+				if err := mail.Send(settings, authCode, subject, body); err != nil {
+					log.Printf("send proxy offline alert failed: %v", err)
+					continue
+				}
+				_ = a.store.SetEventAlert(key)
+			}
+		} else {
+			_ = a.store.ClearEventAlert(key)
+		}
+	}
+}
+
+func (a *App) checkCertAlerts(settings model.PublicSettings, certs []model.CertStatus) {
+	if !settings.SMTPEnabled {
+		return
+	}
+	authCode := a.store.Setting("smtp_auth_code")
+	if authCode == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
+		return
+	}
+	for _, c := range certs {
+		key := "cert_expiry:" + c.Domain
+		if c.Present && c.DaysLeft != nil && !c.OK {
+			if !a.store.EventAlertSent(key) {
+				subject := fmt.Sprintf("FRPS SSL证书即将到期 - %s", c.Domain)
+				body := fmt.Sprintf("域名 %s 的 SSL 证书将在 %d 天后到期（到期时间：%s），请及时续期。", c.Domain, *c.DaysLeft, c.ExpiresAt)
+				if err := mail.Send(settings, authCode, subject, body); err != nil {
+					log.Printf("send cert expiry alert failed: %v", err)
+					continue
+				}
+				_ = a.store.SetEventAlert(key)
+			}
+		} else if c.OK {
+			_ = a.store.ClearEventAlert(key)
+		}
+	}
 }
 
 func (a *App) withAuth(next http.HandlerFunc) http.HandlerFunc {

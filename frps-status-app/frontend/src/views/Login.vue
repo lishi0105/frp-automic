@@ -36,12 +36,6 @@
           <input v-model="form.password" type="password" autocomplete="current-password" placeholder="••••••••••••" />
         </label>
 
-        <div class="login-row">
-          <span></span>
-          <button class="login-link" type="button" @click="hint = true">忘记密码？</button>
-        </div>
-
-        <p v-if="hint" class="login-hint">请使用 FRPS 面板登录名和密码，或检查部署环境变量。</p>
         <p v-if="error" class="login-error">{{ error }}</p>
 
         <button class="login-submit" type="submit" :disabled="loading">
@@ -63,7 +57,6 @@ import logoUrl from '../assets/logo.svg'
 const router = useRouter()
 const loading = ref(false)
 const error = ref('')
-const hint = ref(false)
 const form = reactive({
   username: '',
   password: ''
