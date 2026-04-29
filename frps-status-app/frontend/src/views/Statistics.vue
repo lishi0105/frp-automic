@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="stats-shell">
     <div class="page-header">
       <div>
         <div class="page-title">{{ selectedProxyName ? '历史统计 / ' + selectedProxyName : '历史统计' }}</div>
@@ -14,7 +14,7 @@
       </div>
     </div>
 
-    <div class="page-body analytics-page">
+    <div class="page-body analytics-page stats-page">
       <section class="analytics-overview">
         <div>
           <div class="section-title">所选时间范围</div>
@@ -32,74 +32,45 @@
         <div class="analytics-filter-grid stats-filter-grid">
           <input class="form-input" type="date" v-model="startDate" />
           <input class="form-input" type="date" v-model="endDate" />
+          <span class="stats-filter-spacer" aria-hidden="true"></span>
           <button class="btn btn-outline btn-sm" @click="quickRange(60)">最近60天</button>
           <button class="btn btn-outline btn-sm" @click="quickThisMonth">本月</button>
           <button class="btn btn-outline btn-sm" @click="resetFilter">重置</button>
         </div>
       </section>
 
-      <div class="analytics-main-2col">
-        <section class="card">
+      <div class="analytics-main-2col stats-main">
+        <section class="card stats-chart-card">
           <div class="section-head">
             <div class="section-title">{{ selectedProxyName ? '代理流量趋势' : '流量趋势' }}</div>
           </div>
           <div ref="chartEl" class="analytics-trend-chart"></div>
         </section>
 
-        <section v-if="!selectedProxyName" class="card">
+        <section class="card stats-table-card">
           <div class="section-head">
-            <div class="section-title">代理流量 Top 8</div>
+            <div class="section-title">{{ selectedProxyName ? '当前代理每日明细' : '每日明细（全局聚合）' }}</div>
+            <span class="text-muted text-sm">{{ filteredRows.length }} 条</span>
           </div>
-          <div class="entry-list-bars">
-            <div v-for="p in topContrib" :key="p.name + p.type" class="entry-item">
-              <div class="entry-row">
-                <code>{{ p.name }}</code>
-                <span>{{ humanBytes(p.total) }}</span>
-              </div>
-              <div class="entry-bar">
-                <div class="entry-bar-inner" :style="{ width: topTotal ? ((p.total / topTotal) * 100).toFixed(1) + '%' : '0%' }"></div>
-              </div>
-            </div>
+          <div class="table-wrap stats-table-scroll">
+            <table class="stats-detail-table">
+              <thead>
+                <tr v-if="selectedProxyName"><th class="col-date">日期</th><th class="col-type">类型</th><th class="col-num">上行</th><th class="col-num">下行</th><th class="col-num">合计</th></tr>
+                <tr v-else><th class="col-date">日期</th><th class="col-count">代理数</th><th class="col-num">上行</th><th class="col-num">下行</th><th class="col-num">合计</th></tr>
+              </thead>
+              <tbody>
+                <tr v-if="!pagedRows.length"><td colspan="5" class="empty">暂无数据</td></tr>
+                <tr v-for="r in pagedRows" :key="selectedProxyName ? r.day + r.type : r.day">
+                  <td class="col-date">{{ r.day }}</td>
+                  <td v-if="selectedProxyName" class="col-type"><span class="badge badge-ok">{{ r.type }}</span></td>
+                  <td v-else class="col-count">{{ r.proxy_count }}</td>
+                  <td class="col-num">{{ humanBytes(r.in) }}</td>
+                  <td class="col-num">{{ humanBytes(r.out) }}</td>
+                  <td class="col-num"><b>{{ humanBytes(r.in + r.out) }}</b></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </section>
-
-        <section v-else class="card analytics-side-kv">
-          <div class="section-head"><div class="section-title">代理详情</div></div>
-          <div class="kv"><span>代理类型</span><b>{{ proxyType || '-' }}</b></div>
-          <div class="kv"><span>在线状态</span><b>{{ proxyOnline ? '在线' : '离线' }}</b></div>
-          <div class="kv"><span>当前连接</span><b>{{ proxyCurConns }}</b></div>
-          <div class="kv"><span>日峰值连接</span><b>{{ peakConns }}</b></div>
-          <div class="kv"><span>上行占比</span><b>{{ ratioIn }}%</b></div>
-          <div class="kv"><span>下行占比</span><b>{{ ratioOut }}%</b></div>
-          <div class="kv"><span>关联证书</span><b>{{ certDomain || '-' }}</b></div>
-          <div class="kv"><span>证书剩余</span><b :style="{ color: certColor(certDaysLeft) }">{{ certDaysLeft != null ? certDaysLeft + ' 天' : '-' }}</b></div>
-        </section>
-      </div>
-
-      <section class="card">
-        <div class="section-head">
-          <div class="section-title">{{ selectedProxyName ? '当前代理每日明细' : '每日明细（全局聚合）' }}</div>
-          <span class="text-muted text-sm">{{ filteredRows.length }} 条记录</span>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr v-if="selectedProxyName"><th>日期</th><th>类型</th><th>连接峰值</th><th>上行</th><th>下行</th><th>合计</th></tr>
-              <tr v-else><th>日期</th><th>代理数</th><th>连接峰值</th><th>上行</th><th>下行</th><th>合计</th></tr>
-            </thead>
-            <tbody>
-              <tr v-if="!pagedRows.length"><td colspan="6" class="empty">暂无数据</td></tr>
-              <tr v-for="r in pagedRows" :key="selectedProxyName ? r.day + r.type : r.day">
-                <td>{{ r.day }}</td>
-                <td v-if="selectedProxyName"><span class="badge badge-ok">{{ r.type }}</span></td>
-                <td v-else>{{ r.proxy_count }}</td>
-                <td>{{ r.peak_conns }}</td>
-                <td>{{ humanBytes(r.in) }}</td>
-                <td>{{ humanBytes(r.out) }}</td>
-                <td><b>{{ humanBytes(r.in + r.out) }}</b></td>
-              </tr>
-            </tbody>
-          </table>
           <div v-if="totalPages > 1" class="analytics-pager">
             <button class="btn btn-outline btn-sm" :disabled="page <= 1" @click="page--">上一页</button>
             <div class="page-num-list">
@@ -114,8 +85,8 @@
             <span class="text-muted text-sm">{{ page }} / {{ totalPages }}</span>
             <button class="btn btn-outline btn-sm" :disabled="page >= totalPages" @click="page++">下一页</button>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   </div>
 </template>
@@ -144,19 +115,6 @@ const selectedProxyName = computed(() => decodeURIComponent(route.params.proxyNa
 const proxyRows = computed(() => selectedProxyName.value ? rows.value.filter(r => r.name === selectedProxyName.value) : rows.value)
 const proxyInfo = computed(() => (props.status?.proxies ?? []).find(p => p.name === selectedProxyName.value) || null)
 const proxyType = computed(() => proxyInfo.value?.type || proxyRows.value[0]?.type || '')
-const proxyOnline = computed(() => proxyInfo.value?.online ?? false)
-const proxyCurConns = computed(() => proxyInfo.value?.cur_conns ?? 0)
-const certByDomain = computed(() => {
-  const certs = props.status?.certificates ?? []
-  const domains = (proxyInfo.value?.domains ?? []).filter(Boolean)
-  if (domains.length) {
-    const exact = certs.find(c => domains.includes(c.domain))
-    if (exact) return exact
-  }
-  return certs.find(c => c.domain === selectedProxyName.value || c.domain?.includes(selectedProxyName.value)) || null
-})
-const certDomain = computed(() => certByDomain.value?.domain || '')
-const certDaysLeft = computed(() => certByDomain.value?.days_left ?? null)
 const minDay = computed(() => proxyRows.value.length ? [...proxyRows.value].sort((a, b) => a.day.localeCompare(b.day))[0].day : '')
 const maxDay = computed(() => proxyRows.value.length ? [...proxyRows.value].sort((a, b) => b.day.localeCompare(a.day))[0].day : '')
 
@@ -194,9 +152,6 @@ const filteredRows = computed(() => {
 const totalIn = computed(() => filteredRows.value.reduce((s, r) => s + r.in, 0))
 const totalOut = computed(() => filteredRows.value.reduce((s, r) => s + r.out, 0))
 const totalTraffic = computed(() => totalIn.value + totalOut.value)
-const peakConns = computed(() => filteredRows.value.reduce((m, r) => Math.max(m, Number(r.peak_conns || 0)), 0))
-const ratioIn = computed(() => totalTraffic.value ? ((totalIn.value / totalTraffic.value) * 100).toFixed(1) : '0.0')
-const ratioOut = computed(() => totalTraffic.value ? ((totalOut.value / totalTraffic.value) * 100).toFixed(1) : '0.0')
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredRows.value.length / PAGE_SIZE)))
 const pagedRows = computed(() => {
@@ -212,26 +167,6 @@ const pageNumbers = computed(() => {
   return [p - 2, p - 1, p, p + 1, p + 2]
 })
 watch(filteredRows, () => { page.value = 1 })
-
-const topContrib = computed(() => {
-  const m = {}
-  for (const r of rows.value) {
-    if (startDate.value && r.day < startDate.value) continue
-    if (endDate.value && r.day > endDate.value) continue
-    const key = `${r.name}:${r.type}`
-    m[key] ??= { name: r.name, type: r.type, total: 0 }
-    m[key].total += Number(r.in || 0) + Number(r.out || 0)
-  }
-  return Object.values(m).sort((a, b) => b.total - a.total).slice(0, 8)
-})
-const topTotal = computed(() => topContrib.value[0]?.total || 0)
-
-function certColor(days) {
-  if (days == null) return 'var(--text-2)'
-  if (days < 7) return 'var(--danger)'
-  if (days < 15) return 'var(--warning)'
-  return 'var(--success)'
-}
 
 function quickRange(days) {
   const end = new Date()
@@ -259,7 +194,7 @@ function buildChart() {
     chart.clear()
     return
   }
-  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  const isDark = true
   chart.setOption({
     backgroundColor: 'transparent',
     tooltip: {
@@ -284,7 +219,7 @@ watch(filteredRows, buildChart)
 const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => chart?.resize()) : null
 onMounted(async () => {
   await nextTick()
-  chart = echarts.init(chartEl.value, window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : null)
+  chart = echarts.init(chartEl.value, 'dark')
   buildChart()
   ro?.observe(chartEl.value)
 })
@@ -295,31 +230,73 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.stats-overview-fill { width: 72%; }
-.stats-filter-grid { grid-template-columns: 150px 150px 1fr auto auto auto; }
-.entry-list-bars { margin-top: 8px; display: grid; gap: 10px; }
-.entry-item {
-  display: grid;
-  gap: 8px;
-  border: 1px solid var(--border); border-radius: var(--r-sm);
-  background: var(--surface-2); padding: 8px 10px; color: var(--text);
-  text-align: left;
-}
-.entry-row {
+.stats-shell {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
 }
-.entry-bar {
-  height: 8px;
-  border-radius: 999px;
-  background: var(--border);
+.stats-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden;
 }
-.entry-bar-inner {
-  height: 100%;
-  background: var(--primary);
-  border-radius: 999px;
+.stats-overview-fill { width: 72%; }
+.stats-filter-grid { grid-template-columns: 150px 150px 1fr auto auto auto; }
+.stats-filter-spacer { min-width: 0; }
+.stats-main {
+  flex: 1;
+  grid-template-columns: 3fr 2fr;
+  grid-template-rows: 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+.stats-chart-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.stats-table-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+}
+.stats-chart-card .analytics-trend-chart {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.stats-table-scroll {
+  min-height: 0;
+  overflow: auto;
+}
+.stats-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.stats-detail-table th,
+.stats-detail-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 8px;
+  text-align: left;
+}
+.stats-detail-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+.stats-detail-table .col-date { width: 92px; }
+.stats-detail-table .col-count,
+.stats-detail-table .col-type { width: 64px; }
+.stats-detail-table .col-num { width: 86px; text-align: right; }
+.stats-detail-table .badge {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .card :deep(table th),
 .card :deep(table td) {
@@ -344,11 +321,15 @@ onUnmounted(() => {
   padding: 0 8px;
 }
 .page-num.active {
-  color: #1d4ed8;
-  border-color: #bfdbfe;
-  background: #eff6ff;
+  color: #bfdbfe;
+  border-color: #1d4ed8;
+  background: #172554;
 }
 @media (max-width: 1200px) {
+  .stats-page { flex: none; min-height: auto; overflow: visible; }
+  .stats-main { grid-template-columns: 1fr; overflow: visible; }
+  .stats-chart-card .analytics-trend-chart { flex: none; height: 300px; }
+  .stats-table-scroll { max-height: 480px; }
   .stats-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>

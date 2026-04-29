@@ -167,7 +167,7 @@ function buildChart() {
     chart.clear()
     return
   }
-  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  const isDark = true
   chart.setOption({
     backgroundColor: 'transparent',
     tooltip: { trigger: 'axis', formatter: params => {
@@ -189,7 +189,7 @@ watch(filteredRows, buildChart)
 const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => chart?.resize()) : null
 onMounted(async () => {
   await nextTick()
-  chart = echarts.init(chartEl.value, window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : null)
+  chart = echarts.init(chartEl.value, 'dark')
   buildChart()
   ro?.observe(chartEl.value)
 })

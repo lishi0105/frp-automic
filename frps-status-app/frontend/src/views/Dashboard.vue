@@ -176,7 +176,7 @@ function buildChart(daily) {
     byDay[r.day].out += Number(r.out)
   }
   const days = Object.keys(byDay).sort().slice(-30)
-  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  const isDark = true
   chart.setOption({
     backgroundColor: 'transparent',
     tooltip: {
@@ -202,7 +202,7 @@ const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => char
 
 onMounted(async () => {
   await nextTick()
-  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  const isDark = true
   chart = echarts.init(chartEl.value, isDark ? 'dark' : null)
   if (props.daily?.length) buildChart(props.daily)
   ro?.observe(chartEl.value)
@@ -250,7 +250,7 @@ onUnmounted(() => {
 .metric-ring {
   --ring: 0%;
   width: 96px; height: 96px; border-radius: 50%;
-  background: conic-gradient(#2563eb var(--ring), #e2e8f0 0);
+  background: conic-gradient(#2563eb var(--ring), #334155 0);
   display: grid; place-items: center;
 }
 .metric-ring::before {
@@ -258,10 +258,10 @@ onUnmounted(() => {
   width: 72px; height: 72px; border-radius: 50%;
   background: var(--surface);
 }
-.metric-ring.blue { background: conic-gradient(#2563eb var(--ring), #e2e8f0 0); }
-.metric-ring.green { background: conic-gradient(#10b981 var(--ring), #e2e8f0 0); }
-.metric-ring.teal { background: conic-gradient(#0ea5a4 var(--ring), #e2e8f0 0); }
-.metric-ring.amber { background: conic-gradient(#f59e0b var(--ring), #e2e8f0 0); }
+.metric-ring.blue { background: conic-gradient(#2563eb var(--ring), #334155 0); }
+.metric-ring.green { background: conic-gradient(#10b981 var(--ring), #334155 0); }
+.metric-ring.teal { background: conic-gradient(#0ea5a4 var(--ring), #334155 0); }
+.metric-ring.amber { background: conic-gradient(#f59e0b var(--ring), #334155 0); }
 .ring-center {
   position: absolute;
   font-size: 12px;

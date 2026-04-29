@@ -103,31 +103,32 @@ function toggleSMTP() {
 </script>
 
 <style scoped>
-.smtp-mask { position: fixed; inset: 0; background: rgba(0, 0, 0, .4); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 60; }
-.smtp-modal { width: min(640px, 100%); max-height: 90vh; border-radius: 16px; background: #fff; overflow: hidden; display: flex; flex-direction: column; }
-.smtp-modal-head { height: 70px; border-bottom: 1px solid #f1f5f9; padding: 0 24px; display: flex; justify-content: space-between; align-items: center; }
-.smtp-modal-head h3 { font-size: 18px; font-weight: 700; color: #1e293b; }
-.smtp-close { border: 0; background: transparent; color: #94a3b8; font-size: 24px; line-height: 1; cursor: pointer; }
+.smtp-mask { position: fixed; inset: 0; background: rgba(2, 6, 23, .7); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 60; }
+.smtp-modal { width: min(640px, 100%); max-height: 90vh; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
+.smtp-modal-head { height: 70px; border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; justify-content: space-between; align-items: center; }
+.smtp-modal-head h3 { font-size: 18px; font-weight: 700; color: var(--text); }
+.smtp-close { border: 0; background: transparent; color: var(--text-2); font-size: 24px; line-height: 1; cursor: pointer; }
 .smtp-modal-body { padding: 20px 24px 12px; overflow-y: auto; flex: 1; }
 .smtp-line { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 12px; margin-bottom: 10px; }
 .smtp-line-top { align-items: flex-start; }
-.smtp-label { text-align: right; color: #475569; font-size: 14px; }
+.smtp-label { text-align: right; color: var(--text-2); font-size: 14px; }
 .smtp-label i { color: #ef4444; font-style: normal; margin-right: 4px; }
 .smtp-input-wrap { width: 100%; }
-.smtp-input-wrap input, .smtp-input-wrap textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 12px; font: inherit; }
+.smtp-input-wrap input, .smtp-input-wrap textarea { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 0 12px; font: inherit; background: var(--surface-2); color: var(--text); }
 .smtp-input-wrap input { height: 36px; }
 .smtp-input-wrap textarea { resize: vertical; min-height: 80px; padding-top: 9px; padding-bottom: 9px; }
 .password-row { display: grid; grid-template-columns: minmax(0, 1fr) 62px; gap: 10px; }
-.pass-toggle { height: 36px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #64748b; font-size: 12px; cursor: pointer; }
-.switch-btn { width: 50px; height: 24px; border: 0; border-radius: 999px; background: #cbd5e1; padding: 0 3px; display: flex; align-items: center; cursor: pointer; transition: background .15s; }
-.switch-btn span { width: 18px; height: 18px; border-radius: 50%; background: #fff; transform: translateX(0); transition: transform .15s; }
+.pass-toggle { height: 36px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-2); font-size: 12px; cursor: pointer; }
+.switch-btn { width: 50px; height: 24px; border: 0; border-radius: 999px; background: #475569; padding: 0 3px; display: flex; align-items: center; cursor: pointer; transition: background .15s; }
+.switch-btn span { width: 18px; height: 18px; border-radius: 50%; background: #f8fafc; transform: translateX(0); transition: transform .15s; }
 .switch-btn.on { background: #10b981; }
 .switch-btn.on span { transform: translateX(26px); }
-.smtp-tips { margin: 4px 0 10px 124px; color: #64748b; font-size: 13px; line-height: 1.7; }
-.smtp-modal-foot { background: #f8fafc; height: 70px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
-.btn-test, .btn-plain { border: 1px solid #cbd5e1; background: #fff; color: #475569; }
+.smtp-tips { margin: 4px 0 10px 124px; color: var(--text-2); font-size: 13px; line-height: 1.7; }
+.smtp-modal-foot { background: var(--surface-2); height: 70px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
+.btn-test, .btn-plain { border: 1px solid var(--border); background: var(--surface); color: var(--text); }
 .foot-right { display: flex; gap: 10px; }
 .btn-test, .btn-dark { display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease; }
+.btn-dark { border: 1px solid var(--primary); background: var(--primary); color: #fff; }
 .btn-test.is-busy, .btn-dark.is-busy { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(15, 23, 42, .16); }
 .btn-spinner { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: btnspin .7s linear infinite; }
 @keyframes btnspin { to { transform: rotate(360deg); } }

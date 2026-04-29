@@ -13,7 +13,6 @@
         <div>
           <div class="section-title">告警配置概览</div>
           <div class="text-muted text-sm">月流量阈值、事件告警、SMTP 与数据库维护策略</div>
-          <div class="analytics-overview-bar"><div class="analytics-overview-bar-inner settings-overview-fill"></div></div>
         </div>
         <div class="analytics-overview-metrics">
           <div><b>{{ form.alert_in_gb || 0 }} GB</b><small>月上行阈值</small></div>
@@ -310,7 +309,6 @@ async function doPurge() {
 
 <style scoped>
 .settings-page { display: grid; gap: 12px; }
-.settings-overview-fill { width: 78%; }
 .settings-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
 .settings-card {
   background: var(--surface);
@@ -345,10 +343,10 @@ async function doPurge() {
 .notify-card { display: grid; align-content: start; gap: 10px; }
 .notify-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .smtp-ready-box {
-  height: 28px; border-radius: 8px; border: 1px solid #fee2e2; background: #fef2f2;
-  display: flex; align-items: center; gap: 8px; padding: 0 12px; color: #991b1b; font-size: 12px;
+  height: 28px; border-radius: 8px; border: 1px solid #991b1b; background: #7f1d1d;
+  display: flex; align-items: center; gap: 8px; padding: 0 12px; color: #fca5a5; font-size: 12px;
 }
-.smtp-ready-box.ok { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+.smtp-ready-box.ok { background: #14532d; border-color: #166534; color: #86efac; }
 .smtp-ready-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .smtp-current { color: var(--text-2); font-size: 12px; }
 .notify-foot { display: flex; gap: 8px; justify-content: flex-end; }
@@ -358,12 +356,12 @@ async function doPurge() {
   gap: 10px; padding: 10px; margin-top: 8px;
 }
 .db-line-vacuum { background: var(--surface-2); }
-.db-line-purge { background: #fffbeb; color: #92400e; }
+.db-line-purge { background: #451a03; color: #fde68a; }
 .db-title { font-size: 13px; font-weight: 600; }
 .purge-inline { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .purge-inline input {
   width: 52px; height: 30px; border-radius: 8px; border: 1px solid #d97706;
-  text-align: center; background: #fff;
+  text-align: center; background: var(--surface); color: var(--text);
 }
 .btn-warn { background: #d97706; border-color: #d97706; color: #fff; }
 
@@ -372,7 +370,7 @@ async function doPurge() {
   height: 24px;
   border: 0;
   border-radius: 999px;
-  background: #cbd5e1;
+  background: #475569;
   padding: 0 3px;
   display: flex;
   align-items: center;
@@ -384,7 +382,7 @@ async function doPurge() {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
+  background: #f8fafc;
   transform: translateX(0);
   transition: transform .15s;
 }
@@ -402,6 +400,9 @@ async function doPurge() {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
   transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease;
 }
 

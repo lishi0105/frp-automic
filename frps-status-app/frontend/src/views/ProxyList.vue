@@ -462,9 +462,9 @@ watch(sortedFiltered, (arr) => {
   background: var(--surface-2);
 }
 .btn-on {
-  color: #1d4ed8;
-  border-color: #bfdbfe;
-  background: #eff6ff;
+  color: #bfdbfe;
+  border-color: #1d4ed8;
+  background: #172554;
 }
 .selected td { background: var(--surface-2); }
 .proxy-detail { display: grid; align-content: start; gap: 10px; }
@@ -522,9 +522,9 @@ watch(sortedFiltered, (arr) => {
   padding: 0 8px;
 }
 .page-num.active {
-  color: #1d4ed8;
-  border-color: #bfdbfe;
-  background: #eff6ff;
+  color: #bfdbfe;
+  border-color: #1d4ed8;
+  background: #172554;
 }
 .quick-jump {
   display: inline-flex;
@@ -559,7 +559,7 @@ watch(sortedFiltered, (arr) => {
   font-size: 12px;
 }
 .sort-idle { color: var(--text-2); }
-.sort-asc, .sort-desc { color: #2563eb; font-weight: 700; }
+.sort-asc, .sort-desc { color: #60a5fa; font-weight: 700; }
 .sort-asc::before { content: '↑'; }
 .sort-desc::before { content: '↓'; }
 .sort-asc, .sort-desc { font-size: 0; }

@@ -12,11 +12,11 @@
           <span>FRPS状态监控</span>
         </div>
         <h1>FRPS 综合管理平台</h1>
-        <p>SSL证书 · 流量告警 · 节点审计</p>
+        <p>SSL证书 · 流量告警 · 历史统计</p>
         <ul class="login-feature-list">
           <li><span class="feature-dot blue"></span>自动化证书签发与续期</li>
           <li><span class="feature-dot green"></span>自定义流量阈值监控</li>
-          <li><span class="feature-dot amber"></span>多渠道 WebHook 实时告警</li>
+          <li><span class="feature-dot amber"></span>SMTP 邮件事件告警</li>
         </ul>
       </div>
     </section>
