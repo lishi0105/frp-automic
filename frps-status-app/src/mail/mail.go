@@ -13,7 +13,7 @@ import (
 
 func Send(settings model.PublicSettings, authCode, subject, body string) error {
 	addr := net.JoinHostPort(settings.SMTPHost, strconv.Itoa(settings.SMTPPort))
-	auth := smtp.PlainAuth("", settings.SMTPUser, authCode, settings.SMTPHost)
+	auth := smtp.PlainAuth("", settings.SMTPFrom, authCode, settings.SMTPHost)
 	msg := "From: " + settings.SMTPFrom + "\r\n" +
 		"To: " + settings.SMTPTo + "\r\n" +
 		"Subject: " + subject + "\r\n" +
