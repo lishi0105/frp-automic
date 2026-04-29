@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="proxy-shell">
     <div class="page-header">
       <div>
         <div class="page-title">代理列表</div>
@@ -14,7 +14,7 @@
       </div>
     </div>
 
-    <div class="page-body analytics-page">
+    <div class="page-body analytics-page proxy-page">
       <section class="analytics-overview">
         <div>
           <div class="section-title">代理运行概览</div>
@@ -363,6 +363,18 @@ watch(sortedFiltered, (arr) => {
 </script>
 
 <style scoped>
+.proxy-shell {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.proxy-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
 .proxy-filters-grid {
   display: grid;
   grid-template-columns: minmax(240px, 1fr) 130px 130px auto auto auto;
@@ -393,6 +405,11 @@ watch(sortedFiltered, (arr) => {
   box-shadow: var(--shadow);
   padding: 14px;
 }
+.proxy-table-wrap {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+}
 .proxy-table-wrap .section-title,
 .proxy-detail .section-title {
   font-size: 15px;
@@ -414,7 +431,7 @@ watch(sortedFiltered, (arr) => {
   padding: 0 8px;
 }
 .table-scroll {
-  max-height: calc(100vh - 440px);
+  min-height: 0;
   overflow: auto;
 }
 .sticky-head th {
@@ -452,7 +469,7 @@ watch(sortedFiltered, (arr) => {
 .selected td { background: var(--surface-2); }
 .proxy-detail { display: grid; align-content: start; gap: 10px; }
 .proxy-detail {
-  max-height: calc(100vh - 340px);
+  min-height: 0;
   overflow: auto;
 }
 .detail-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
@@ -484,7 +501,11 @@ watch(sortedFiltered, (arr) => {
   font-size: 12px;
 }
 .detail-link { justify-self: start; }
-.proxy-main-custom { grid-template-columns: 1fr 300px; }
+.proxy-main-custom {
+  flex: 1;
+  grid-template-columns: 1fr 300px;
+  min-height: 0;
+}
 .proxy-pager {
   margin-top: 10px;
   display: flex;
@@ -543,6 +564,7 @@ watch(sortedFiltered, (arr) => {
 .sort-desc::before { content: '↓'; }
 .sort-asc, .sort-desc { font-size: 0; }
 @media (max-width: 1200px) {
+  .proxy-page { flex: none; min-height: auto; }
   .proxy-filters-grid { grid-template-columns: 1fr 1fr 1fr; }
   .proxy-filters-advanced { grid-template-columns: 1fr 1fr; }
   .proxy-main-custom { grid-template-columns: 1fr; }

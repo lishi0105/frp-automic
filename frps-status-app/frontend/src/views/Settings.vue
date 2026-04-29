@@ -157,7 +157,7 @@ const savingEvents = ref(false)
 const testingEmail = ref(false)
 const vacuuming = ref(false)
 const purging = ref(false)
-const purgeDays = ref(30)
+const purgeDays = ref(60)
 
 const saveMsg = ref(null)
 const smtpMsg = ref(null)

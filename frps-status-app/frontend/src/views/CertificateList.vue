@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="cert-shell">
     <div class="page-header">
       <div>
         <div class="page-title">证书列表</div>
@@ -13,7 +13,7 @@
       </div>
     </div>
 
-    <div class="page-body analytics-page">
+    <div class="page-body analytics-page cert-page">
       <section class="analytics-overview">
         <div>
           <div class="section-title">证书健康概览</div>
@@ -252,6 +252,18 @@ watch(sortedFiltered, (arr) => {
 </script>
 
 <style scoped>
+.cert-shell {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.cert-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
 .cert-overview-fill { width: 75%; }
 .cert-filters-grid {
   display: grid;
@@ -259,7 +271,11 @@ watch(sortedFiltered, (arr) => {
   gap: 10px;
   align-items: center;
 }
-.cert-main-custom { grid-template-columns: 1fr 320px; }
+.cert-main-custom {
+  flex: 1;
+  grid-template-columns: 1fr 320px;
+  min-height: 0;
+}
 .proxy-table-wrap, .proxy-detail {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -267,9 +283,14 @@ watch(sortedFiltered, (arr) => {
   box-shadow: var(--shadow);
   padding: 14px;
 }
+.proxy-table-wrap {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+}
 .proxy-table-tools { display: flex; align-items: center; gap: 12px; }
 .page-size { margin-left: 6px; width: 74px; height: 28px; padding: 0 8px; }
-.table-scroll { max-height: calc(100vh - 440px); overflow: auto; }
+.table-scroll { min-height: 0; overflow: auto; }
 .sticky-head th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
 .table-wrap table { table-layout: fixed; }
 .table-wrap th { font-size: 12px; font-weight: 650; color: var(--text-2); padding: 11px 10px; }
@@ -277,7 +298,7 @@ watch(sortedFiltered, (arr) => {
 .table-wrap tbody tr:hover td, .selected td { background: var(--surface-2); }
 .btn-on { color: #1d4ed8; border-color: #bfdbfe; background: #eff6ff; }
 .btn-on.warn { color: #92400e; border-color: #fde68a; background: #fffbeb; }
-.proxy-detail { display: grid; align-content: start; gap: 10px; max-height: calc(100vh - 340px); overflow: auto; }
+.proxy-detail { display: grid; align-content: start; gap: 10px; min-height: 0; overflow: auto; }
 .detail-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
 .detail-row span { color: var(--text-2); font-size: 12px; }
 .sortable { cursor: pointer; user-select: none; white-space: nowrap; }
@@ -295,6 +316,7 @@ watch(sortedFiltered, (arr) => {
 .page-num { min-width: 34px; padding: 0 8px; }
 .page-num.active { color: #1d4ed8; border-color: #bfdbfe; background: #eff6ff; }
 @media (max-width: 1200px) {
+  .cert-page { flex: none; min-height: auto; }
   .cert-filters-grid { grid-template-columns: 1fr 1fr 1fr; }
   .cert-main-custom { grid-template-columns: 1fr; }
   .table-scroll { max-height: 480px; }

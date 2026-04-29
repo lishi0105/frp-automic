@@ -224,7 +224,7 @@ npm run build  # 输出至 ../web/
 | GET/POST | `/api/settings` | 读取 / 保存配置 |
 | POST | `/api/settings/test-email` | 发送测试邮件 |
 | POST | `/api/db/vacuum` | SQLite VACUUM |
-| POST | `/api/db/purge` | 清理旧数据 `{"days": 30}` |
+| POST | `/api/db/purge` | 清理旧数据 `{"days": 60}` |
 
 所有接口均使用 HTTP Basic Auth（与面板登录凭据相同）。
 

@@ -2,8 +2,8 @@
   <div>
     <div class="page-header">
       <div>
-        <div class="page-title">历史统计</div>
-        <div class="page-sub">全部代理汇总视角</div>
+        <div class="page-title">{{ selectedProxyName ? '历史统计 / ' + selectedProxyName : '历史统计' }}</div>
+        <div class="page-sub">{{ selectedProxyName ? '代理分项视角' : '全部代理汇总视角' }}</div>
       </div>
       <div class="flex-center">
         <a class="btn btn-outline btn-sm" :href="exportUrl">⬇ 导出 CSV</a>
@@ -18,7 +18,7 @@
       <section class="analytics-overview">
         <div>
           <div class="section-title">所选时间范围</div>
-          <div class="text-muted text-sm">{{ startDate || minDay || '-' }} 至 {{ endDate || maxDay || '-' }} · 全部代理汇总</div>
+          <div class="text-muted text-sm">{{ startDate || minDay || '-' }} 至 {{ endDate || maxDay || '-' }} · {{ selectedProxyName || '全部代理汇总' }}</div>
           <div class="analytics-overview-bar"><div class="analytics-overview-bar-inner stats-overview-fill"></div></div>
         </div>
         <div class="analytics-overview-metrics">
@@ -32,8 +32,7 @@
         <div class="analytics-filter-grid stats-filter-grid">
           <input class="form-input" type="date" v-model="startDate" />
           <input class="form-input" type="date" v-model="endDate" />
-          <input class="form-input" value="全局汇总，不筛代理" readonly />
-          <button class="btn btn-outline btn-sm" @click="quickRange(30)">最近30天</button>
+          <button class="btn btn-outline btn-sm" @click="quickRange(60)">最近60天</button>
           <button class="btn btn-outline btn-sm" @click="quickThisMonth">本月</button>
           <button class="btn btn-outline btn-sm" @click="resetFilter">重置</button>
         </div>
@@ -42,17 +41,17 @@
       <div class="analytics-main-2col">
         <section class="card">
           <div class="section-head">
-            <div class="section-title">流量趋势</div>
+            <div class="section-title">{{ selectedProxyName ? '代理流量趋势' : '流量趋势' }}</div>
           </div>
           <div ref="chartEl" class="analytics-trend-chart"></div>
         </section>
 
-        <section class="card">
+        <section v-if="!selectedProxyName" class="card">
           <div class="section-head">
-            <div class="section-title">代理详情入口</div>
+            <div class="section-title">代理流量 Top 8</div>
           </div>
           <div class="entry-list-bars">
-            <button v-for="p in topContrib" :key="p.name + p.type" class="entry-item" @click="goProxyStats(p.name)">
+            <div v-for="p in topContrib" :key="p.name + p.type" class="entry-item">
               <div class="entry-row">
                 <code>{{ p.name }}</code>
                 <span>{{ humanBytes(p.total) }}</span>
@@ -60,46 +59,40 @@
               <div class="entry-bar">
                 <div class="entry-bar-inner" :style="{ width: topTotal ? ((p.total / topTotal) * 100).toFixed(1) + '%' : '0%' }"></div>
               </div>
-            </button>
+            </div>
           </div>
+        </section>
+
+        <section v-else class="card analytics-side-kv">
+          <div class="section-head"><div class="section-title">代理表现</div></div>
+          <div class="kv"><span>代理类型</span><b>{{ proxyType || '-' }}</b></div>
+          <div class="kv"><span>在线状态</span><b>{{ proxyOnline ? '在线' : '离线' }}</b></div>
+          <div class="kv"><span>当前连接</span><b>{{ proxyCurConns }}</b></div>
+          <div class="kv"><span>日峰值连接</span><b>{{ peakConns }}</b></div>
+          <div class="kv"><span>上行占比</span><b>{{ ratioIn }}%</b></div>
+          <div class="kv"><span>下行占比</span><b>{{ ratioOut }}%</b></div>
+          <div class="kv"><span>关联证书</span><b>{{ certDomain || '-' }}</b></div>
+          <div class="kv"><span>证书剩余</span><b :style="{ color: certColor(certDaysLeft) }">{{ certDaysLeft != null ? certDaysLeft + ' 天' : '-' }}</b></div>
         </section>
       </div>
 
       <section class="card">
         <div class="section-head">
-          <div class="section-title">代理统计子页</div>
-          <span class="text-muted text-sm">{{ proxyPages.length }} 个动态页面</span>
-        </div>
-        <div class="proxy-page-grid">
-          <button v-if="!proxyPages.length" class="entry-item" disabled>暂无代理</button>
-          <button
-            v-for="p in proxyPages"
-            :key="p.name + p.type"
-            class="entry-item proxy-page-entry"
-            @click="goProxyStats(p.name)"
-          >
-            <div class="entry-row">
-              <code>{{ p.name }}</code>
-              <span class="badge badge-ok">{{ p.type }}</span>
-            </div>
-            <div class="text-muted text-sm">/statistics/{{ encodeURIComponent(p.name) }}</div>
-          </button>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="section-head">
-          <div class="section-title">每日明细（全局聚合）</div>
+          <div class="section-title">{{ selectedProxyName ? '当前代理每日明细' : '每日明细（全局聚合）' }}</div>
           <span class="text-muted text-sm">{{ filteredRows.length }} 条记录</span>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>日期</th><th>代理数</th><th>连接峰值</th><th>上行</th><th>下行</th><th>合计</th></tr></thead>
+            <thead>
+              <tr v-if="selectedProxyName"><th>日期</th><th>类型</th><th>连接峰值</th><th>上行</th><th>下行</th><th>合计</th></tr>
+              <tr v-else><th>日期</th><th>代理数</th><th>连接峰值</th><th>上行</th><th>下行</th><th>合计</th></tr>
+            </thead>
             <tbody>
               <tr v-if="!pagedRows.length"><td colspan="6" class="empty">暂无数据</td></tr>
-              <tr v-for="r in pagedRows" :key="r.day">
+              <tr v-for="r in pagedRows" :key="selectedProxyName ? r.day + r.type : r.day">
                 <td>{{ r.day }}</td>
-                <td>{{ r.proxy_count }}</td>
+                <td v-if="selectedProxyName"><span class="badge badge-ok">{{ r.type }}</span></td>
+                <td v-else>{{ r.proxy_count }}</td>
                 <td>{{ r.peak_conns }}</td>
                 <td>{{ humanBytes(r.in) }}</td>
                 <td>{{ humanBytes(r.out) }}</td>
@@ -129,14 +122,14 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import { humanBytes } from '../utils/format.js'
 import { api } from '../api/index.js'
 
 const props = defineProps({ status: Object, daily: Array, loading: Boolean })
 defineEmits(['refresh'])
-const router = useRouter()
+const route = useRoute()
 
 const exportUrl = api.exportCSVUrl
 const chartEl = ref(null)
@@ -147,11 +140,41 @@ const page = ref(1)
 const PAGE_SIZE = 15
 
 const rows = computed(() => props.daily ?? [])
-const minDay = computed(() => rows.value.length ? [...rows.value].sort((a, b) => a.day.localeCompare(b.day))[0].day : '')
-const maxDay = computed(() => rows.value.length ? [...rows.value].sort((a, b) => b.day.localeCompare(a.day))[0].day : '')
+const selectedProxyName = computed(() => decodeURIComponent(route.params.proxyName || ''))
+const proxyRows = computed(() => selectedProxyName.value ? rows.value.filter(r => r.name === selectedProxyName.value) : rows.value)
+const proxyInfo = computed(() => (props.status?.proxies ?? []).find(p => p.name === selectedProxyName.value) || null)
+const proxyType = computed(() => proxyInfo.value?.type || proxyRows.value[0]?.type || '')
+const proxyOnline = computed(() => proxyInfo.value?.online ?? false)
+const proxyCurConns = computed(() => proxyInfo.value?.cur_conns ?? 0)
+const certByDomain = computed(() => {
+  const certs = props.status?.certificates ?? []
+  const domains = (proxyInfo.value?.domains ?? []).filter(Boolean)
+  if (domains.length) {
+    const exact = certs.find(c => domains.includes(c.domain))
+    if (exact) return exact
+  }
+  return certs.find(c => c.domain === selectedProxyName.value || c.domain?.includes(selectedProxyName.value)) || null
+})
+const certDomain = computed(() => certByDomain.value?.domain || '')
+const certDaysLeft = computed(() => certByDomain.value?.days_left ?? null)
+const minDay = computed(() => proxyRows.value.length ? [...proxyRows.value].sort((a, b) => a.day.localeCompare(b.day))[0].day : '')
+const maxDay = computed(() => proxyRows.value.length ? [...proxyRows.value].sort((a, b) => b.day.localeCompare(a.day))[0].day : '')
 
 const filteredRows = computed(() => {
   const byDay = {}
+  if (selectedProxyName.value) {
+    const byDayType = {}
+    for (const r of proxyRows.value) {
+      if (startDate.value && r.day < startDate.value) continue
+      if (endDate.value && r.day > endDate.value) continue
+      const key = `${r.day}:${r.type || proxyType.value}`
+      byDayType[key] ??= { day: r.day, type: r.type || proxyType.value, in: 0, out: 0, peak_conns: 0 }
+      byDayType[key].in += Number(r.in || 0)
+      byDayType[key].out += Number(r.out || 0)
+      byDayType[key].peak_conns = Math.max(byDayType[key].peak_conns, Number(r.peak_conns || 0))
+    }
+    return Object.values(byDayType).sort((a, b) => b.day.localeCompare(a.day))
+  }
   for (const r of rows.value) {
     if (startDate.value && r.day < startDate.value) continue
     if (endDate.value && r.day > endDate.value) continue
@@ -171,6 +194,9 @@ const filteredRows = computed(() => {
 const totalIn = computed(() => filteredRows.value.reduce((s, r) => s + r.in, 0))
 const totalOut = computed(() => filteredRows.value.reduce((s, r) => s + r.out, 0))
 const totalTraffic = computed(() => totalIn.value + totalOut.value)
+const peakConns = computed(() => filteredRows.value.reduce((m, r) => Math.max(m, Number(r.peak_conns || 0)), 0))
+const ratioIn = computed(() => totalTraffic.value ? ((totalIn.value / totalTraffic.value) * 100).toFixed(1) : '0.0')
+const ratioOut = computed(() => totalTraffic.value ? ((totalOut.value / totalTraffic.value) * 100).toFixed(1) : '0.0')
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredRows.value.length / PAGE_SIZE)))
 const pagedRows = computed(() => {
@@ -199,17 +225,12 @@ const topContrib = computed(() => {
   return Object.values(m).sort((a, b) => b.total - a.total).slice(0, 8)
 })
 const topTotal = computed(() => topContrib.value[0]?.total || 0)
-const proxyPages = computed(() => {
-  const map = new Map()
-  for (const p of (props.status?.proxies ?? [])) {
-    const k = `${p.name}:${p.type}`
-    if (!map.has(k)) map.set(k, { name: p.name, type: p.type })
-  }
-  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
-})
 
-function goProxyStats(name) {
-  router.push(`/statistics/${encodeURIComponent(name)}`)
+function certColor(days) {
+  if (days == null) return 'var(--text-2)'
+  if (days < 7) return 'var(--danger)'
+  if (days < 15) return 'var(--warning)'
+  return 'var(--success)'
 }
 
 function quickRange(days) {
@@ -281,7 +302,7 @@ onUnmounted(() => {
   display: grid;
   gap: 8px;
   border: 1px solid var(--border); border-radius: var(--r-sm);
-  background: var(--surface-2); padding: 8px 10px; cursor: pointer; color: var(--text);
+  background: var(--surface-2); padding: 8px 10px; color: var(--text);
   text-align: left;
 }
 .entry-row {
@@ -299,16 +320,6 @@ onUnmounted(() => {
   height: 100%;
   background: var(--primary);
   border-radius: 999px;
-}
-.entry-item:hover { border-color: var(--primary); }
-.proxy-page-grid {
-  margin-top: 8px;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
-.proxy-page-entry {
-  min-height: 66px;
 }
 .card :deep(table th),
 .card :deep(table td) {
@@ -339,9 +350,5 @@ onUnmounted(() => {
 }
 @media (max-width: 1200px) {
   .stats-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .proxy-page-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (max-width: 760px) {
-  .proxy-page-grid { grid-template-columns: 1fr; }
 }
 </style>

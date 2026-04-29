@@ -11,7 +11,23 @@
         <RouterLink class="nav-item" to="/"><span class="nav-icon">📊</span> 数据看板</RouterLink>
         <RouterLink class="nav-item" to="/proxies"><span class="nav-icon">🔗</span> 代理列表</RouterLink>
         <RouterLink class="nav-item" to="/certificates"><span class="nav-icon">🔒</span> 证书列表</RouterLink>
-        <RouterLink class="nav-item" to="/statistics"><span class="nav-icon">📈</span> 历史统计</RouterLink>
+        <div class="nav-group">
+          <div class="nav-row">
+            <RouterLink class="nav-item nav-parent" to="/statistics"><span class="nav-icon">📈</span> 历史统计</RouterLink>
+            <button class="nav-toggle" type="button" :aria-expanded="statsOpen" @click="statsOpen = !statsOpen">{{ statsOpen ? '⌄' : '›' }}</button>
+          </div>
+          <div v-if="statsOpen" class="nav-children">
+            <RouterLink
+              v-for="p in proxyNavItems"
+              :key="p.name + p.type"
+              class="nav-subitem"
+              :to="'/statistics/' + encodeURIComponent(p.name)"
+            >
+              <span class="nav-subdot"></span>
+              <span class="nav-subtext">{{ p.name }}</span>
+            </RouterLink>
+          </div>
+        </div>
         <RouterLink class="nav-item" to="/settings"><span class="nav-icon">⚙️</span> 系统配置</RouterLink>
       </nav>
       <div class="sidebar-footer">
@@ -26,7 +42,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { api } from './api/index.js'
 import logoUrl from './assets/logo.svg'
@@ -37,9 +53,21 @@ const status = ref(null)
 const daily = ref([])
 const loading = ref(false)
 const updatedAt = ref('')
+const statsOpen = ref(false)
 
 const isLogin = computed(() => route.path === '/login')
 const frpsOnline = computed(() => status.value?.frps?.bind?.ok ?? false)
+const proxyNavItems = computed(() => {
+  const map = new Map()
+  for (const p of (status.value?.proxies ?? [])) {
+    if (!map.has(p.name)) map.set(p.name, p)
+  }
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+})
+
+watch(() => route.path, (path) => {
+  if (path.startsWith('/statistics')) statsOpen.value = true
+}, { immediate: true })
 
 async function load() {
   loading.value = true

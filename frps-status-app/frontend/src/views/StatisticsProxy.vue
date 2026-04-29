@@ -32,7 +32,7 @@
         <div class="analytics-filter-grid proxy-filter-grid">
           <input class="form-input" type="date" v-model="startDate" />
           <input class="form-input" type="date" v-model="endDate" />
-          <button class="btn btn-outline btn-sm" @click="quickRange(30)">最近30天</button>
+          <button class="btn btn-outline btn-sm" @click="quickRange(60)">最近60天</button>
           <button class="btn btn-outline btn-sm" @click="resetFilter">重置</button>
         </div>
       </section>

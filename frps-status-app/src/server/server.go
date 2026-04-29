@@ -112,7 +112,7 @@ func (a *App) Refresh(ctx context.Context) error {
 			TopProxies:  buildTopProxies(proxies, 5),
 			Certificate: summarizeCertificates(certs),
 		},
-		Settings:     settings,
+		Settings: settings,
 	}
 	a.mu.Lock()
 	a.latest = s
@@ -502,7 +502,7 @@ func (a *App) handlePurge(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	if body.Days < 1 {
-		body.Days = 30
+		body.Days = 60
 	}
 	deleted, err := a.store.Purge(body.Days)
 	if err != nil {
