@@ -24,7 +24,7 @@ func (s *Store) InitDB() error {
 		`PRAGMA journal_mode=WAL`,
 		`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS proxy_counters (name TEXT NOT NULL, type TEXT NOT NULL, last_in INTEGER NOT NULL, last_out INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(name,type))`,
-		`CREATE TABLE IF NOT EXISTS daily_traffic (day TEXT NOT NULL, proxy_name TEXT NOT NULL, proxy_type TEXT NOT NULL, in_bytes INTEGER NOT NULL DEFAULT 0, out_bytes INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(day,proxy_name,proxy_type))`,
+		`CREATE TABLE IF NOT EXISTS daily_traffic (day TEXT NOT NULL, proxy_name TEXT NOT NULL, proxy_type TEXT NOT NULL, in_bytes INTEGER NOT NULL DEFAULT 0, out_bytes INTEGER NOT NULL DEFAULT 0, peak_conns INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(day,proxy_name,proxy_type))`,
 		`CREATE TABLE IF NOT EXISTS alert_state (month TEXT NOT NULL, direction TEXT NOT NULL, sent_at TEXT NOT NULL, PRIMARY KEY(month,direction))`,
 		`CREATE TABLE IF NOT EXISTS event_alert_state (key TEXT PRIMARY KEY, sent_at TEXT NOT NULL)`,
 	}
@@ -33,6 +33,7 @@ func (s *Store) InitDB() error {
 			return err
 		}
 	}
+	_, _ = s.db.Exec(`ALTER TABLE daily_traffic ADD COLUMN peak_conns INTEGER NOT NULL DEFAULT 0`)
 	defaults := map[string]string{"alert_in_gb": "0", "alert_out_gb": "0", "alert_total_gb": "0", "smtp_port": "465", "smtp_enabled": "false", "alert_proxy_offline": "false", "alert_cert_expiry": "false", "alert_cert_days": "15"}
 	for k, v := range defaults {
 		if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)`, k, v); err != nil {
@@ -94,8 +95,8 @@ func (s *Store) RecordTraffic(proxies []model.ProxyTraffic) error {
 			return err
 		}
 		deltaIn, deltaOut := deltaCounter(lastIn, p.CurrentIn), deltaCounter(lastOut, p.CurrentOut)
-		_, err = tx.Exec(`INSERT INTO daily_traffic(day,proxy_name,proxy_type,in_bytes,out_bytes) VALUES(?,?,?,?,?)
-ON CONFLICT(day,proxy_name,proxy_type) DO UPDATE SET in_bytes=in_bytes+excluded.in_bytes,out_bytes=out_bytes+excluded.out_bytes`, day, p.Name, p.Type, deltaIn, deltaOut)
+		_, err = tx.Exec(`INSERT INTO daily_traffic(day,proxy_name,proxy_type,in_bytes,out_bytes,peak_conns) VALUES(?,?,?,?,?,?)
+ON CONFLICT(day,proxy_name,proxy_type) DO UPDATE SET in_bytes=in_bytes+excluded.in_bytes,out_bytes=out_bytes+excluded.out_bytes,peak_conns=MAX(daily_traffic.peak_conns,excluded.peak_conns)`, day, p.Name, p.Type, deltaIn, deltaOut, p.CurConns)
 		if err != nil {
 			return err
 		}
@@ -165,7 +166,7 @@ func (s *Store) Purge(days int) (int64, error) {
 }
 
 func (s *Store) DailyTraffic() ([]map[string]any, error) {
-	rows, err := s.db.Query(`SELECT day,proxy_name,proxy_type,in_bytes,out_bytes FROM daily_traffic ORDER BY day,proxy_name,proxy_type`)
+	rows, err := s.db.Query(`SELECT day,proxy_name,proxy_type,in_bytes,out_bytes,peak_conns FROM daily_traffic ORDER BY day,proxy_name,proxy_type`)
 	if err != nil {
 		return nil, err
 	}
@@ -173,11 +174,11 @@ func (s *Store) DailyTraffic() ([]map[string]any, error) {
 	var data []map[string]any
 	for rows.Next() {
 		var day, name, typ string
-		var in, out int64
-		if err := rows.Scan(&day, &name, &typ, &in, &out); err != nil {
+		var in, out, peak int64
+		if err := rows.Scan(&day, &name, &typ, &in, &out, &peak); err != nil {
 			return nil, err
 		}
-		data = append(data, map[string]any{"day": day, "name": name, "type": typ, "in": clampZero(in), "out": clampZero(out)})
+		data = append(data, map[string]any{"day": day, "name": name, "type": typ, "in": clampZero(in), "out": clampZero(out), "peak_conns": clampZero(peak)})
 	}
 	return data, nil
 }

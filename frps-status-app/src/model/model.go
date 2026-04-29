@@ -18,6 +18,7 @@ type CertStatus struct {
 type ProxyTraffic struct {
 	Name       string `json:"name"`
 	Type       string `json:"type"`
+	Domains    []string `json:"domains,omitempty"`
 	Online     bool   `json:"online"`
 	CurConns   int64  `json:"cur_conns"`
 	CurrentIn  uint64 `json:"current_in"`
@@ -48,5 +49,28 @@ type Snapshot struct {
 	Certificates []CertStatus      `json:"certificates"`
 	Proxies      []ProxyTraffic    `json:"proxies"`
 	MonthTotals  map[string]uint64 `json:"month_totals"`
+	Dashboard    DashboardSummary  `json:"dashboard"`
 	Settings     PublicSettings    `json:"settings"`
+}
+
+type DashboardTopProxy struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	MonthIn  uint64 `json:"month_in"`
+	MonthOut uint64 `json:"month_out"`
+	Total    uint64 `json:"total"`
+}
+
+type DashboardCertSummary struct {
+	Total       int    `json:"total"`
+	OK          int    `json:"ok"`
+	Warn        int    `json:"warn"`
+	Fail        int    `json:"fail"`
+	MinDomain   string `json:"min_domain,omitempty"`
+	MinDaysLeft *int   `json:"min_days_left,omitempty"`
+}
+
+type DashboardSummary struct {
+	TopProxies  []DashboardTopProxy  `json:"top_proxies"`
+	Certificate DashboardCertSummary `json:"certificate"`
 }

@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -107,12 +108,66 @@ func (a *App) Refresh(ctx context.Context) error {
 		Certificates: certs,
 		Proxies:      proxies,
 		MonthTotals:  map[string]uint64{"in": monthIn, "out": monthOut},
+		Dashboard: model.DashboardSummary{
+			TopProxies:  buildTopProxies(proxies, 5),
+			Certificate: summarizeCertificates(certs),
+		},
 		Settings:     settings,
 	}
 	a.mu.Lock()
 	a.latest = s
 	a.mu.Unlock()
 	return fetchErr
+}
+
+func buildTopProxies(proxies []model.ProxyTraffic, limit int) []model.DashboardTopProxy {
+	if limit <= 0 {
+		limit = 5
+	}
+	items := make([]model.DashboardTopProxy, 0, len(proxies))
+	for _, p := range proxies {
+		total := p.MonthIn + p.MonthOut
+		items = append(items, model.DashboardTopProxy{
+			Name:     p.Name,
+			Type:     p.Type,
+			MonthIn:  p.MonthIn,
+			MonthOut: p.MonthOut,
+			Total:    total,
+		})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Total == items[j].Total {
+			return items[i].Name < items[j].Name
+		}
+		return items[i].Total > items[j].Total
+	})
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items
+}
+
+func summarizeCertificates(certs []model.CertStatus) model.DashboardCertSummary {
+	out := model.DashboardCertSummary{Total: len(certs)}
+	for _, c := range certs {
+		if !c.Present || !c.OK {
+			out.Fail++
+			continue
+		}
+		if c.DaysLeft != nil && *c.DaysLeft < 15 {
+			out.Warn++
+		} else {
+			out.OK++
+		}
+		if c.DaysLeft != nil {
+			if out.MinDaysLeft == nil || *c.DaysLeft < *out.MinDaysLeft {
+				v := *c.DaysLeft
+				out.MinDaysLeft = &v
+				out.MinDomain = c.Domain
+			}
+		}
+	}
+	return out
 }
 
 func (a *App) checkAlerts(settings model.PublicSettings, month string, monthIn, monthOut uint64) error {
@@ -470,7 +525,7 @@ func (a *App) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="frps-traffic.csv"`)
 	cw := csv.NewWriter(w)
-	_ = cw.Write([]string{"day", "proxy_name", "proxy_type", "in_bytes", "out_bytes"})
+	_ = cw.Write([]string{"day", "proxy_name", "proxy_type", "in_bytes", "out_bytes", "peak_conns"})
 	for _, row := range rows {
 		_ = cw.Write([]string{
 			fmt.Sprint(row["day"]),
@@ -478,6 +533,7 @@ func (a *App) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 			fmt.Sprint(row["type"]),
 			strconv.FormatInt(int64(row["in"].(int64)), 10),
 			strconv.FormatInt(int64(row["out"].(int64)), 10),
+			strconv.FormatInt(int64(row["peak_conns"].(int64)), 10),
 		})
 	}
 	cw.Flush()

@@ -515,9 +515,81 @@ code { font-family: var(--mono); font-size: 12px; background: var(--surface-2); 
 .mb-4 { margin-bottom: 16px; }
 .gap-2 { gap: 8px; }
 
+/* ── Shared Analytics Layout ── */
+.analytics-page { display: grid; gap: 14px; }
+.analytics-overview {
+  background: linear-gradient(130deg, #eff6ff, #ecfdf5);
+  border: 1px solid #bfdbfe;
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.analytics-overview-bar {
+  margin-top: 10px;
+  width: 240px;
+  max-width: 100%;
+  height: 8px;
+  border-radius: 8px;
+  background: #dbeafe;
+  overflow: hidden;
+}
+.analytics-overview-bar-inner { height: 100%; background: #2563eb; }
+.analytics-overview-metrics { display: flex; gap: 22px; align-items: center; }
+.analytics-overview-metrics div { display: grid; gap: 2px; }
+.analytics-overview-metrics b { font-size: 22px; line-height: 1; }
+.analytics-overview-metrics span { color: var(--text-2); font-size: 14px; }
+.analytics-overview-metrics small { color: var(--text-3); font-size: 12px; }
+
+.analytics-filters {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  padding: 12px;
+}
+.analytics-filter-grid {
+  display: grid;
+  gap: 8px;
+  align-items: center;
+}
+.analytics-main-2col {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 12px;
+}
+.analytics-main-2col .card { padding: 14px; }
+.analytics-trend-chart { height: 290px; }
+.analytics-pager {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 12px;
+}
+.analytics-side-kv {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+.analytics-side-kv .kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+.analytics-side-kv .kv span { color: var(--text-2); font-size: 12px; }
+
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+@media (max-width: 1200px) {
+  .analytics-main-2col { grid-template-columns: 1fr; }
+}
 
 @media (max-width: 760px) {
   .login-page {

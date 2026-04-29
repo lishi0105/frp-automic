@@ -114,6 +114,7 @@ func (c *Client) fetchProxyType(ctx context.Context, typ string) ([]model.ProxyT
 		out = append(out, model.ProxyTraffic{
 			Name:       name,
 			Type:       typ,
+			Domains:    domainValues(obj),
 			Online:     boolValue(obj, "online", "status"),
 			CurConns:   int64(uintValue(obj, "curConns", "cur_conns")),
 			CurrentIn:  uintValue(obj, "totalTrafficIn", "trafficIn", "todayTrafficIn", "in"),
@@ -121,6 +122,42 @@ func (c *Client) fetchProxyType(ctx context.Context, typ string) ([]model.ProxyT
 		})
 	}
 	return out, nil
+}
+
+func domainValues(m map[string]any) []string {
+	seen := map[string]struct{}{}
+	add := func(s string) {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return
+		}
+		seen[s] = struct{}{}
+	}
+	if arr, ok := m["custom_domains"].([]any); ok {
+		for _, v := range arr {
+			if s, ok := v.(string); ok {
+				add(s)
+			}
+		}
+	}
+	if arr, ok := m["domains"].([]any); ok {
+		for _, v := range arr {
+			if s, ok := v.(string); ok {
+				add(s)
+			}
+		}
+	}
+	if s, ok := m["subdomain"].(string); ok {
+		add(s)
+	}
+	if s, ok := m["domain"].(string); ok {
+		add(s)
+	}
+	out := make([]string, 0, len(seen))
+	for d := range seen {
+		out = append(out, d)
+	}
+	return out
 }
 
 func extractObjects(v any) []map[string]any {

@@ -1,0 +1,192 @@
+<svg width="1440" height="900" viewBox="0 0 1440 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#0F172A" flood-opacity="0.08"/>
+    </filter>
+    <linearGradient id="heroGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#EFF6FF"/>
+      <stop offset="1" stop-color="#F0FDFA"/>
+    </linearGradient>
+    <style>
+      .cn { font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif; }
+      .mono { font-family: "SFMono-Regular", Consolas, Menlo, monospace; }
+      .h1 { font-size: 24px; font-weight: 700; fill: #0F172A; }
+      .h2 { font-size: 15px; font-weight: 700; fill: #0F172A; }
+      .label { font-size: 12px; fill: #64748B; }
+      .muted { font-size: 12px; fill: #94A3B8; }
+      .value { font-size: 28px; font-weight: 750; fill: #0F172A; }
+      .card { fill: #FFFFFF; stroke: #E2E8F0; filter: url(#shadow); }
+      .line { stroke: #E2E8F0; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="900" fill="#F6F8FB"/>
+
+  <g id="sidebar">
+    <rect width="248" height="900" fill="#111827"/>
+    <rect x="20" y="22" width="40" height="40" rx="10" fill="#2563EB"/>
+    <path d="M31 42h18M40 33v18" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+    <text x="72" y="42" class="cn" font-size="18" font-weight="700" fill="#F8FAFC">FRPS 状态监控</text>
+    <circle cx="218" cy="38" r="5" fill="#22C55E"/>
+
+    <text x="52" y="118" class="cn" font-size="14" fill="#9CA3AF">数据看板</text>
+    <circle cx="34" cy="113" r="7" fill="#38BDF8" fill-opacity="0.14"/>
+    <path d="M31 116l3-6 3 4 4-8" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <text x="52" y="170" class="cn" font-size="14" fill="#9CA3AF">代理列表</text>
+    <path d="M29 170h14M36 163v14" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round"/>
+
+    <rect x="16" y="196" width="216" height="42" rx="8" fill="#1F2937"/>
+    <rect x="16" y="196" width="3" height="42" rx="1.5" fill="#38BDF8"/>
+    <text x="52" y="222" class="cn" font-size="14" font-weight="600" fill="#F8FAFC">证书列表</text>
+    <rect x="30" y="208" width="13" height="16" rx="2" stroke="#38BDF8" stroke-width="1.8"/>
+    <path d="M33 208v-4a4 4 0 0 1 8 0v4" stroke="#38BDF8" stroke-width="1.8" stroke-linecap="round"/>
+
+    <text x="52" y="274" class="cn" font-size="14" fill="#9CA3AF">历史统计</text>
+    <path d="M29 276l5-7 6 4 6-12" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="52" y="322" class="cn" font-size="14" fill="#9CA3AF">系统配置</text>
+    <circle cx="36" cy="318" r="7" stroke="#6B7280" stroke-width="1.8"/>
+    <path d="M36 307v4M36 325v4M47 318h-4M29 318h-4" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round"/>
+
+    <rect x="20" y="760" width="208" height="88" rx="10" fill="#0B1220" stroke="#243041"/>
+    <text x="36" y="790" class="cn" font-size="12" fill="#9CA3AF">最近同步</text>
+    <text x="36" y="815" class="cn" font-size="14" font-weight="650" fill="#E5E7EB">2026/04/29 15:42</text>
+    <text x="36" y="838" class="cn" font-size="12" fill="#64748B">30 秒自动刷新</text>
+  </g>
+
+  <g id="certificate-list">
+    <rect x="248" y="0" width="1192" height="900" fill="#F6F8FB"/>
+    <text x="288" y="54" class="cn h1">证书列表</text>
+    <text x="288" y="80" class="cn label">统一检索 SSL 证书、到期风险、关联代理与检查状态</text>
+    <rect x="1132" y="32" width="112" height="36" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <path d="M1152 50a10 10 0 1 0 3-7M1155 43h-7v-7" stroke="#475569" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="1172" y="55" class="cn" font-size="13" font-weight="650" fill="#334155">刷新</text>
+    <rect x="1256" y="32" width="132" height="36" rx="8" fill="#0F172A"/>
+    <path d="M1276 40v16M1268 48h16" stroke="#F8FAFC" stroke-width="1.8" stroke-linecap="round"/>
+    <text x="1294" y="55" class="cn" font-size="13" font-weight="650" fill="#F8FAFC">新增证书</text>
+
+    <rect x="288" y="112" width="1100" height="118" rx="10" fill="url(#heroGrad)" stroke="#BFDBFE" filter="url(#shadow)"/>
+    <text x="312" y="148" class="cn h2">证书健康概览</text>
+    <text x="312" y="173" class="cn label">共 10 张证书，8 张正常，2 张即将过期，0 张检查失败</text>
+    <rect x="312" y="192" width="202" height="10" rx="5" fill="#DBEAFE"/>
+    <rect x="312" y="192" width="162" height="10" rx="5" fill="#16A34A"/>
+
+    <text x="604" y="150" class="cn value">8</text>
+    <text x="604" y="176" class="cn label">正常证书</text>
+    <rect x="716" y="132" width="1" height="64" fill="#BFDBFE"/>
+    <text x="760" y="150" class="cn value" fill="#D97706">2</text>
+    <text x="760" y="176" class="cn label">15 天内到期</text>
+    <rect x="914" y="132" width="1" height="64" fill="#BFDBFE"/>
+    <text x="958" y="150" class="cn value">12 天</text>
+    <text x="958" y="176" class="cn label">最快过期</text>
+    <rect x="1200" y="132" width="1" height="64" fill="#BFDBFE"/>
+    <rect x="1242" y="130" width="84" height="28" rx="14" fill="#FEF3C7" stroke="#FDE68A"/>
+    <circle cx="1258" cy="144" r="4" fill="#F59E0B"/>
+    <text x="1270" y="149" class="cn" font-size="12" font-weight="650" fill="#92400E">需续期</text>
+    <text x="1242" y="178" class="cn label">api.example.com</text>
+
+    <rect x="288" y="254" width="1100" height="76" rx="10" class="card"/>
+    <rect x="312" y="276" width="316" height="34" rx="8" fill="#F8FAFC" stroke="#CBD5E1"/>
+    <circle cx="331" cy="293" r="6" stroke="#94A3B8" stroke-width="1.7"/>
+    <path d="M336 298l6 6" stroke="#94A3B8" stroke-width="1.7" stroke-linecap="round"/>
+    <text x="354" y="298" class="cn" font-size="13" fill="#94A3B8">搜索域名、证书指纹或代理</text>
+    <rect x="648" y="276" width="132" height="34" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <text x="668" y="298" class="cn" font-size="13" fill="#334155">全部状态</text>
+    <path d="M756 289l5 6 5-6" stroke="#64748B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="792" y="276" width="142" height="34" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <text x="812" y="298" class="cn" font-size="13" fill="#334155">全部剩余天数</text>
+    <path d="M910 289l5 6 5-6" stroke="#64748B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="956" y="276" width="86" height="34" rx="8" fill="#EFF6FF" stroke="#BFDBFE"/>
+    <circle cx="974" cy="293" r="4" fill="#2563EB"/>
+    <text x="986" y="298" class="cn" font-size="13" font-weight="650" fill="#1D4ED8">有效</text>
+    <rect x="1052" y="276" width="86" height="34" rx="8" fill="#FFFBEB" stroke="#FDE68A"/>
+    <circle cx="1070" cy="293" r="4" fill="#F59E0B"/>
+    <text x="1082" y="298" class="cn" font-size="13" font-weight="650" fill="#92400E">临期</text>
+    <rect x="1216" y="276" width="142" height="34" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <path d="M1234 286v13M1240 286v13M1230 292h14" stroke="#475569" stroke-width="1.8" stroke-linecap="round"/>
+    <text x="1254" y="298" class="cn" font-size="13" font-weight="650" fill="#334155">高级筛选</text>
+
+    <rect x="288" y="354" width="1100" height="494" rx="10" class="card"/>
+    <text x="312" y="390" class="cn h2">证书清单</text>
+    <text x="312" y="414" class="cn label">按剩余天数升序排列，临期与失败状态置顶</text>
+    <line x1="312" y1="436" x2="1364" y2="436" class="line"/>
+    <text x="312" y="462" class="cn label" font-weight="650">域名</text>
+    <text x="548" y="462" class="cn label" font-weight="650">状态</text>
+    <text x="672" y="462" class="cn label" font-weight="650">剩余天数</text>
+    <text x="802" y="462" class="cn label" font-weight="650">到期时间</text>
+    <text x="980" y="462" class="cn label" font-weight="650">签发者</text>
+    <text x="1164" y="462" class="cn label" font-weight="650">关联代理</text>
+    <text x="1300" y="462" class="cn label" font-weight="650">操作</text>
+    <line x1="312" y1="476" x2="1364" y2="476" class="line"/>
+
+    <rect x="304" y="492" width="1068" height="54" rx="8" fill="#FFFBEB"/>
+    <text x="312" y="523" class="mono" font-size="13" font-weight="650" fill="#0F172A">api.example.com</text>
+    <rect x="548" y="505" width="70" height="24" rx="12" fill="#FEF3C7" stroke="#FDE68A"/>
+    <circle cx="564" cy="517" r="4" fill="#F59E0B"/>
+    <text x="576" y="522" class="cn" font-size="11" font-weight="650" fill="#92400E">WARN</text>
+    <text x="672" y="523" class="cn" font-size="13" font-weight="700" fill="#D97706">12 天</text>
+    <text x="802" y="523" class="mono" font-size="13" fill="#334155">2026-05-11</text>
+    <text x="980" y="523" class="cn" font-size="13" fill="#334155">Let's Encrypt</text>
+    <text x="1164" y="523" class="mono" font-size="13" fill="#334155">api-gateway</text>
+    <rect x="1300" y="504" width="52" height="26" rx="6" fill="#FFFFFF" stroke="#FDE68A"/>
+    <text x="1326" y="522" text-anchor="middle" class="cn" font-size="12" font-weight="650" fill="#92400E">续期</text>
+
+    <text x="312" y="581" class="mono" font-size="13" font-weight="650" fill="#0F172A">cdn.example.com</text>
+    <rect x="548" y="563" width="70" height="24" rx="12" fill="#FEF3C7" stroke="#FDE68A"/>
+    <circle cx="564" cy="575" r="4" fill="#F59E0B"/>
+    <text x="576" y="580" class="cn" font-size="11" font-weight="650" fill="#92400E">WARN</text>
+    <text x="672" y="581" class="cn" font-size="13" font-weight="700" fill="#D97706">14 天</text>
+    <text x="802" y="581" class="mono" font-size="13" fill="#334155">2026-05-13</text>
+    <text x="980" y="581" class="cn" font-size="13" fill="#334155">ZeroSSL</text>
+    <text x="1164" y="581" class="mono" font-size="13" fill="#334155">files-cdn</text>
+    <rect x="1300" y="562" width="52" height="26" rx="6" fill="#FFFFFF" stroke="#FDE68A"/>
+    <text x="1326" y="580" text-anchor="middle" class="cn" font-size="12" font-weight="650" fill="#92400E">续期</text>
+    <line x1="312" y1="606" x2="1364" y2="606" class="line"/>
+
+    <text x="312" y="639" class="mono" font-size="13" font-weight="650" fill="#0F172A">admin.example.com</text>
+    <rect x="548" y="621" width="58" height="24" rx="12" fill="#DCFCE7" stroke="#86EFAC"/>
+    <circle cx="564" cy="633" r="4" fill="#16A34A"/>
+    <text x="576" y="638" class="cn" font-size="11" font-weight="650" fill="#166534">OK</text>
+    <text x="672" y="639" class="cn" font-size="13" font-weight="700" fill="#16A34A">72 天</text>
+    <text x="802" y="639" class="mono" font-size="13" fill="#334155">2026-07-10</text>
+    <text x="980" y="639" class="cn" font-size="13" fill="#334155">Let's Encrypt</text>
+    <text x="1164" y="639" class="mono" font-size="13" fill="#334155">web-console</text>
+    <rect x="1300" y="620" width="52" height="26" rx="6" fill="#F8FAFC" stroke="#CBD5E1"/>
+    <text x="1326" y="638" text-anchor="middle" class="cn" font-size="12" font-weight="650" fill="#334155">详情</text>
+    <line x1="312" y1="664" x2="1364" y2="664" class="line"/>
+
+    <text x="312" y="697" class="mono" font-size="13" font-weight="650" fill="#0F172A">status.example.com</text>
+    <rect x="548" y="679" width="58" height="24" rx="12" fill="#DCFCE7" stroke="#86EFAC"/>
+    <circle cx="564" cy="691" r="4" fill="#16A34A"/>
+    <text x="576" y="696" class="cn" font-size="11" font-weight="650" fill="#166534">OK</text>
+    <text x="672" y="697" class="cn" font-size="13" font-weight="700" fill="#16A34A">91 天</text>
+    <text x="802" y="697" class="mono" font-size="13" fill="#334155">2026-07-29</text>
+    <text x="980" y="697" class="cn" font-size="13" fill="#334155">DigiCert</text>
+    <text x="1164" y="697" class="mono" font-size="13" fill="#334155">status-page</text>
+    <rect x="1300" y="678" width="52" height="26" rx="6" fill="#F8FAFC" stroke="#CBD5E1"/>
+    <text x="1326" y="696" text-anchor="middle" class="cn" font-size="12" font-weight="650" fill="#334155">详情</text>
+    <line x1="312" y1="722" x2="1364" y2="722" class="line"/>
+
+    <text x="312" y="755" class="mono" font-size="13" font-weight="650" fill="#0F172A">ssh.example.net</text>
+    <rect x="548" y="737" width="58" height="24" rx="12" fill="#DCFCE7" stroke="#86EFAC"/>
+    <circle cx="564" cy="749" r="4" fill="#16A34A"/>
+    <text x="576" y="754" class="cn" font-size="11" font-weight="650" fill="#166534">OK</text>
+    <text x="672" y="755" class="cn" font-size="13" font-weight="700" fill="#16A34A">128 天</text>
+    <text x="802" y="755" class="mono" font-size="13" fill="#334155">2026-09-04</text>
+    <text x="980" y="755" class="cn" font-size="13" fill="#334155">Let's Encrypt</text>
+    <text x="1164" y="755" class="mono" font-size="13" fill="#334155">ssh-office</text>
+    <rect x="1300" y="736" width="52" height="26" rx="6" fill="#F8FAFC" stroke="#CBD5E1"/>
+    <text x="1326" y="754" text-anchor="middle" class="cn" font-size="12" font-weight="650" fill="#334155">详情</text>
+
+    <line x1="312" y1="790" x2="1364" y2="790" class="line"/>
+    <text x="312" y="824" class="cn label">显示 1-5 / 共 10 张证书</text>
+    <rect x="1148" y="804" width="72" height="32" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <text x="1184" y="825" class="cn" text-anchor="middle" font-size="13" fill="#64748B">上一页</text>
+    <rect x="1230" y="804" width="32" height="32" rx="8" fill="#0F172A"/>
+    <text x="1246" y="825" class="cn" text-anchor="middle" font-size="13" font-weight="650" fill="#FFFFFF">1</text>
+    <rect x="1270" y="804" width="32" height="32" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <text x="1286" y="825" class="cn" text-anchor="middle" font-size="13" fill="#334155">2</text>
+    <rect x="1312" y="804" width="72" height="32" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <text x="1348" y="825" class="cn" text-anchor="middle" font-size="13" fill="#334155">下一页</text>
+  </g>
+</svg>

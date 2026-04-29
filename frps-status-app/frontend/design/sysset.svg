@@ -1,56 +1,151 @@
-<svg width="1000" height="500" viewBox="0 0 1000 500" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1000" height="500" fill="#F8FAFC"/>
-  
-  <text x="30" y="40" font-family="PingFang SC, sans-serif" font-size="20" font-weight="600" fill="#1E293B">系统配置</text>
+<svg width="1440" height="900" viewBox="0 0 1440 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#0F172A" flood-opacity="0.08"/>
+    </filter>
+    <linearGradient id="heroGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#EFF6FF"/>
+      <stop offset="1" stop-color="#F0FDFA"/>
+    </linearGradient>
+    <style>
+      .cn { font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif; }
+      .mono { font-family: "SFMono-Regular", Consolas, Menlo, monospace; }
+      .h1 { font-size: 24px; font-weight: 700; fill: #0F172A; }
+      .h2 { font-size: 15px; font-weight: 700; fill: #0F172A; }
+      .label { font-size: 12px; fill: #64748B; }
+      .muted { font-size: 12px; fill: #94A3B8; }
+      .value { font-size: 28px; font-weight: 750; fill: #0F172A; }
+      .card { fill: #FFFFFF; stroke: #E2E8F0; filter: url(#shadow); }
+      .line { stroke: #E2E8F0; stroke-width: 1; }
+    </style>
+  </defs>
 
-  <rect x="30" y="70" width="940" height="120" rx="10" fill="white" stroke="#E2E8F0"/>
-  <text x="50" y="100" font-family="PingFang SC, sans-serif" font-size="14" font-weight="600" fill="#1E293B">流量阈值设置</text>
-  
-  <g transform="translate(50, 120)">
-    <text y="5" font-family="PingFang SC" font-size="12" fill="#64748B">月上行 (GB)</text>
-    <rect x="80" y="-12" width="100" height="28" rx="4" stroke="#D1D5DB" fill="white"/>
-    <text x="90" y="7" font-family="Arial" font-size="13" fill="#1E293B">300</text>
-    
-    <text x="210" y="5" font-family="PingFang SC" font-size="12" fill="#64748B">月下行 (GB)</text>
-    <rect x="290" y="-12" width="100" height="28" rx="4" stroke="#D1D5DB" fill="white"/>
-    <text x="300" y="7" font-family="Arial" font-size="13" fill="#1E293B">300</text>
-    
-    <text x="420" y="5" font-family="PingFang SC" font-size="12" fill="#64748B">上下行总量 (GB)</text>
-    <rect x="530" y="-12" width="100" height="28" rx="4" stroke="#D1D5DB" fill="white"/>
-    <text x="540" y="7" font-family="Arial" font-size="13" fill="#1E293B">400</text>
-    
-    <rect x="830" y="-12" width="60" height="28" rx="4" fill="#2563EB"/>
-    <text x="860" y="7" font-family="PingFang SC" font-size="12" font-weight="600" fill="white" text-anchor="middle">保存</text>
+  <rect width="1440" height="900" fill="#F6F8FB"/>
+
+  <g id="sidebar">
+    <rect width="248" height="900" fill="#111827"/>
+    <rect x="20" y="22" width="40" height="40" rx="10" fill="#2563EB"/>
+    <path d="M31 42h18M40 33v18" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+    <text x="72" y="42" class="cn" font-size="18" font-weight="700" fill="#F8FAFC">FRPS 状态监控</text>
+    <circle cx="218" cy="38" r="5" fill="#22C55E"/>
+
+    <text x="52" y="118" class="cn" font-size="14" fill="#9CA3AF">数据看板</text>
+    <circle cx="34" cy="113" r="7" fill="#38BDF8" fill-opacity="0.14"/>
+    <path d="M31 116l3-6 3 4 4-8" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="52" y="170" class="cn" font-size="14" fill="#9CA3AF">代理列表</text>
+    <path d="M29 170h14M36 163v14" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round"/>
+    <text x="52" y="222" class="cn" font-size="14" fill="#9CA3AF">证书列表</text>
+    <rect x="30" y="208" width="13" height="16" rx="2" stroke="#6B7280" stroke-width="1.8"/>
+    <path d="M33 208v-4a4 4 0 0 1 8 0v4" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round"/>
+    <text x="52" y="274" class="cn" font-size="14" fill="#9CA3AF">历史统计</text>
+    <path d="M29 276l5-7 6 4 6-12" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect x="16" y="300" width="216" height="42" rx="8" fill="#1F2937"/>
+    <rect x="16" y="300" width="3" height="42" rx="1.5" fill="#38BDF8"/>
+    <text x="52" y="326" class="cn" font-size="14" font-weight="600" fill="#F8FAFC">系统配置</text>
+    <circle cx="36" cy="318" r="7" stroke="#38BDF8" stroke-width="1.8"/>
+    <path d="M36 307v4M36 325v4M47 318h-4M29 318h-4" stroke="#38BDF8" stroke-width="1.8" stroke-linecap="round"/>
+
+    <rect x="20" y="760" width="208" height="88" rx="10" fill="#0B1220" stroke="#243041"/>
+    <text x="36" y="790" class="cn" font-size="12" fill="#9CA3AF">最近同步</text>
+    <text x="36" y="815" class="cn" font-size="14" font-weight="650" fill="#E5E7EB">2026/04/29 15:42</text>
+    <text x="36" y="838" class="cn" font-size="12" fill="#64748B">30 秒自动刷新</text>
   </g>
 
-  <rect x="30" y="210" width="940" height="70" rx="10" fill="white" stroke="#E2E8F0"/>
-  <text x="50" y="250" font-family="PingFang SC" font-size="14" font-weight="600" fill="#1E293B">告警通知</text>
-  <rect x="130" y="232" width="120" height="26" rx="13" fill="#F0FDF4" stroke="#BBF7D0"/>
-  <circle cx="145" cy="245" r="3" fill="#16A34A"/>
-  <text x="155" y="250" font-family="PingFang SC" font-size="12" fill="#166534">SMTP 已就绪</text>
-  <text x="280" y="250" font-family="Arial" font-size="12" fill="#94A3B8">lishi0105@163.com</text>
-  
-  <rect x="850" y="231" width="100" height="28" rx="6" stroke="#2563EB" fill="white"/>
-  <text x="900" y="250" font-family="PingFang SC" font-size="12" font-weight="600" fill="#2563EB" text-anchor="middle">配置邮件</text>
+  <g id="settings">
+    <rect x="248" y="0" width="1192" height="900" fill="#F6F8FB"/>
+    <text x="288" y="54" class="cn h1">系统配置</text>
+    <text x="288" y="80" class="cn label">管理阈值告警、邮件通知与数据库维护策略</text>
+    <rect x="1132" y="32" width="112" height="36" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <path d="M1152 50a10 10 0 1 0 3-7M1155 43h-7v-7" stroke="#475569" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="1172" y="55" class="cn" font-size="13" font-weight="650" fill="#334155">刷新</text>
+    <rect x="1256" y="32" width="132" height="36" rx="8" fill="#0F172A"/>
+    <path d="M1276 40v16M1268 48h16" stroke="#F8FAFC" stroke-width="1.8" stroke-linecap="round"/>
+    <text x="1294" y="55" class="cn" font-size="13" font-weight="650" fill="#F8FAFC">保存全部</text>
 
-  <rect x="30" y="300" width="940" height="150" rx="10" fill="white" stroke="#E2E8F0"/>
-  <text x="50" y="330" font-family="PingFang SC" font-size="14" font-weight="600" fill="#1E293B">数据库维护 (SQLite)</text>
-  
-  <g transform="translate(50, 360)">
-    <rect width="880" height="36" rx="6" fill="#F8FAFC"/>
-    <text x="12" y="23" font-family="PingFang SC" font-size="13" fill="#334155">空间碎片整理 (VACUUM)：释放物理磁盘空间</text>
-    <rect x="810" y="6" width="60" height="24" rx="4" fill="#334155"/>
-    <text x="840" y="22" font-family="PingFang SC" font-size="11" fill="white" text-anchor="middle">执行</text>
-  </g>
+    <rect x="288" y="112" width="1100" height="118" rx="10" fill="url(#heroGrad)" stroke="#BFDBFE" filter="url(#shadow)"/>
+    <text x="312" y="148" class="cn h2">告警配置概览</text>
+    <text x="312" y="173" class="cn label">月流量阈值、事件告警、SMTP 与数据库维护策略</text>
+    <rect x="312" y="192" width="202" height="10" rx="5" fill="#DBEAFE"/>
+    <rect x="312" y="192" width="172" height="10" rx="5" fill="#2563EB"/>
+    <text x="604" y="150" class="cn value">300 GB</text>
+    <text x="604" y="176" class="cn label">月上行阈值</text>
+    <rect x="760" y="132" width="1" height="64" fill="#BFDBFE"/>
+    <text x="804" y="150" class="cn value">300 GB</text>
+    <text x="804" y="176" class="cn label">月下行阈值</text>
+    <rect x="960" y="132" width="1" height="64" fill="#BFDBFE"/>
+    <text x="1004" y="150" class="cn value">SMTP</text>
+    <text x="1004" y="176" class="cn label">已启用</text>
+    <rect x="1188" y="130" width="132" height="28" rx="14" fill="#DCFCE7" stroke="#86EFAC"/>
+    <circle cx="1204" cy="144" r="4" fill="#16A34A"/>
+    <text x="1216" y="149" class="cn" font-size="12" font-weight="650" fill="#166534">告警链路健康</text>
 
-  <g transform="translate(50, 405)">
-    <rect width="880" height="36" rx="6" fill="#FFFBEB"/>
-    <text x="12" y="23" font-family="PingFang SC" font-size="13" fill="#92400E">自动清理策略：保留近</text>
-    <rect x="145" y="6" width="40" height="24" rx="4" fill="white" stroke="#D97706"/>
-    <text x="165" y="23" font-family="Arial" font-size="13" fill="#1E293B" text-anchor="middle">30</text>
-    <text x="195" y="23" font-family="PingFang SC" font-size="13" fill="#92400E">天历史记录</text>
-    
-    <rect x="810" y="6" width="60" height="24" rx="4" fill="#D97706"/>
-    <text x="840" y="22" font-family="PingFang SC" font-size="11" fill="white" text-anchor="middle">清理</text>
+    <rect x="288" y="254" width="740" height="268" rx="10" class="card"/>
+    <text x="312" y="290" class="cn h2">流量阈值设置</text>
+    <text x="312" y="314" class="cn label">配置月上行、月下行与总量阈值</text>
+    <text x="312" y="354" class="cn label">月上行 (GB)</text>
+    <rect x="312" y="366" width="190" height="38" rx="8" fill="#F8FAFC" stroke="#CBD5E1"/>
+    <text x="332" y="390" class="mono" font-size="14" fill="#0F172A">300</text>
+    <text x="530" y="354" class="cn label">月下行 (GB)</text>
+    <rect x="530" y="366" width="190" height="38" rx="8" fill="#F8FAFC" stroke="#CBD5E1"/>
+    <text x="550" y="390" class="mono" font-size="14" fill="#0F172A">300</text>
+    <text x="748" y="354" class="cn label">上下行总量 (GB)</text>
+    <rect x="748" y="366" width="190" height="38" rx="8" fill="#F8FAFC" stroke="#CBD5E1"/>
+    <text x="768" y="390" class="mono" font-size="14" fill="#0F172A">400</text>
+    <rect x="838" y="470" width="100" height="34" rx="8" fill="#0F172A"/>
+    <text x="888" y="492" class="cn" text-anchor="middle" font-size="13" font-weight="650" fill="#F8FAFC">保存阈值</text>
+
+    <rect x="1048" y="254" width="340" height="268" rx="10" class="card"/>
+    <text x="1072" y="290" class="cn h2">事件告警</text>
+    <text x="1072" y="314" class="cn label">代理离线和证书到期通知策略</text>
+    <text x="1072" y="354" class="cn" font-size="13" fill="#334155">代理离线告警</text>
+    <rect x="1264" y="338" width="56" height="30" rx="15" fill="#2563EB"/>
+    <circle cx="1304" cy="353" r="11" fill="#FFFFFF"/>
+    <text x="1072" y="402" class="cn" font-size="13" fill="#334155">SSL证书到期告警</text>
+    <rect x="1264" y="386" width="56" height="30" rx="15" fill="#2563EB"/>
+    <circle cx="1304" cy="401" r="11" fill="#FFFFFF"/>
+    <text x="1072" y="446" class="cn label">提前提醒天数</text>
+    <rect x="1172" y="430" width="70" height="32" rx="8" fill="#F8FAFC" stroke="#CBD5E1"/>
+    <text x="1207" y="451" class="mono" text-anchor="middle" font-size="13" fill="#0F172A">15</text>
+    <text x="1248" y="451" class="cn label">天</text>
+    <rect x="1238" y="470" width="92" height="34" rx="8" fill="#0F172A"/>
+    <text x="1284" y="492" class="cn" text-anchor="middle" font-size="13" font-weight="650" fill="#F8FAFC">保存策略</text>
+
+    <rect x="288" y="546" width="740" height="302" rx="10" class="card"/>
+    <text x="312" y="582" class="cn h2">告警通知 (SMTP)</text>
+    <text x="312" y="606" class="cn label">SMTP 字段较多，通过弹窗完成配置、测试与保存</text>
+    <rect x="312" y="628" width="148" height="28" rx="14" fill="#DCFCE7" stroke="#86EFAC"/>
+    <circle cx="328" cy="642" r="4" fill="#16A34A"/>
+    <text x="340" y="647" class="cn" font-size="12" fill="#166534">SMTP 已就绪</text>
+    <text x="478" y="647" class="mono" font-size="12" fill="#64748B">ops@example.com ...</text>
+    <line x1="312" y1="672" x2="1004" y2="672" class="line"/>
+    <text x="312" y="700" class="cn label">最近测试</text>
+    <text x="388" y="700" class="mono" font-size="12" fill="#334155">2026-04-29 15:20 · 成功</text>
+    <text x="312" y="726" class="cn label">服务地址</text>
+    <text x="388" y="726" class="mono" font-size="12" fill="#334155">smtp.example.com:465 (SSL/TLS)</text>
+    <text x="312" y="752" class="cn label">接收邮箱</text>
+    <text x="388" y="752" class="mono" font-size="12" fill="#334155">ops@example.com, oncall@example.com</text>
+    <rect x="824" y="804" width="84" height="34" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <text x="866" y="826" class="cn" text-anchor="middle" font-size="13" font-weight="650" fill="#334155">测试邮件</text>
+    <rect x="916" y="804" width="92" height="34" rx="8" fill="#0F172A"/>
+    <text x="962" y="826" class="cn" text-anchor="middle" font-size="13" font-weight="650" fill="#F8FAFC">配置邮件</text>
+
+    <rect x="1048" y="546" width="340" height="302" rx="10" class="card"/>
+    <text x="1072" y="582" class="cn h2">数据库维护</text>
+    <text x="1072" y="606" class="cn label">SQLite 清理与保留策略</text>
+    <rect x="1072" y="628" width="292" height="74" rx="8" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <text x="1092" y="652" class="cn label">空间碎片整理 (VACUUM)</text>
+    <text x="1092" y="675" class="cn" font-size="13" fill="#334155">释放数据库文件空间，减少碎片</text>
+    <rect x="1288" y="648" width="60" height="30" rx="8" fill="#334155"/>
+    <text x="1318" y="668" class="cn" text-anchor="middle" font-size="12" font-weight="650" fill="#F8FAFC">执行</text>
+    <rect x="1072" y="718" width="292" height="88" rx="8" fill="#FFFBEB" stroke="#FDE68A"/>
+    <text x="1092" y="744" class="cn label">自动清理策略</text>
+    <text x="1092" y="768" class="cn" font-size="13" fill="#92400E">保留近</text>
+    <rect x="1140" y="750" width="54" height="30" rx="8" fill="#FFFFFF" stroke="#FDE68A"/>
+    <text x="1167" y="770" class="mono" text-anchor="middle" font-size="13" fill="#0F172A">30</text>
+    <text x="1202" y="768" class="cn" font-size="13" fill="#92400E">天历史记录</text>
+    <rect x="1288" y="750" width="60" height="30" rx="8" fill="#D97706"/>
+    <text x="1318" y="770" class="cn" text-anchor="middle" font-size="12" font-weight="650" fill="#FFFFFF">清理</text>
+
   </g>
 </svg>

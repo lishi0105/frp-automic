@@ -10,6 +10,7 @@
       <nav>
         <RouterLink class="nav-item" to="/"><span class="nav-icon">📊</span> 数据看板</RouterLink>
         <RouterLink class="nav-item" to="/proxies"><span class="nav-icon">🔗</span> 代理列表</RouterLink>
+        <RouterLink class="nav-item" to="/certificates"><span class="nav-icon">🔒</span> 证书列表</RouterLink>
         <RouterLink class="nav-item" to="/statistics"><span class="nav-icon">📈</span> 历史统计</RouterLink>
         <RouterLink class="nav-item" to="/settings"><span class="nav-icon">⚙️</span> 系统配置</RouterLink>
       </nav>

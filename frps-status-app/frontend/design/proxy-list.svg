@@ -1,0 +1,224 @@
+<svg width="1440" height="900" viewBox="0 0 1440 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#0F172A" flood-opacity="0.08"/>
+    </filter>
+    <linearGradient id="heroGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#EFF6FF"/>
+      <stop offset="1" stop-color="#F0FDFA"/>
+    </linearGradient>
+    <style>
+      .cn { font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif; }
+      .mono { font-family: "SFMono-Regular", Consolas, Menlo, monospace; }
+      .h1 { font-size: 24px; font-weight: 700; fill: #0F172A; }
+      .h2 { font-size: 15px; font-weight: 700; fill: #0F172A; }
+      .label { font-size: 12px; fill: #64748B; }
+      .muted { font-size: 12px; fill: #94A3B8; }
+      .value { font-size: 28px; font-weight: 750; fill: #0F172A; }
+      .card { fill: #FFFFFF; stroke: #E2E8F0; filter: url(#shadow); }
+      .line { stroke: #E2E8F0; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="900" fill="#F6F8FB"/>
+
+  <g id="sidebar">
+    <rect width="248" height="900" fill="#111827"/>
+    <rect x="20" y="22" width="40" height="40" rx="10" fill="#2563EB"/>
+    <path d="M31 42h18M40 33v18" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+    <text x="72" y="42" class="cn" font-size="18" font-weight="700" fill="#F8FAFC">FRPS 状态监控</text>
+    <circle cx="218" cy="38" r="5" fill="#22C55E"/>
+
+    <text x="52" y="118" class="cn" font-size="14" fill="#9CA3AF">数据看板</text>
+    <circle cx="34" cy="113" r="7" fill="#38BDF8" fill-opacity="0.14"/>
+    <path d="M31 116l3-6 3 4 4-8" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect x="16" y="144" width="216" height="42" rx="8" fill="#1F2937"/>
+    <rect x="16" y="144" width="3" height="42" rx="1.5" fill="#38BDF8"/>
+    <text x="52" y="170" class="cn" font-size="14" font-weight="600" fill="#F8FAFC">代理列表</text>
+    <path d="M29 170h14M36 163v14" stroke="#38BDF8" stroke-width="1.8" stroke-linecap="round"/>
+
+    <text x="52" y="218" class="cn" font-size="14" fill="#9CA3AF">历史统计</text>
+    <path d="M29 220l5-7 6 4 6-12" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="52" y="266" class="cn" font-size="14" fill="#9CA3AF">系统配置</text>
+    <circle cx="36" cy="262" r="7" stroke="#6B7280" stroke-width="1.8"/>
+    <path d="M36 251v4M36 269v4M47 262h-4M29 262h-4" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round"/>
+
+    <rect x="20" y="760" width="208" height="88" rx="10" fill="#0B1220" stroke="#243041"/>
+    <text x="36" y="790" class="cn" font-size="12" fill="#9CA3AF">最近同步</text>
+    <text x="36" y="815" class="cn" font-size="14" font-weight="650" fill="#E5E7EB">2026/04/29 15:42</text>
+    <text x="36" y="838" class="cn" font-size="12" fill="#64748B">30 秒自动刷新</text>
+  </g>
+
+  <g id="proxy-list">
+    <rect x="248" y="0" width="1192" height="900" fill="#F6F8FB"/>
+    <text x="288" y="54" class="cn h1">代理列表</text>
+    <text x="288" y="80" class="cn label">统一检索 FRPS 代理、连接状态、月度流量与证书风险</text>
+    <rect x="1132" y="32" width="112" height="36" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <path d="M1152 50a10 10 0 1 0 3-7M1155 43h-7v-7" stroke="#475569" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="1172" y="55" class="cn" font-size="13" font-weight="650" fill="#334155">刷新</text>
+    <rect x="1256" y="32" width="132" height="36" rx="8" fill="#0F172A"/>
+    <path d="M1275 43v14M1268 50h14" stroke="#F8FAFC" stroke-width="1.8" stroke-linecap="round"/>
+    <text x="1294" y="55" class="cn" font-size="13" font-weight="650" fill="#F8FAFC">导出列表</text>
+
+    <rect x="288" y="112" width="1100" height="118" rx="10" fill="url(#heroGrad)" stroke="#BFDBFE" filter="url(#shadow)"/>
+    <text x="312" y="148" class="cn h2">代理运行概览</text>
+    <text x="312" y="173" class="cn label">共 21 个代理，18 个在线，3 个需要关注</text>
+    <rect x="312" y="192" width="202" height="10" rx="5" fill="#DBEAFE"/>
+    <rect x="312" y="192" width="174" height="10" rx="5" fill="#2563EB"/>
+
+    <text x="604" y="150" class="cn value">18</text>
+    <text x="646" y="150" class="cn" font-size="17" fill="#64748B">/ 21</text>
+    <text x="604" y="176" class="cn label">在线代理</text>
+    <rect x="716" y="132" width="1" height="64" fill="#BFDBFE"/>
+    <text x="760" y="150" class="cn value">126</text>
+    <text x="760" y="176" class="cn label">当前连接数</text>
+    <rect x="914" y="132" width="1" height="64" fill="#BFDBFE"/>
+    <text x="958" y="150" class="cn value">431.1 GB</text>
+    <text x="958" y="176" class="cn label">本月总流量</text>
+    <rect x="1200" y="132" width="1" height="64" fill="#BFDBFE"/>
+    <rect x="1242" y="130" width="84" height="28" rx="14" fill="#FEF3C7" stroke="#FDE68A"/>
+    <circle cx="1258" cy="144" r="4" fill="#F59E0B"/>
+    <text x="1270" y="149" class="cn" font-size="12" font-weight="650" fill="#92400E">3 项预警</text>
+    <text x="1242" y="178" class="cn label">离线与证书临期</text>
+
+    <rect x="288" y="254" width="1100" height="76" rx="10" class="card"/>
+    <rect x="312" y="276" width="316" height="34" rx="8" fill="#F8FAFC" stroke="#CBD5E1"/>
+    <circle cx="331" cy="293" r="6" stroke="#94A3B8" stroke-width="1.7"/>
+    <path d="M336 298l6 6" stroke="#94A3B8" stroke-width="1.7" stroke-linecap="round"/>
+    <text x="354" y="298" class="cn" font-size="13" fill="#94A3B8">搜索代理名称、域名或端口</text>
+    <rect x="648" y="276" width="132" height="34" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <text x="668" y="298" class="cn" font-size="13" fill="#334155">全部类型</text>
+    <path d="M756 289l5 6 5-6" stroke="#64748B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="792" y="276" width="132" height="34" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <text x="812" y="298" class="cn" font-size="13" fill="#334155">全部状态</text>
+    <path d="M900 289l5 6 5-6" stroke="#64748B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="946" y="276" width="86" height="34" rx="8" fill="#EFF6FF" stroke="#BFDBFE"/>
+    <circle cx="964" cy="293" r="4" fill="#2563EB"/>
+    <text x="976" y="298" class="cn" font-size="13" font-weight="650" fill="#1D4ED8">在线</text>
+    <rect x="1042" y="276" width="86" height="34" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <text x="1066" y="298" class="cn" font-size="13" fill="#334155">离线</text>
+    <rect x="1216" y="276" width="142" height="34" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <path d="M1236 286v13M1230 292h12" stroke="#475569" stroke-width="1.8" stroke-linecap="round"/>
+    <text x="1254" y="298" class="cn" font-size="13" font-weight="650" fill="#334155">高级筛选</text>
+
+    <!-- Proxy table card -->
+    <rect x="288" y="354" width="796" height="494" rx="10" class="card"/>
+    <text x="312" y="390" class="cn h2">代理清单</text>
+    <text x="312" y="414" class="cn label">点击连接数或流量列头可切换升序 / 降序排列</text>
+    <line x1="312" y1="436" x2="1060" y2="436" class="line"/>
+
+    <!-- Column headers -->
+    <text x="312" y="462" class="cn label" font-weight="650">名称</text>
+    <text x="490" y="462" class="cn label" font-weight="650">类型</text>
+    <text x="562" y="462" class="cn label" font-weight="650">状态</text>
+
+    <!-- 连接 sortable header (inactive) -->
+    <text x="646" y="462" class="cn label" font-weight="650">连接</text>
+    <path d="M674 457l4-4l4 4" stroke="#CBD5E1" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M674 462l4 4l4-4" stroke="#CBD5E1" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- 本月上行 sortable header (inactive) -->
+    <text x="722" y="462" class="cn label" font-weight="650">本月上行</text>
+    <path d="M778 457l4-4l4 4" stroke="#CBD5E1" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M778 462l4 4l4-4" stroke="#CBD5E1" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- 本月下行 sortable header (inactive) -->
+    <text x="832" y="462" class="cn label" font-weight="650">本月下行</text>
+    <path d="M888 457l4-4l4 4" stroke="#CBD5E1" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M888 462l4 4l4-4" stroke="#CBD5E1" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- 总流量 sortable header (active: descending, blue) -->
+    <text x="942" y="462" class="cn label" font-weight="650" fill="#2563EB">总流量</text>
+    <path d="M982 455l5 6l5-6" stroke="#2563EB" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <line x1="312" y1="476" x2="1060" y2="476" class="line"/>
+
+    <!-- Row 1: legacy-admin (离线, highlighted) -->
+    <rect x="304" y="492" width="764" height="54" rx="8" fill="#FFF7ED"/>
+    <text x="312" y="523" class="mono" font-size="13" font-weight="650" fill="#0F172A">legacy-admin</text>
+    <rect x="490" y="505" width="56" height="24" rx="12" fill="#FEF3C7"/>
+    <text x="518" y="522" text-anchor="middle" class="cn" font-size="11" font-weight="650" fill="#92400E">TCP</text>
+    <circle cx="574" cy="517" r="5" fill="#EF4444"/>
+    <text x="588" y="522" class="cn" font-size="13" fill="#991B1B">离线</text>
+    <text x="646" y="523" class="mono" font-size="13" fill="#334155">0</text>
+    <text x="722" y="523" class="mono" font-size="13" fill="#334155">4.1 GB</text>
+    <text x="832" y="523" class="mono" font-size="13" fill="#334155">18.6 GB</text>
+    <text x="942" y="523" class="mono" font-size="13" fill="#334155">22.7 GB</text>
+
+    <!-- Row 2: api-gateway (在线) -->
+    <text x="312" y="581" class="mono" font-size="13" font-weight="650" fill="#0F172A">api-gateway</text>
+    <rect x="490" y="563" width="64" height="24" rx="12" fill="#EFF6FF"/>
+    <text x="522" y="580" text-anchor="middle" class="cn" font-size="11" font-weight="650" fill="#1D4ED8">HTTPS</text>
+    <circle cx="574" cy="575" r="5" fill="#16A34A"/>
+    <text x="588" y="580" class="cn" font-size="13" fill="#166534">在线</text>
+    <text x="646" y="581" class="mono" font-size="13" fill="#334155">42</text>
+    <text x="722" y="581" class="mono" font-size="13" fill="#334155">68.4 GB</text>
+    <text x="832" y="581" class="mono" font-size="13" fill="#334155">102.8 GB</text>
+    <text x="942" y="581" class="mono" font-size="13" font-weight="700" fill="#0F172A">171.2 GB</text>
+    <line x1="312" y1="606" x2="1060" y2="606" class="line"/>
+
+    <!-- Row 3: web-console (在线) -->
+    <text x="312" y="639" class="mono" font-size="13" font-weight="650" fill="#0F172A">web-console</text>
+    <rect x="490" y="621" width="56" height="24" rx="12" fill="#ECFDF5"/>
+    <text x="518" y="638" text-anchor="middle" class="cn" font-size="11" font-weight="650" fill="#047857">HTTP</text>
+    <circle cx="574" cy="633" r="5" fill="#16A34A"/>
+    <text x="588" y="638" class="cn" font-size="13" fill="#166534">在线</text>
+    <text x="646" y="639" class="mono" font-size="13" fill="#334155">27</text>
+    <text x="722" y="639" class="mono" font-size="13" fill="#334155">31.6 GB</text>
+    <text x="832" y="639" class="mono" font-size="13" fill="#334155">74.9 GB</text>
+    <text x="942" y="639" class="mono" font-size="13" fill="#334155">106.5 GB</text>
+    <line x1="312" y1="664" x2="1060" y2="664" class="line"/>
+
+    <!-- Row 4: ssh-office (在线) -->
+    <text x="312" y="697" class="mono" font-size="13" font-weight="650" fill="#0F172A">ssh-office</text>
+    <rect x="490" y="679" width="56" height="24" rx="12" fill="#FEF3C7"/>
+    <text x="518" y="696" text-anchor="middle" class="cn" font-size="11" font-weight="650" fill="#92400E">TCP</text>
+    <circle cx="574" cy="691" r="5" fill="#16A34A"/>
+    <text x="588" y="696" class="cn" font-size="13" fill="#166534">在线</text>
+    <text x="646" y="697" class="mono" font-size="13" fill="#334155">11</text>
+    <text x="722" y="697" class="mono" font-size="13" fill="#334155">9.3 GB</text>
+    <text x="832" y="697" class="mono" font-size="13" fill="#334155">21.5 GB</text>
+    <text x="942" y="697" class="mono" font-size="13" fill="#334155">30.8 GB</text>
+    <line x1="312" y1="722" x2="1060" y2="722" class="line"/>
+
+    <!-- Row 5: files-cdn (在线) -->
+    <text x="312" y="755" class="mono" font-size="13" font-weight="650" fill="#0F172A">files-cdn</text>
+    <rect x="490" y="737" width="64" height="24" rx="12" fill="#EFF6FF"/>
+    <text x="522" y="754" text-anchor="middle" class="cn" font-size="11" font-weight="650" fill="#1D4ED8">HTTPS</text>
+    <circle cx="574" cy="749" r="5" fill="#16A34A"/>
+    <text x="588" y="754" class="cn" font-size="13" fill="#166534">在线</text>
+    <text x="646" y="755" class="mono" font-size="13" fill="#334155">34</text>
+    <text x="722" y="755" class="mono" font-size="13" fill="#334155">57.2 GB</text>
+    <text x="832" y="755" class="mono" font-size="13" fill="#334155">88.0 GB</text>
+    <text x="942" y="755" class="mono" font-size="13" fill="#334155">145.2 GB</text>
+
+    <!-- Right detail panel -->
+    <rect x="1104" y="354" width="284" height="494" rx="10" class="card"/>
+    <text x="1128" y="390" class="cn h2">选中代理详情</text>
+    <text x="1128" y="414" class="cn label">api-gateway · HTTPS</text>
+    <rect x="1128" y="438" width="236" height="74" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <text x="1148" y="466" class="cn label">在线状态</text>
+    <rect x="1248" y="449" width="76" height="26" rx="13" fill="#DCFCE7" stroke="#86EFAC"/>
+    <circle cx="1264" cy="462" r="4" fill="#16A34A"/>
+    <text x="1276" y="467" class="cn" font-size="12" font-weight="650" fill="#166534">在线</text>
+    <text x="1148" y="493" class="cn" font-size="13" fill="#334155">最近心跳 15 秒前</text>
+
+    <text x="1128" y="548" class="cn h2">流量构成</text>
+    <rect x="1128" y="572" width="236" height="10" rx="5" fill="#E2E8F0"/>
+    <rect x="1128" y="572" width="94" height="10" rx="5" fill="#2563EB"/>
+    <rect x="1222" y="572" width="142" height="10" rx="5" fill="#059669"/>
+    <circle cx="1132" cy="610" r="4" fill="#2563EB"/>
+    <text x="1144" y="615" class="cn label">上行 68.4 GB</text>
+    <circle cx="1252" cy="610" r="4" fill="#059669"/>
+    <text x="1264" y="615" class="cn label">下行 102.8 GB</text>
+
+    <text x="1128" y="662" class="cn h2">证书状态</text>
+    <rect x="1128" y="686" width="236" height="44" rx="8" fill="#FFFBEB" stroke="#FDE68A"/>
+    <text x="1148" y="713" class="mono" font-size="13" fill="#0F172A">api.example.com</text>
+    <text x="1288" y="713" class="cn" font-size="13" font-weight="700" fill="#D97706">12 天</text>
+    <rect x="1128" y="742" width="236" height="44" rx="8" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <text x="1148" y="769" class="mono" font-size="13" fill="#0F172A">admin.example.com</text>
+    <text x="1288" y="769" class="cn" font-size="13" font-weight="700" fill="#16A34A">72 天</text>
+  </g>
+</svg>
