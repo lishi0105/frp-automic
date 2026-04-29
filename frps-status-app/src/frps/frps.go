@@ -107,6 +107,17 @@ func (c *Client) fetchProxyType(ctx context.Context, typ string) ([]model.ProxyT
 	}
 	var out []model.ProxyTraffic
 	for _, obj := range extractObjects(raw) {
+		// Merge nested info objects (proxyInfo, conf, config) into the top-level map
+		// so fields like customDomains are accessible regardless of FRPS version.
+		for _, key := range []string{"proxyInfo", "conf", "config", "info"} {
+			if nested, ok := obj[key].(map[string]any); ok {
+				for k, v := range nested {
+					if _, exists := obj[k]; !exists {
+						obj[k] = v
+					}
+				}
+			}
+		}
 		name := stringValue(obj, "name", "proxyName")
 		if name == "" {
 			continue
@@ -133,25 +144,29 @@ func domainValues(m map[string]any) []string {
 		}
 		seen[s] = struct{}{}
 	}
-	if arr, ok := m["custom_domains"].([]any); ok {
-		for _, v := range arr {
-			if s, ok := v.(string); ok {
+	collectFrom := func(src map[string]any) {
+		// Handle both snake_case (older FRPS) and camelCase (newer FRPS) domain fields.
+		for _, key := range []string{"custom_domains", "customDomains", "domains"} {
+			if arr, ok := src[key].([]any); ok {
+				for _, v := range arr {
+					if s, ok := v.(string); ok {
+						add(s)
+					}
+				}
+			}
+		}
+		for _, key := range []string{"subdomain", "domain"} {
+			if s, ok := src[key].(string); ok {
 				add(s)
 			}
 		}
 	}
-	if arr, ok := m["domains"].([]any); ok {
-		for _, v := range arr {
-			if s, ok := v.(string); ok {
-				add(s)
-			}
+	collectFrom(m)
+	// Also scan nested info objects in case they were not merged upstream.
+	for _, key := range []string{"proxyInfo", "conf", "config", "info"} {
+		if nested, ok := m[key].(map[string]any); ok {
+			collectFrom(nested)
 		}
-	}
-	if s, ok := m["subdomain"].(string); ok {
-		add(s)
-	}
-	if s, ok := m["domain"].(string); ok {
-		add(s)
 	}
 	out := make([]string, 0, len(seen))
 	for d := range seen {
