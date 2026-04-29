@@ -71,11 +71,19 @@ a { color: var(--primary); text-decoration: none; }
   gap: 9px;
 }
 
+.logo-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  flex-shrink: 0;
+}
+
 .logo-dot {
-  width: 9px; height: 9px;
+  width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--success);
   flex-shrink: 0;
+  margin-left: auto;
   transition: background .3s;
 }
 .logo-dot.offline { background: var(--danger); }
@@ -249,7 +257,15 @@ a { color: var(--primary); text-decoration: none; }
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 10px 25px rgba(0,0,0,.08);
-  padding: 56px 40px 28px;
+  padding: 40px 40px 28px;
+}
+
+.login-panel-logo {
+  display: block;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
+  border-radius: 13px;
 }
 
 .login-panel h2 {
@@ -257,7 +273,23 @@ a { color: var(--primary); text-decoration: none; }
   font-size: 24px;
   line-height: 1.2;
   font-weight: 700;
-  margin-bottom: 44px;
+  margin-bottom: 36px;
+}
+
+.login-hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #f1f5f9;
+  letter-spacing: .03em;
+}
+.login-hero-brand img {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
 }
 
 .login-field {

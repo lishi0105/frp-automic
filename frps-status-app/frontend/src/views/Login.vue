@@ -7,6 +7,10 @@
         <div class="hex"></div>
       </div>
       <div class="login-hero-content">
+        <div class="login-hero-brand">
+          <img :src="logoUrl" alt="FRPS Status" />
+          <span>FRPS Status</span>
+        </div>
         <h1>FRPS 综合管理平台</h1>
         <p>SSL证书 · 流量告警 · 节点审计</p>
         <ul class="login-feature-list">
@@ -19,6 +23,7 @@
 
     <section class="login-panel-wrap">
       <form class="login-panel" @submit.prevent="submit">
+        <img :src="logoUrl" class="login-panel-logo" alt="FRPS Status" />
         <h2>管理端登录</h2>
 
         <label class="login-field">
@@ -53,6 +58,7 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/index.js'
+import logoUrl from '../assets/logo.svg'
 
 const router = useRouter()
 const loading = ref(false)

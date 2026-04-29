@@ -3,8 +3,9 @@
   <div v-else class="layout">
     <aside class="sidebar">
       <div class="sidebar-logo">
-        <span class="logo-dot" :class="{ offline: !frpsOnline }"></span>
+        <img :src="logoUrl" class="logo-icon" alt="FRPS Status" />
         FRPS Status
+        <span class="logo-dot" :class="{ offline: !frpsOnline }"></span>
       </div>
       <nav>
         <RouterLink class="nav-item" to="/"><span class="nav-icon">📊</span> 数据看板</RouterLink>
@@ -27,6 +28,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { api } from './api/index.js'
+import logoUrl from './assets/logo.svg'
 
 const route = useRoute()
 const router = useRouter()

@@ -8,75 +8,56 @@
     </div>
 
     <div class="page-body settings-page">
-      <section class="settings-grid-top">
-        <article class="settings-card">
-          <h3 class="settings-card-title">流量阈值设置</h3>
-          <div class="threshold-grid">
-            <label class="threshold-item">
-              <span>月上行阈值 (GB)</span>
-              <input v-model.number="form.alert_in_gb" type="number" min="0" step="0.1" />
-            </label>
-            <label class="threshold-item">
-              <span>月下行阈值 (GB)</span>
-              <input v-model.number="form.alert_out_gb" type="number" min="0" step="0.1" />
-            </label>
-            <label class="threshold-item">
-              <span>上下行总量阈值 (GB)</span>
-              <input v-model.number="form.alert_total_gb" type="number" min="0" step="0.1" />
-            </label>
-          </div>
-          <div class="threshold-actions">
-            <button class="btn-solid-blue" :disabled="savingThreshold" @click="saveThreshold">
-              {{ savingThreshold ? '保存中…' : '保存' }}
-            </button>
-          </div>
-          <div v-if="saveMsg" class="alert mt-3" :class="saveMsg.ok ? 'alert-success' : 'alert-error'">
-            {{ saveMsg.text }}
-          </div>
-        </article>
+      <section class="settings-card threshold-card">
+        <h3 class="settings-card-title">流量阈值设置</h3>
+        <div class="threshold-inline">
+          <label class="threshold-inline-item">
+            <span>月上行 (GB)</span>
+            <input v-model.number="form.alert_in_gb" type="number" min="0" step="0.1" />
+          </label>
+          <label class="threshold-inline-item">
+            <span>月下行 (GB)</span>
+            <input v-model.number="form.alert_out_gb" type="number" min="0" step="0.1" />
+          </label>
+          <label class="threshold-inline-item threshold-total">
+            <span>上下行总量 (GB)</span>
+            <input v-model.number="form.alert_total_gb" type="number" min="0" step="0.1" />
+          </label>
+          <button class="btn-solid-blue btn-threshold-save" :disabled="savingThreshold" @click="saveThreshold">
+            {{ savingThreshold ? '保存中…' : '保存' }}
+          </button>
+        </div>
+        <div v-if="saveMsg" class="alert mt-3" :class="saveMsg.ok ? 'alert-success' : 'alert-error'">{{ saveMsg.text }}</div>
+      </section>
 
-        <article class="settings-card">
-          <h3 class="settings-card-title">告警通知服务</h3>
+      <section class="settings-card notify-card">
+        <div class="notify-left">
+          <h3 class="settings-card-title notify-title">告警通知</h3>
           <div class="smtp-ready-box" :class="{ ok: smtpReady }">
             <span class="smtp-ready-dot"></span>
-            <span>{{ smtpReady ? 'SMTP 服务已就绪' : 'SMTP 尚未配置完成' }}</span>
+            <span>{{ smtpReady ? 'SMTP 已就绪' : 'SMTP 未就绪' }}</span>
           </div>
-          <p class="smtp-current">当前接收人: {{ smtpRecipientsPreview }}</p>
-          <div class="smtp-actions">
-            <button class="btn-outline-blue" @click="smtpModalOpen = true">配置邮件告警</button>
-          </div>
-        </article>
+          <span class="smtp-current">{{ smtpRecipientsPreview }}</span>
+        </div>
+        <button class="btn-outline-blue notify-btn" @click="smtpModalOpen = true">配置邮件</button>
       </section>
 
       <section class="settings-card db-card">
         <h3 class="settings-card-title">数据库维护 (SQLite)</h3>
-        <div class="db-grid">
-          <article class="db-item db-item-vacuum">
-            <h4>空间碎片整理 (VACUUM)</h4>
-            <p>立即释放数据库占用的冗余磁盘空间</p>
-            <button class="btn-dark" :disabled="vacuuming" @click="doVacuum">
-              {{ vacuuming ? '执行中…' : '执行压缩' }}
-            </button>
-            <div v-if="vacuumMsg" class="alert mt-3" :class="vacuumMsg.ok ? 'alert-success' : 'alert-error'">
-              {{ vacuumMsg.text }}
-            </div>
-          </article>
-
-          <article class="db-item db-item-purge">
-            <h4>历史数据清理</h4>
-            <div class="purge-line">
-              <span>保留近</span>
-              <input v-model.number="purgeDays" type="number" min="1" max="365" />
-              <span>天记录</span>
-            </div>
-            <button class="btn-warn" :disabled="purging" @click="doPurge">
-              {{ purging ? '执行中…' : '立即清理' }}
-            </button>
-            <div v-if="purgeMsg" class="alert mt-3" :class="purgeMsg.ok ? 'alert-success' : 'alert-error'">
-              {{ purgeMsg.text }}
-            </div>
-          </article>
+        <div class="db-line db-line-vacuum">
+          <span>空间碎片整理 (VACUUM)：释放物理磁盘空间</span>
+          <button class="btn-dark db-line-btn" :disabled="vacuuming" @click="doVacuum">{{ vacuuming ? '执行中…' : '执行' }}</button>
         </div>
+        <div class="db-line db-line-purge">
+          <div class="purge-inline">
+            <span>自动清理策略：保留近</span>
+            <input v-model.number="purgeDays" type="number" min="1" max="365" />
+            <span>天历史记录</span>
+          </div>
+          <button class="btn-warn db-line-btn" :disabled="purging" @click="doPurge">{{ purging ? '执行中…' : '清理' }}</button>
+        </div>
+        <div v-if="vacuumMsg" class="alert mt-3" :class="vacuumMsg.ok ? 'alert-success' : 'alert-error'">{{ vacuumMsg.text }}</div>
+        <div v-if="purgeMsg" class="alert mt-3" :class="purgeMsg.ok ? 'alert-success' : 'alert-error'">{{ purgeMsg.text }}</div>
       </section>
     </div>
 
@@ -337,56 +318,62 @@ async function doPurge() {
 .settings-page {
   background: #f8fafc;
   min-height: calc(100vh - 72px);
-}
-
-.settings-grid-top {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  margin-bottom: 18px;
+  gap: 16px;
 }
 
 .settings-card {
   background: #fff;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 22px;
+  border-radius: 10px;
+  padding: 18px 20px;
 }
 
 .settings-card-title {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #1e293b;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
-.threshold-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+.threshold-inline {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
-.threshold-item {
-  display: grid;
+.threshold-inline-item {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.threshold-item span {
+.threshold-inline-item span {
   font-size: 13px;
   color: #64748b;
+  white-space: nowrap;
 }
 
-.threshold-item input {
-  height: 36px;
-  border-radius: 6px;
-  border: 1px solid #cbd5e1;
+.threshold-inline-item input {
+  height: 28px;
+  width: 100px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
   padding: 0 12px;
 }
 
-.threshold-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 26px;
+.threshold-total input {
+  width: 110px;
+}
+
+.btn-threshold-save {
+  margin-left: auto;
+  min-width: 60px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 4px;
+  font-size: 12px;
 }
 
 .btn-solid-blue,
@@ -416,16 +403,16 @@ async function doPurge() {
 }
 
 .smtp-ready-box {
-  height: 60px;
+  height: 26px;
   border-radius: 8px;
   border: 1px solid #fee2e2;
   background: #fef2f2;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 16px;
+  gap: 8px;
+  padding: 0 12px;
   color: #991b1b;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -436,60 +423,69 @@ async function doPurge() {
 }
 
 .smtp-ready-dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: currentColor;
 }
 
-.smtp-current {
-  margin-top: 16px;
-  color: #64748b;
-  font-size: 12px;
+.notify-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.smtp-actions {
+.notify-left {
   display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.notify-title {
+  margin: 0;
+}
+
+.smtp-current {
+  margin-top: 0;
+  color: #64748b;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notify-btn {
+  height: 28px;
+  border-radius: 6px;
+  padding: 0 12px;
 }
 
 .db-card {
   margin-bottom: 0;
 }
 
-.db-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
+.db-line {
+  min-height: 36px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px;
+  margin-top: 8px;
 }
 
-.db-item {
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.db-item-vacuum {
+.db-line-vacuum {
   background: #f8fafc;
-  border: 1px solid #f1f5f9;
-}
-
-.db-item-purge {
-  background: #fffbeb;
-  border: 1px solid #fef3c7;
-}
-
-.db-item h4 {
-  font-size: 14px;
-  font-weight: 600;
   color: #334155;
-  margin-bottom: 10px;
+  font-size: 13px;
 }
 
-.db-item p {
-  font-size: 12px;
-  color: #94a3b8;
-  margin-bottom: 14px;
+.db-line-purge {
+  background: #fffbeb;
+  color: #92400e;
 }
 
 .btn-dark {
@@ -498,27 +494,33 @@ async function doPurge() {
   color: #fff;
 }
 
-.purge-line {
+.purge-inline {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 6px 0 14px;
-  color: #b45309;
   font-size: 13px;
 }
 
-.purge-line input {
-  width: 56px;
+.purge-inline input {
+  width: 40px;
   height: 24px;
   border-radius: 4px;
   border: 1px solid #d97706;
   text-align: center;
+  background: #fff;
 }
 
 .btn-warn {
   border: 0;
   background: #d97706;
   color: #fff;
+}
+
+.db-line-btn {
+  height: 24px;
+  border-radius: 4px;
+  padding: 0 10px;
+  font-size: 11px;
 }
 
 .smtp-mask {
@@ -729,16 +731,33 @@ button:disabled {
 }
 
 @media (max-width: 980px) {
-  .settings-grid-top,
-  .db-grid {
-    grid-template-columns: 1fr;
+  .notify-card,
+  .notify-left {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .db-line {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 8px 12px;
   }
 }
 
 @media (max-width: 640px) {
-  .threshold-grid,
+  .threshold-inline,
   .smtp-line {
-    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .threshold-inline-item {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .btn-threshold-save {
+    width: 100%;
+    margin-left: 0;
   }
 
   .smtp-label {
