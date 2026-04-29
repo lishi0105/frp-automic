@@ -30,6 +30,33 @@
         <div v-if="saveMsg" class="alert mt-3" :class="saveMsg.ok ? 'alert-success' : 'alert-error'">{{ saveMsg.text }}</div>
       </section>
 
+      <section class="settings-card event-alert-card">
+        <h3 class="settings-card-title">事件告警</h3>
+        <div class="event-rows">
+          <div class="event-row">
+            <span class="event-label">代理离线告警</span>
+            <button class="switch-btn" :class="{ on: form.alert_proxy_offline === 'true' }" type="button" @click="toggleField('alert_proxy_offline')"><span></span></button>
+          </div>
+          <div class="event-row">
+            <span class="event-label">SSL证书到期告警</span>
+            <div class="event-row-right">
+              <button class="switch-btn" :class="{ on: form.alert_cert_expiry === 'true' }" type="button" @click="toggleField('alert_cert_expiry')"><span></span></button>
+              <template v-if="form.alert_cert_expiry === 'true'">
+                <span class="event-sub">提前</span>
+                <input v-model.number="form.alert_cert_days" type="number" min="1" max="90" class="event-days-input" />
+                <span class="event-sub">天提醒</span>
+              </template>
+            </div>
+          </div>
+        </div>
+        <div class="event-footer">
+          <button class="btn-solid-blue btn-event-save" :disabled="savingEvents" @click="saveEvents">
+            {{ savingEvents ? '保存中…' : '保存' }}
+          </button>
+          <div v-if="eventMsg" class="alert" :class="eventMsg.ok ? 'alert-success' : 'alert-error'">{{ eventMsg.text }}</div>
+        </div>
+      </section>
+
       <section class="settings-card notify-card">
         <div class="notify-left">
           <h3 class="settings-card-title notify-title">告警通知</h3>
@@ -173,13 +200,17 @@ const form = reactive({
   smtp_enabled: 'false',
   alert_in_gb: 0,
   alert_out_gb: 0,
-  alert_total_gb: 0
+  alert_total_gb: 0,
+  alert_proxy_offline: 'false',
+  alert_cert_expiry: 'false',
+  alert_cert_days: 15
 })
 
 const showSMTPPass = ref(false)
 const smtpModalOpen = ref(false)
 const savingThreshold = ref(false)
 const savingSMTP = ref(false)
+const savingEvents = ref(false)
 const testingEmail = ref(false)
 const vacuuming = ref(false)
 const purging = ref(false)
@@ -187,6 +218,7 @@ const purgeDays = ref(30)
 
 const saveMsg = ref(null)
 const smtpMsg = ref(null)
+const eventMsg = ref(null)
 const vacuumMsg = ref(null)
 const purgeMsg = ref(null)
 
@@ -213,6 +245,9 @@ function fillForm(s) {
   form.alert_out_gb = s.alert_out_gb || 0
   form.alert_total_gb = s.alert_total_gb || 0
   form.smtp_auth_code = s.smtp_auth_code || ''
+  form.alert_proxy_offline = s.alert_proxy_offline ? 'true' : 'false'
+  form.alert_cert_expiry = s.alert_cert_expiry ? 'true' : 'false'
+  form.alert_cert_days = s.alert_cert_days || 15
 }
 
 watch(() => props.status?.settings, fillForm, { immediate: true })
@@ -286,6 +321,26 @@ function toggleSMTP() {
   form.smtp_enabled = form.smtp_enabled === 'true' ? 'false' : 'true'
 }
 
+function toggleField(key) {
+  form[key] = form[key] === 'true' ? 'false' : 'true'
+}
+
+async function saveEvents() {
+  savingEvents.value = true
+  try {
+    await api.saveSettings({
+      alert_proxy_offline: form.alert_proxy_offline,
+      alert_cert_expiry: form.alert_cert_expiry,
+      alert_cert_days: form.alert_cert_days
+    })
+    flash(eventMsg, true, '事件告警配置已保存')
+  } catch (e) {
+    flash(eventMsg, false, '保存失败：' + e.message)
+  } finally {
+    savingEvents.value = false
+  }
+}
+
 async function doVacuum() {
   vacuuming.value = true
   vacuumMsg.value = null
@@ -319,21 +374,21 @@ async function doPurge() {
   background: #f8fafc;
   min-height: calc(100vh - 72px);
   display: grid;
-  gap: 16px;
+  gap: 10px;
 }
 
 .settings-card {
   background: #fff;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: 18px 20px;
+  padding: 14px 16px;
 }
 
 .settings-card-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #1e293b;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .threshold-inline {
@@ -467,14 +522,14 @@ async function doPurge() {
 }
 
 .db-line {
-  min-height: 36px;
+  min-height: 30px;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 0 12px;
-  margin-top: 8px;
+  padding: 0 10px;
+  margin-top: 5px;
 }
 
 .db-line-vacuum {
@@ -728,6 +783,69 @@ async function doPurge() {
 button:disabled {
   opacity: .65;
   cursor: not-allowed;
+}
+
+.event-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 30px;
+  gap: 12px;
+}
+
+.event-label {
+  font-size: 13px;
+  color: #334155;
+}
+
+.event-row-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.event-sub {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.event-days-input {
+  width: 52px;
+  height: 26px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 0 6px;
+  text-align: center;
+  font: inherit;
+  font-size: 13px;
+}
+
+.event-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.btn-event-save {
+  height: 26px;
+  padding: 0 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.event-footer .alert {
+  margin: 0;
+  padding: 4px 10px;
+  font-size: 12px;
 }
 
 @media (max-width: 980px) {

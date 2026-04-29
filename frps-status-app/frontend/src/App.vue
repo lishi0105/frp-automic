@@ -3,8 +3,8 @@
   <div v-else class="layout">
     <aside class="sidebar">
       <div class="sidebar-logo">
-        <img :src="logoUrl" class="logo-icon" alt="FRPS Status" />
-        FRPS Status
+        <img :src="logoUrl" class="logo-icon" alt="FRPS状态监控" />
+        FRPS状态监控
         <span class="logo-dot" :class="{ offline: !frpsOnline }"></span>
       </div>
       <nav>

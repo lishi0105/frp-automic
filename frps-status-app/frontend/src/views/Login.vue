@@ -8,8 +8,8 @@
       </div>
       <div class="login-hero-content">
         <div class="login-hero-brand">
-          <img :src="logoUrl" alt="FRPS Status" />
-          <span>FRPS Status</span>
+          <img :src="logoUrl" alt="FRPS状态监控" />
+          <span>FRPS状态监控</span>
         </div>
         <h1>FRPS 综合管理平台</h1>
         <p>SSL证书 · 流量告警 · 节点审计</p>
@@ -23,7 +23,7 @@
 
     <section class="login-panel-wrap">
       <form class="login-panel" @submit.prevent="submit">
-        <img :src="logoUrl" class="login-panel-logo" alt="FRPS Status" />
+        <img :src="logoUrl" class="login-panel-logo" alt="FRPS状态监控" />
         <h2>管理端登录</h2>
 
         <label class="login-field">

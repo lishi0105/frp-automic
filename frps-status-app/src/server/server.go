@@ -149,7 +149,7 @@ func (a *App) sendAlertOnce(month, direction string, current uint64, thresholdGB
 }
 
 func (a *App) checkProxyAlerts(settings model.PublicSettings, proxies []model.ProxyTraffic) {
-	if !settings.SMTPEnabled {
+	if !settings.SMTPEnabled || !settings.AlertProxyOffline {
 		return
 	}
 	authCode := a.store.Setting("smtp_auth_code")
@@ -175,16 +175,20 @@ func (a *App) checkProxyAlerts(settings model.PublicSettings, proxies []model.Pr
 }
 
 func (a *App) checkCertAlerts(settings model.PublicSettings, certs []model.CertStatus) {
-	if !settings.SMTPEnabled {
+	if !settings.SMTPEnabled || !settings.AlertCertExpiry {
 		return
 	}
 	authCode := a.store.Setting("smtp_auth_code")
 	if authCode == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
 		return
 	}
+	threshold := settings.AlertCertDays
+	if threshold <= 0 {
+		threshold = 15
+	}
 	for _, c := range certs {
 		key := "cert_expiry:" + c.Domain
-		if c.Present && c.DaysLeft != nil && !c.OK {
+		if c.Present && c.DaysLeft != nil && *c.DaysLeft <= threshold {
 			if !a.store.EventAlertSent(key) {
 				subject := fmt.Sprintf("FRPS SSL证书即将到期 - %s", c.Domain)
 				body := fmt.Sprintf("域名 %s 的 SSL 证书将在 %d 天后到期（到期时间：%s），请及时续期。", c.Domain, *c.DaysLeft, c.ExpiresAt)
@@ -194,7 +198,7 @@ func (a *App) checkCertAlerts(settings model.PublicSettings, certs []model.CertS
 				}
 				_ = a.store.SetEventAlert(key)
 			}
-		} else if c.OK {
+		} else if c.Present && c.DaysLeft != nil && *c.DaysLeft > threshold {
 			_ = a.store.ClearEventAlert(key)
 		}
 	}
@@ -390,7 +394,7 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		allowed := map[string]bool{"alert_in_gb": true, "alert_out_gb": true, "alert_total_gb": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true}
+		allowed := map[string]bool{"alert_in_gb": true, "alert_out_gb": true, "alert_total_gb": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true, "alert_proxy_offline": true, "alert_cert_expiry": true, "alert_cert_days": true}
 		for key, value := range in {
 			if !allowed[key] {
 				continue
@@ -414,7 +418,7 @@ func (a *App) handleTestEmail(w http.ResponseWriter, r *http.Request) {
 	}
 	settings, _ := a.store.PublicSettings()
 	authCode := a.store.Setting("smtp_auth_code")
-	if err := mail.Send(settings, authCode, "FRPS Status - 测试邮件", "这是一封来自 FRPS Status 的测试邮件，SMTP 配置正常。"); err != nil {
+	if err := mail.Send(settings, authCode, "FRPS状态监控 - 测试邮件", "这是一封来自 FRPS状态监控 的测试邮件，SMTP 配置正常。"); err != nil {
 		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}

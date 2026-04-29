@@ -35,8 +35,11 @@ type PublicSettings struct {
 	SMTPUser        string  `json:"smtp_user"`
 	SMTPFrom        string  `json:"smtp_from"`
 	SMTPTo          string  `json:"smtp_to"`
-	SMTPEnabled     bool    `json:"smtp_enabled"`
-	SMTPAuthCode    string  `json:"smtp_auth_code"`
+	SMTPEnabled        bool    `json:"smtp_enabled"`
+	SMTPAuthCode       string  `json:"smtp_auth_code"`
+	AlertProxyOffline  bool    `json:"alert_proxy_offline"`
+	AlertCertExpiry    bool    `json:"alert_cert_expiry"`
+	AlertCertDays      int     `json:"alert_cert_days"`
 }
 
 type Snapshot struct {

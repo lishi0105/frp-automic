@@ -33,7 +33,7 @@ func (s *Store) InitDB() error {
 			return err
 		}
 	}
-	defaults := map[string]string{"alert_in_gb": "0", "alert_out_gb": "0", "alert_total_gb": "0", "smtp_port": "465", "smtp_enabled": "false"}
+	defaults := map[string]string{"alert_in_gb": "0", "alert_out_gb": "0", "alert_total_gb": "0", "smtp_port": "465", "smtp_enabled": "false", "alert_proxy_offline": "false", "alert_cert_expiry": "false", "alert_cert_days": "15"}
 	for k, v := range defaults {
 		if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)`, k, v); err != nil {
 			return err
@@ -63,8 +63,11 @@ func (s *Store) PublicSettings() (model.PublicSettings, error) {
 		SMTPUser:        s.Setting("smtp_user"),
 		SMTPFrom:        s.Setting("smtp_from"),
 		SMTPTo:          s.Setting("smtp_to"),
-		SMTPEnabled:     strings.EqualFold(s.Setting("smtp_enabled"), "true"),
-		SMTPAuthCode:    s.Setting("smtp_auth_code"),
+		SMTPEnabled:        strings.EqualFold(s.Setting("smtp_enabled"), "true"),
+		SMTPAuthCode:       s.Setting("smtp_auth_code"),
+		AlertProxyOffline:  strings.EqualFold(s.Setting("alert_proxy_offline"), "true"),
+		AlertCertExpiry:    strings.EqualFold(s.Setting("alert_cert_expiry"), "true"),
+		AlertCertDays:      int(parseFloatDefault(s.Setting("alert_cert_days"), 15)),
 	}, nil
 }
 
