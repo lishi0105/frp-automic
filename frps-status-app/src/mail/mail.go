@@ -3,6 +3,7 @@ package mail
 import (
 	"crypto/tls"
 	"fmt"
+	"log"
 	"net"
 	"net/smtp"
 	"strconv"
@@ -40,6 +41,7 @@ func GBToBytes(gb float64) uint64 {
 }
 
 func sendTLS(addr, host string, auth smtp.Auth, from string, to []string, msg string) error {
+	log.Printf("Connecting to SMTP server %s for TLS email sending from %s to %v", addr, from, to)
 	conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
 	if err != nil {
 		return err
