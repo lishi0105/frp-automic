@@ -44,7 +44,7 @@
         </section>
         <section class="card analytics-side-kv">
           <div class="section-head"><div class="section-title">代理详情</div></div>
-          <div class="kv"><span>当前连接</span><b>{{ proxyCurConns }}</b></div>
+          <div class="kv"><span>当前连接</span><b>{{ proxyCurConns }}</b></div>   
           <div class="kv"><span>日峰值连接</span><b>{{ peakConns }}</b></div>
           <div class="kv"><span>上行占比</span><b>{{ ratioIn }}%</b></div>
           <div class="kv"><span>下行占比</span><b>{{ ratioOut }}%</b></div>

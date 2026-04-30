@@ -19,6 +19,7 @@ type Config struct {
 	Domains           []string
 	StatusUser        string
 	StatusPassword    string
+	LogDir            string
 	PollInterval      time.Duration
 }
 
@@ -37,6 +38,7 @@ func Load() Config {
 		Domains:           SplitCSV(os.Getenv("STATUS_DOMAINS")),
 		StatusUser:        env("STATUS_USER", frpsUser),
 		StatusPassword:    env("STATUS_PASSWORD", frpsPass),
+		LogDir:            env("LOG_DIR", ""),
 		PollInterval:      time.Duration(envInt("POLL_SECONDS", 60)) * time.Second,
 	}
 }

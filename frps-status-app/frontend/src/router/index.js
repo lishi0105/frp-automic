@@ -16,6 +16,7 @@ const router = createRouter({
     { path: '/statistics', component: Statistics },
     { path: '/statistics/:proxyName', component: Statistics },
     { path: '/settings', component: Settings },
+    { path: '/account', redirect: '/?account=1' },
     { path: '/login', component: Login, meta: { public: true } }
   ]
 })

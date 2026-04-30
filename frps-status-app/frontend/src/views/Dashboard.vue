@@ -5,10 +5,13 @@
         <div class="page-title">数据看板</div>
         <div class="page-sub">{{ updatedAt ? '最后更新：' + updatedAt : '加载中…' }}</div>
       </div>
-      <button class="btn btn-outline btn-sm" :disabled="loading" @click="$emit('refresh')">
-        <span v-if="loading" class="spinner"></span>
-        <span v-else>↻</span> 刷新
-      </button>
+      <div class="page-actions">
+        <button class="btn btn-outline btn-sm" @click="openLogModal">日志</button>
+        <button class="btn btn-outline btn-sm" :disabled="loading" @click="$emit('refresh')">
+          <span v-if="loading" class="spinner"></span>
+          <span v-else>↻</span> 刷新
+        </button>
+      </div>
     </div>
 
     <div class="page-body dashboard-page">
@@ -82,6 +85,75 @@
         </section>
       </div>
     </div>
+
+    <Teleport to="body">
+      <Transition name="log-modal-fade">
+        <div v-if="logOpen" class="log-modal-mask" @click.self="logOpen = false">
+          <section class="log-modal" role="dialog" aria-modal="true" aria-labelledby="log-modal-title">
+            <header class="log-modal-head">
+              <div>
+                <h2 id="log-modal-title">运行日志</h2>
+                <p>{{ logMeta }}</p>
+              </div>
+              <div class="log-head-actions">
+                <button class="btn btn-danger btn-sm" :disabled="logClearing" @click="clearLog">
+                  {{ logClearing ? '清空中...' : '清空' }}
+                </button>
+                <button class="btn btn-outline btn-sm" :disabled="logLoading" @click="loadLog">
+                  <span v-if="logLoading" class="spinner"></span>
+                  <span v-else>↻</span> 刷新
+                </button>
+                <button class="log-close" type="button" aria-label="关闭" @click="logOpen = false">×</button>
+              </div>
+            </header>
+            <div class="log-toolbar">
+              <div class="log-filter-group" aria-label="日志等级筛选">
+                <button
+                  v-for="item in logLevelOptions"
+                  :key="item.value"
+                  class="log-filter-btn"
+                  :class="[item.value, { active: logLevelFilter === item.value }]"
+                  type="button"
+                  @click="logLevelFilter = item.value"
+                >
+                  {{ item.label }}
+                </button>
+              </div>
+              <label class="log-follow-toggle">
+                <input v-model="logAutoFollow" type="checkbox" />
+                <span>自动显示最新</span>
+              </label>
+              <span class="log-toolbar-note">当前 {{ displayedLogRows.length }} / {{ logRows.length }} 行</span>
+            </div>
+            <div ref="logBodyEl" class="log-body">
+              <div v-if="logLoading && !logContent" class="log-empty">日志加载中...</div>
+              <div v-else-if="logError" class="log-empty error">{{ logError }}</div>
+              <div v-else-if="displayedLogRows.length" class="log-table-wrap">
+                <table class="log-table">
+                  <thead>
+                    <tr>
+                      <th class="log-col-time">时间</th>
+                      <th class="log-col-file">文件</th>
+                      <th class="log-col-level">级别</th>
+                      <th class="log-col-message">内容</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, index) in displayedLogRows" :key="index" :class="row.levelClass">
+                      <td class="log-col-time">{{ row.time }}</td>
+                      <td class="log-col-file">{{ row.file }}</td>
+                      <td class="log-col-level"><span class="log-level">{{ row.level }}</span></td>
+                      <td class="log-col-message">{{ row.message }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div v-else class="log-empty">当前暂无日志</div>
+            </div>
+          </section>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -89,11 +161,23 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { humanBytes, percent } from '../utils/format.js'
+import { api } from '../api/index.js'
 
 const props = defineProps({ status: Object, daily: Array, loading: Boolean })
 defineEmits(['refresh'])
 
 const chartEl = ref(null)
+const logOpen = ref(false)
+const logLoading = ref(false)
+const logContent = ref('')
+const logPath = ref('')
+const logSize = ref(0)
+const logError = ref('')
+const logBodyEl = ref(null)
+const logAutoFollow = ref(true)
+const logLevelFilter = ref('all')
+const logClearing = ref(false)
+let logTimer = null
 let chart = null
 
 const updatedAt = computed(() => props.status
@@ -128,6 +212,127 @@ const topProxies = computed(() => {
     .map(p => ({ name: p.name, type: p.type, month_in: Number(p.month_in || 0), month_out: Number(p.month_out || 0), total: Number(p.month_in || 0) + Number(p.month_out || 0) }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 5)
+})
+
+const logLevelOptions = [
+  { value: 'all', label: '全部' },
+  { value: 'info', label: 'Info' },
+  { value: 'warn', label: 'Warn' },
+  { value: 'error', label: 'Error' }
+]
+
+const logRows = computed(() => parseLogRows(logContent.value))
+const displayedLogRows = computed(() => {
+  if (logLevelFilter.value === 'all') return logRows.value
+  return logRows.value.filter(row => row.levelClass === logLevelFilter.value)
+})
+const logMeta = computed(() => {
+  if (!logPath.value) return '当前日志文件'
+  return `${logPath.value} · ${humanBytes(logSize.value)}`
+})
+
+function parseLogRows(content) {
+  if (!content) return []
+  return content
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => {
+      const match = line.match(/^\[([^\]]+)\]\s+(Info|Warn|Error)\s+(.*)$/)
+      if (!match) {
+        return { time: '-', file: '-', level: 'Info', levelClass: 'info', message: line }
+      }
+      const header = match[1]
+      const splitAt = header.lastIndexOf(' ')
+      const time = splitAt > -1 ? header.slice(0, splitAt) : header
+      const file = splitAt > -1 ? header.slice(splitAt + 1) : '-'
+      const level = match[2]
+      return {
+        time,
+        file,
+        level,
+        levelClass: level.toLowerCase(),
+        message: match[3]
+      }
+    })
+}
+
+async function openLogModal() {
+  logOpen.value = true
+  await loadLog()
+  startLogAutoRefresh()
+}
+
+async function loadLog(options = {}) {
+  logLoading.value = true
+  if (!options.silent) logError.value = ''
+  try {
+    const res = await api.getCurrentLog()
+    logContent.value = res.content || ''
+    logPath.value = res.path || ''
+    logSize.value = Number(res.size || 0)
+    if (logAutoFollow.value) {
+      await nextTick()
+      await scrollLogToBottom()
+    }
+  } catch (e) {
+    logError.value = e.message || '日志读取失败'
+  } finally {
+    logLoading.value = false
+    if (logAutoFollow.value) await scrollLogToBottom()
+  }
+}
+
+async function clearLog() {
+  if (!confirm('确定清空当前日志文件内容？此操作不可恢复。')) return
+  logClearing.value = true
+  logError.value = ''
+  try {
+    await api.clearCurrentLog()
+    await loadLog({ silent: true })
+  } catch (e) {
+    logError.value = e.message || '日志清空失败'
+  } finally {
+    logClearing.value = false
+  }
+}
+
+async function scrollLogToBottom() {
+  await nextTick()
+  await new Promise(resolve => requestAnimationFrame(resolve))
+  const el = logBodyEl.value
+  if (el) el.scrollTop = el.scrollHeight
+}
+
+function startLogAutoRefresh() {
+  stopLogAutoRefresh()
+  if (!logAutoFollow.value) return
+  logTimer = setInterval(() => {
+    if (logOpen.value && logAutoFollow.value && !logLoading.value) loadLog({ silent: true })
+  }, 5000)
+}
+
+function stopLogAutoRefresh() {
+  if (logTimer) {
+    clearInterval(logTimer)
+    logTimer = null
+  }
+}
+
+watch(logAutoFollow, async (enabled) => {
+  if (enabled) {
+    startLogAutoRefresh()
+    await scrollLogToBottom()
+  } else {
+    stopLogAutoRefresh()
+  }
+})
+
+watch(logOpen, (open) => {
+  if (!open) stopLogAutoRefresh()
+})
+
+watch(displayedLogRows, async () => {
+  if (logOpen.value && logAutoFollow.value) await scrollLogToBottom()
 })
 
 const certs = computed(() => {
@@ -209,6 +414,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  stopLogAutoRefresh()
   ro?.disconnect()
   chart?.dispose()
 })
@@ -228,6 +434,11 @@ onUnmounted(() => {
   flex: 1;
   flex-direction: column;
   min-height: 0;
+}
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .dashboard-rings {
   display: grid;
@@ -361,11 +572,242 @@ onUnmounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.log-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 520;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, .58);
+  color: #0f172a;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --text-2: #475569;
+}
+.log-modal {
+  width: min(980px, 100%);
+  height: min(720px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, .34);
+  overflow: hidden;
+}
+.log-modal-head {
+  min-height: 66px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.log-modal-head h2 {
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+.log-modal-head p {
+  margin-top: 3px;
+  color: var(--text-2);
+  font-size: 12px;
+  word-break: break-all;
+}
+.log-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.log-close {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text-2);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.log-close:hover { background: var(--surface-2); color: var(--text); }
+.log-toolbar {
+  min-height: 44px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.log-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+}
+.log-filter-btn {
+  height: 26px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.log-filter-btn:hover { background: var(--surface-2); color: var(--text); }
+.log-filter-btn.active.all { background: #e2e8f0; color: #0f172a; }
+.log-filter-btn.active.info { background: #dbeafe; color: #1d4ed8; }
+.log-filter-btn.active.warn { background: #fef3c7; color: #92400e; }
+.log-filter-btn.active.error { background: #fee2e2; color: #991b1b; }
+.log-follow-toggle {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.log-follow-toggle input {
+  width: 14px;
+  height: 14px;
+  accent-color: #2563eb;
+}
+.log-toolbar-note {
+  margin-left: auto;
+  color: var(--text-2);
+  font-size: 12px;
+}
+.log-body {
+  min-height: 0;
+  background: #0b1220;
+  color: #dbeafe;
+  overflow: auto;
+}
+.log-table-wrap {
+  min-height: 100%;
+  min-width: 980px;
+}
+.log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+  table-layout: auto;
+}
+.log-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 34px;
+  padding: 0 10px;
+  border-bottom: 1px solid #1e293b;
+  background: #111827;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+}
+.log-table td {
+  height: 30px;
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(30, 41, 59, .72);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.log-table tbody tr:hover td {
+  background: rgba(30, 41, 59, .72);
+}
+.log-col-time { width: 174px; color: #93c5fd; }
+.log-col-file { width: 96px; color: #c4b5fd; }
+.log-col-level { width: 72px; }
+.log-col-message {
+  min-width: 620px;
+  color: #dbeafe;
+}
+.log-level {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+  height: 22px;
+  border-radius: 999px;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 700;
+}
+.log-table tr.info .log-level {
+  background: rgba(37, 99, 235, .16);
+  color: #93c5fd;
+}
+.log-table tr.warn .log-level {
+  background: rgba(245, 158, 11, .16);
+  color: #fcd34d;
+}
+.log-table tr.error .log-level {
+  background: rgba(239, 68, 68, .18);
+  color: #fca5a5;
+}
+.log-table tr.warn .log-col-message { color: #fde68a; }
+.log-table tr.error .log-col-message { color: #fecaca; }
+.log-table tr.warn .log-col-time,
+.log-table tr.warn .log-col-file { color: #fbbf24; }
+.log-table tr.error .log-col-time,
+.log-table tr.error .log-col-file { color: #f87171; }
+.log-body ::selection {
+  background: rgba(59, 130, 246, .42);
+  color: #fff;
+}
+.log-empty {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+.log-empty.error { color: #fecaca; }
+.log-modal-fade-enter-active,
+.log-modal-fade-leave-active {
+  transition: opacity .15s ease;
+}
+.log-modal-fade-enter-from,
+.log-modal-fade-leave-to {
+  opacity: 0;
+}
 @media (max-width: 1200px) {
   .dashboard-page { height: auto; grid-template-rows: auto auto; overflow: visible; padding-bottom: 0; }
   .dashboard-rings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dashboard-main { grid-template-columns: 1fr; }
   .trend-chart { flex: none; height: 300px; }
   .top5-scroll { height: auto; max-height: 260px; }
+}
+@media (max-width: 640px) {
+  .page-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .log-modal-mask { padding: 12px; }
+  .log-modal { height: calc(100vh - 24px); }
+  .log-modal-head { align-items: flex-start; flex-direction: column; }
+  .log-toolbar { align-items: flex-start; flex-wrap: wrap; }
+  .log-toolbar-note { margin-left: 0; width: 100%; }
 }
 </style>

@@ -13,7 +13,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,6 +24,7 @@ import (
 
 	"frps-status-app.local/status/src/config"
 	"frps-status-app.local/status/src/frps"
+	"frps-status-app.local/status/src/logger"
 	"frps-status-app.local/status/src/mail"
 	"frps-status-app.local/status/src/model"
 	"frps-status-app.local/status/src/store"
@@ -52,6 +52,11 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/api/login", a.handleLogin)
 	mux.HandleFunc("/api/logout", a.handleLogout)
 	mux.HandleFunc("/api/session", a.handleSession)
+	mux.HandleFunc("/api/user/forgot-password", a.handleForgotPassword)
+	mux.HandleFunc("/api/user", a.withAuth(a.handleUser))
+	mux.HandleFunc("/api/user/credentials", a.withAuth(a.handleChangeCredentials))
+	mux.HandleFunc("/api/user/recovery-email", a.withAuth(a.handleChangeRecoveryEmail))
+	mux.HandleFunc("/api/warnings", a.withAuth(a.handleWarnings))
 	mux.HandleFunc("/api/status", a.withAuth(a.handleStatus))
 	mux.HandleFunc("/api/daily", a.withAuth(a.handleDaily))
 	mux.HandleFunc("/api/daily/export", a.withAuth(a.handleExportCSV))
@@ -59,6 +64,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/api/settings/test-email", a.withAuth(a.handleTestEmail))
 	mux.HandleFunc("/api/db/vacuum", a.withAuth(a.handleVacuum))
 	mux.HandleFunc("/api/db/purge", a.withAuth(a.handlePurge))
+	mux.HandleFunc("/api/logs/current", a.withAuth(a.handleCurrentLog))
+	mux.HandleFunc("/api/logs/clear", a.withAuth(a.handleClearLog))
 	mux.HandleFunc("/", a.serveIndex)
 	return mux
 }
@@ -68,7 +75,7 @@ func (a *App) PollLoop() {
 	defer ticker.Stop()
 	for range ticker.C {
 		if err := a.Refresh(context.Background()); err != nil {
-			log.Printf("refresh failed: %v", err)
+			logger.Warn("定时刷新失败: %v", err)
 		}
 	}
 }
@@ -77,10 +84,10 @@ func (a *App) Refresh(ctx context.Context) error {
 	proxies, fetchErr := a.frps.FetchProxies(ctx)
 	if fetchErr == nil {
 		if err := a.store.RecordTraffic(proxies); err != nil {
-			log.Printf("record traffic failed: %v", err)
+			logger.Error("记录流量数据失败: %v", err)
 		}
 	} else {
-		log.Printf("fetch frps proxies failed: %v", fetchErr)
+		logger.Warn("获取 FRPS 代理列表失败: %v", fetchErr)
 	}
 	month := time.Now().Format("2006-01")
 	for i := range proxies {
@@ -94,8 +101,11 @@ func (a *App) Refresh(ctx context.Context) error {
 	_ = a.checkAlerts(settings, month, monthIn, monthOut)
 	if fetchErr == nil {
 		a.checkProxyAlerts(settings, proxies)
+		a.syncProxyWarnings(proxies)
 	}
 	a.checkCertAlerts(settings, certs)
+	a.syncCertWarnings(settings, certs)
+	a.syncTrafficWarnings(settings, monthIn, monthOut)
 	s := model.Snapshot{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 		FRPS: map[string]any{
@@ -189,18 +199,26 @@ func (a *App) checkAlerts(settings model.PublicSettings, month string, monthIn, 
 
 func (a *App) sendAlertOnce(month, direction string, current uint64, thresholdGB float64, settings model.PublicSettings) error {
 	if a.store.AlertSent(month, direction) {
+		logger.Info("流量告警已发送，跳过重复发送 月份=%s 方向=%s", month, direction)
 		return nil
 	}
 	authCode := a.store.Setting("smtp_auth_code")
 	if authCode == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
+		logger.Warn("跳过流量告警，SMTP 配置不完整 月份=%s 方向=%s", month, direction)
 		return nil
 	}
 	subject := fmt.Sprintf("FRPS %s traffic alert %s", strings.ToUpper(direction), month)
 	body := fmt.Sprintf("FRPS monthly %s traffic is %s, threshold is %.2f GB.", direction, mail.HumanBytes(current), thresholdGB)
 	if err := mail.Send(settings, authCode, subject, body); err != nil {
+		logger.Error("发送流量告警邮件失败 月份=%s 方向=%s 错误=%v", month, direction, err)
 		return err
 	}
-	return a.store.MarkAlertSent(month, direction)
+	if err := a.store.MarkAlertSent(month, direction); err != nil {
+		logger.Error("标记流量告警已发送失败 月份=%s 方向=%s 错误=%v", month, direction, err)
+		return err
+	}
+	logger.Info("流量告警邮件已发送 月份=%s 方向=%s 当前=%d 阈值(GB)=%.2f", month, direction, current, thresholdGB)
+	return nil
 }
 
 func (a *App) checkProxyAlerts(settings model.PublicSettings, proxies []model.ProxyTraffic) {
@@ -218,7 +236,7 @@ func (a *App) checkProxyAlerts(settings model.PublicSettings, proxies []model.Pr
 				subject := fmt.Sprintf("FRPS 代理离线告警 - %s", p.Name)
 				body := fmt.Sprintf("代理 %s（类型：%s）已离线，请检查客户端连接状态。", p.Name, p.Type)
 				if err := mail.Send(settings, authCode, subject, body); err != nil {
-					log.Printf("send proxy offline alert failed: %v", err)
+					logger.Error("发送代理离线告警邮件失败: %v", err)
 					continue
 				}
 				_ = a.store.SetEventAlert(key)
@@ -248,7 +266,7 @@ func (a *App) checkCertAlerts(settings model.PublicSettings, certs []model.CertS
 				subject := fmt.Sprintf("FRPS SSL证书即将到期 - %s", c.Domain)
 				body := fmt.Sprintf("域名 %s 的 SSL 证书将在 %d 天后到期（到期时间：%s），请及时续期。", c.Domain, *c.DaysLeft, c.ExpiresAt)
 				if err := mail.Send(settings, authCode, subject, body); err != nil {
-					log.Printf("send cert expiry alert failed: %v", err)
+					logger.Error("发送证书到期告警邮件失败: %v", err)
 					continue
 				}
 				_ = a.store.SetEventAlert(key)
@@ -265,14 +283,12 @@ func (a *App) withAuth(next http.HandlerFunc) http.HandlerFunc {
 			next(w, r)
 			return
 		}
+		logger.Warn("未授权请求 方法=%s 路径=%s 来源=%s", r.Method, r.URL.Path, r.RemoteAddr)
 		w.WriteHeader(http.StatusUnauthorized)
 	}
 }
 
 func (a *App) authorized(r *http.Request) bool {
-	if a.cfg.StatusUser == "" && a.cfg.StatusPassword == "" {
-		return true
-	}
 	if a.validSession(r) {
 		return true
 	}
@@ -282,22 +298,33 @@ func (a *App) authorized(r *http.Request) bool {
 	}
 	raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(header, "Basic "))
 	if err != nil {
+		logger.Warn("无效的 Basic Auth 请求头 来源=%s 错误=%v", r.RemoteAddr, err)
 		return false
 	}
-	expected := []byte(a.cfg.StatusUser + ":" + a.cfg.StatusPassword)
-	if len(raw) != len(expected) {
+	parts := strings.SplitN(string(raw), ":", 2)
+	if len(parts) != 2 {
+		logger.Warn("Basic Auth 凭据格式错误 来源=%s", r.RemoteAddr)
 		return false
 	}
-	return subtle.ConstantTimeCompare(raw, expected) == 1
+	return a.checkCredentials(parts[0], parts[1])
 }
 
-func (a *App) checkCredentials(user, password string) bool {
-	expected := []byte(a.cfg.StatusUser + ":" + a.cfg.StatusPassword)
-	actual := []byte(user + ":" + password)
-	if len(actual) != len(expected) {
+func (a *App) checkCredentials(username, password string) bool {
+	u, err := a.store.GetUser()
+	if err != nil {
+		logger.Error("凭据验证时获取用户失败: %v", err)
 		return false
 	}
-	return subtle.ConstantTimeCompare(actual, expected) == 1
+	if subtle.ConstantTimeCompare([]byte(u.Username), []byte(username)) == 0 {
+		logger.Warn("凭据验证失败：用户名不匹配 用户名=%s", username)
+		return false
+	}
+	expected := store.HashPassword(u.PasswordSalt, password)
+	ok := subtle.ConstantTimeCompare([]byte(expected), []byte(u.PasswordHash)) == 1
+	if !ok {
+		logger.Warn("凭据验证失败：密码不匹配 用户名=%s", username)
+	}
+	return ok
 }
 
 func (a *App) validSession(r *http.Request) bool {
@@ -311,6 +338,7 @@ func (a *App) validSession(r *http.Request) bool {
 	}
 	expiry, err := strconv.ParseInt(parts[0], 10, 64)
 	if err != nil || time.Now().Unix() > expiry {
+		logger.Warn("Session Cookie 无效或已过期 来源=%s", r.RemoteAddr)
 		return false
 	}
 	msg := parts[0] + "." + parts[1]
@@ -343,12 +371,8 @@ func (a *App) signSession(msg string) string {
 
 func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
+		logger.Warn("登录请求被拒绝：请求方法不允许 方法=%s", r.Method)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	if a.cfg.StatusUser == "" && a.cfg.StatusPassword == "" {
-		http.SetCookie(w, a.newSessionCookie())
-		writeJSON(w, map[string]any{"ok": true})
 		return
 	}
 	var in struct {
@@ -356,19 +380,214 @@ func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		logger.Warn("登录请求体解析失败 来源=%s 错误=%v", r.RemoteAddr, err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if !a.checkCredentials(in.Username, in.Password) {
+		logger.Warn("登录失败 用户名=%s 来源=%s", in.Username, r.RemoteAddr)
 		writeJSONStatus(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "用户名或密码不正确"})
 		return
 	}
 	http.SetCookie(w, a.newSessionCookie())
+	u, _ := a.store.GetUser()
+	logger.Info("登录成功 用户名=%s 来源=%s", in.Username, r.RemoteAddr)
+	writeJSON(w, map[string]any{"ok": true, "force_change": u.IsInitialPassword})
+}
+
+func (a *App) handleUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		logger.Warn("获取用户请求被拒绝：请求方法不允许 方法=%s", r.Method)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	u, err := a.store.GetUser()
+	if err != nil {
+		logger.Error("获取用户信息失败: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{
+		"id":                  u.ID,
+		"username":            u.Username,
+		"recovery_email":      u.RecoveryEmail,
+		"is_initial_password": u.IsInitialPassword,
+	})
+}
+
+func (a *App) handleChangeCredentials(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		logger.Warn("修改凭据请求被拒绝：请求方法不允许 方法=%s", r.Method)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var in struct {
+		Username        string `json:"username"`
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		logger.Warn("修改凭据请求体解析失败 来源=%s 错误=%v", r.RemoteAddr, err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	u, err := a.store.GetUser()
+	if err != nil {
+		logger.Error("修改凭据时获取用户失败: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if subtle.ConstantTimeCompare([]byte(store.HashPassword(u.PasswordSalt, in.CurrentPassword)), []byte(u.PasswordHash)) == 0 {
+		logger.Warn("修改凭据被拒绝：当前密码不匹配 用户名=%s 来源=%s", u.Username, r.RemoteAddr)
+		writeJSONStatus(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "当前密码不正确"})
+		return
+	}
+	targetUsername := strings.TrimSpace(in.Username)
+	if targetUsername == "" {
+		targetUsername = u.Username
+	}
+	if err := validateUsername(targetUsername); err != nil {
+		logger.Warn("修改凭据时用户名验证失败 用户名=%s 错误=%v", targetUsername, err)
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	salt := u.PasswordSalt
+	hash := u.PasswordHash
+	if in.NewPassword != "" {
+		if err := validatePassword(in.NewPassword); err != nil {
+			logger.Warn("修改凭据时密码验证失败 用户名=%s 错误=%v", targetUsername, err)
+			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		newSalt, err := store.GenerateSalt()
+		if err != nil {
+			logger.Error("修改凭据时生成密码盐失败 用户名=%s 错误=%v", targetUsername, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		salt = newSalt
+		hash = store.HashPassword(newSalt, in.NewPassword)
+	}
+	if err := a.store.UpdateUserCredentials(u.ID, targetUsername, hash, salt); err != nil {
+		logger.Error("更新用户凭据失败 用户名=%s 错误=%v", targetUsername, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	logger.Info("用户凭据已更新 旧用户名=%s 新用户名=%s 密码已修改=%t", u.Username, targetUsername, in.NewPassword != "")
 	writeJSON(w, map[string]any{"ok": true})
+}
+
+func (a *App) handleChangeRecoveryEmail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		logger.Warn("修改找回邮箱请求被拒绝：请求方法不允许 方法=%s", r.Method)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var in struct {
+		RecoveryEmail string `json:"recovery_email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		logger.Warn("修改找回邮箱请求体解析失败 来源=%s 错误=%v", r.RemoteAddr, err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	u, err := a.store.GetUser()
+	if err != nil {
+		logger.Error("修改找回邮箱时获取用户失败: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := a.store.UpdateUserRecoveryEmail(u.ID, strings.TrimSpace(in.RecoveryEmail)); err != nil {
+		logger.Error("更新找回邮箱失败 用户名=%s 错误=%v", u.Username, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	a.syncRecoveryEmailWarning()
+	logger.Info("找回邮箱已更新 用户名=%s 是否有邮箱=%t", u.Username, strings.TrimSpace(in.RecoveryEmail) != "")
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+func (a *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		logger.Warn("忘记密码请求被拒绝：请求方法不允许 方法=%s", r.Method)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var in struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		logger.Warn("忘记密码请求体解析失败 来源=%s 错误=%v", r.RemoteAddr, err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	email := strings.TrimSpace(in.Email)
+	if email == "" {
+		logger.Warn("忘记密码被拒绝：邮箱为空 来源=%s", r.RemoteAddr)
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请输入找回邮箱"})
+		return
+	}
+	u, err := a.store.GetUser()
+	if err != nil || strings.EqualFold(u.RecoveryEmail, "") || !strings.EqualFold(u.RecoveryEmail, email) {
+		if err != nil {
+			logger.Error("忘记密码时获取用户失败: %v", err)
+		} else {
+			logger.Warn("忘记密码被拒绝：邮箱不匹配 来源=%s", r.RemoteAddr)
+		}
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "邮箱不匹配，请联系管理员"})
+		return
+	}
+	settings, _ := a.store.PublicSettings()
+	authCode := a.store.Setting("smtp_auth_code")
+	if !settings.SMTPEnabled || settings.SMTPHost == "" || authCode == "" {
+		logger.Warn("忘记密码被拒绝：SMTP 配置不完整 用户名=%s", u.Username)
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "SMTP 未配置，无法发送重置邮件"})
+		return
+	}
+	newPass, err := generatePassword(16)
+	if err != nil {
+		logger.Error("忘记密码时生成新密码失败 用户名=%s 错误=%v", u.Username, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	newSalt, err := store.GenerateSalt()
+	if err != nil {
+		logger.Error("忘记密码时生成密码盐失败 用户名=%s 错误=%v", u.Username, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := a.store.UpdateUserCredentials(u.ID, u.Username, store.HashPassword(newSalt, newPass), newSalt); err != nil {
+		logger.Error("忘记密码时更新凭据失败 用户名=%s 错误=%v", u.Username, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	subject := "FRPS状态监控 - 密码重置通知"
+	body := fmt.Sprintf("您的账户凭据已重置：\n\n用户名：%s\n密　码：%s\n\n请登录后及时修改密码。", u.Username, newPass)
+	if err := mail.SendTo(settings, authCode, email, subject, body); err != nil {
+		logger.Error("忘记密码时发送重置邮件失败 用户名=%s 错误=%v", u.Username, err)
+		writeJSONStatus(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "邮件发送失败：" + err.Error()})
+		return
+	}
+	logger.Info("忘记密码重置邮件已发送 用户名=%s", u.Username)
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+func generatePassword(length int) (string, error) {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*#!()"
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		logger.Error("生成随机密码时读取随机数失败: %v", err)
+		return "", err
+	}
+	for i := range b {
+		b[i] = charset[int(b[i])%len(charset)]
+	}
+	return string(b), nil
 }
 
 func (a *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
+		logger.Warn("退出登录请求被拒绝：请求方法不允许 方法=%s", r.Method)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -380,11 +599,13 @@ func (a *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
+	logger.Info("退出登录成功 来源=%s", r.RemoteAddr)
 	writeJSON(w, map[string]any{"ok": true})
 }
 
 func (a *App) handleSession(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
+		logger.Warn("Session 检查请求被拒绝：请求方法不允许 方法=%s", r.Method)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -398,6 +619,7 @@ func (a *App) serveIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	path = filepath.Clean(path)
 	if strings.HasPrefix(path, "..") {
+		logger.Warn("拦截可疑静态文件路径 路径=%s 来源=%s", r.URL.Path, r.RemoteAddr)
 		http.NotFound(w, r)
 		return
 	}
@@ -407,6 +629,7 @@ func (a *App) serveIndex(w http.ResponseWriter, r *http.Request) {
 			http.ServeFile(w, r, "/app/web/index.html")
 			return
 		}
+		logger.Error("检查静态文件状态失败 路径=%s 错误=%v", full, err)
 		http.Error(w, err.Error(), 500)
 		return
 	}
@@ -415,10 +638,13 @@ func (a *App) serveIndex(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
+		logger.Warn("状态查询请求被拒绝：请求方法不允许 方法=%s", r.Method)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	_ = a.Refresh(r.Context())
+	if err := a.Refresh(r.Context()); err != nil {
+		logger.Warn("状态刷新失败: %v", err)
+	}
 	a.mu.RLock()
 	s := a.latest
 	a.mu.RUnlock()
@@ -427,11 +653,13 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) handleDaily(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
+		logger.Warn("每日流量查询请求被拒绝：请求方法不允许 方法=%s", r.Method)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	data, err := a.store.DailyTraffic()
 	if err != nil {
+		logger.Error("每日流量数据查询失败: %v", err)
 		http.Error(w, err.Error(), 500)
 		return
 	}
@@ -442,58 +670,83 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		settings, _ := a.store.PublicSettings()
+		logger.Info("设置数据已读取 来源=%s", r.RemoteAddr)
 		writeJSON(w, settings)
 	case http.MethodPost:
 		var in map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			logger.Warn("设置数据解析失败 来源=%s 错误=%v", r.RemoteAddr, err)
 			http.Error(w, err.Error(), 400)
 			return
 		}
+		smtpKeys := map[string]bool{"smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true}
 		allowed := map[string]bool{"alert_in_gb": true, "alert_out_gb": true, "alert_total_gb": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true, "alert_proxy_offline": true, "alert_cert_expiry": true, "alert_cert_days": true}
+		smtpChanged := false
 		for key, value := range in {
 			if !allowed[key] {
+				logger.Warn("忽略未知设置项 键=%s 来源=%s", key, r.RemoteAddr)
 				continue
 			}
 			if err := a.store.SaveSetting(key, fmt.Sprint(value)); err != nil {
+				logger.Error("保存设置失败 键=%s 错误=%v", key, err)
 				http.Error(w, err.Error(), 500)
 				return
 			}
+			if smtpKeys[key] {
+				smtpChanged = true
+			}
+		}
+		if smtpChanged {
+			_ = a.store.SaveSetting("smtp_verified", "false")
+			logger.Info("SMTP 配置已变更，验证状态已重置")
 		}
 		settings, _ := a.store.PublicSettings()
+		a.syncSMTPWarnings(settings)
+		logger.Info("设置已保存 项数=%d SMTP已变更=%t", len(in), smtpChanged)
 		writeJSON(w, settings)
 	default:
+		logger.Warn("设置请求被拒绝：请求方法不允许 方法=%s", r.Method)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
 func (a *App) handleTestEmail(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
+		logger.Warn("测试邮件请求被拒绝：请求方法不允许 方法=%s", r.Method)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	settings, _ := a.store.PublicSettings()
 	authCode := a.store.Setting("smtp_auth_code")
 	if err := mail.Send(settings, authCode, "FRPS状态监控 - 测试邮件", "这是一封来自 FRPS状态监控 的测试邮件，SMTP 配置正常。"); err != nil {
+		logger.Error("测试邮件发送失败: %v", err)
 		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
+	_ = a.store.SaveSetting("smtp_verified", "true")
+	a.syncSMTPWarnings(settings)
+	logger.Info("测试邮件已发送 收件人=%s", settings.SMTPTo)
 	writeJSON(w, map[string]any{"ok": true})
 }
 
 func (a *App) handleVacuum(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
+		logger.Warn("数据库整理请求被拒绝：请求方法不允许 方法=%s", r.Method)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	if err := a.store.Vacuum(); err != nil {
+		logger.Error("数据库整理失败: %v", err)
 		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
+	logger.Info("数据库整理完成")
 	writeJSON(w, map[string]any{"ok": true})
 }
 
 func (a *App) handlePurge(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
+		logger.Warn("数据清理请求被拒绝：请求方法不允许 方法=%s", r.Method)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -506,19 +759,23 @@ func (a *App) handlePurge(w http.ResponseWriter, r *http.Request) {
 	}
 	deleted, err := a.store.Purge(body.Days)
 	if err != nil {
+		logger.Error("清理流量数据失败 保留天数=%d 错误=%v", body.Days, err)
 		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
+	logger.Info("流量数据清理完成 保留天数=%d 已删除=%d", body.Days, deleted)
 	writeJSON(w, map[string]any{"ok": true, "deleted": deleted})
 }
 
 func (a *App) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
+		logger.Warn("导出 CSV 请求被拒绝：请求方法不允许 方法=%s", r.Method)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	rows, err := a.store.DailyTraffic()
 	if err != nil {
+		logger.Error("导出 CSV 时查询流量数据失败: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -537,6 +794,214 @@ func (a *App) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	cw.Flush()
+	logger.Info("流量数据 CSV 已导出 行数=%d 来源=%s", len(rows), r.RemoteAddr)
+}
+
+func (a *App) handleCurrentLog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		logger.Warn("查看当前日志请求被拒绝：请求方法不允许 方法=%s", r.Method)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	path, content, size, err := logger.CurrentLog(256 * 1024)
+	if err != nil {
+		logger.Error("读取当前日志失败: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{
+		"path":    path,
+		"size":    size,
+		"content": content,
+	})
+}
+
+func (a *App) handleClearLog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		logger.Warn("清空日志请求被拒绝：请求方法不允许 方法=%s", r.Method)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := logger.ClearCurrentLog(); err != nil {
+		logger.Error("清空当前日志失败: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	logger.Warn("当前日志已清空 来源=%s", r.RemoteAddr)
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+// ── credential validation ────────────────────────────────────────────────────
+
+const allowedSpecial = "*@#!()-_"
+
+func isAlphaRune(r rune) bool { return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') }
+func isDigitRune(r rune) bool { return r >= '0' && r <= '9' }
+func toLowerRune(r rune) rune {
+	if r >= 'A' && r <= 'Z' {
+		return r + 32
+	}
+	return r
+}
+
+func validatePassword(password string) error {
+	if len(password) <= 8 || len(password) >= 32 {
+		logger.Warn("密码验证失败：密码长度必须大于 8 位且小于 32 位")
+		return errors.New("密码长度必须大于 8 位且小于 32 位")
+	}
+	hasLetter, hasDigit := false, false
+	for _, r := range password {
+		switch {
+		case isAlphaRune(r):
+			hasLetter = true
+		case isDigitRune(r):
+			hasDigit = true
+		case strings.ContainsRune(allowedSpecial, r):
+			// ok
+		default:
+			logger.Warn("密码验证失败：密码只能包含英文字母、数字及 *@#!()-_ 特殊字符")
+			return errors.New("密码只能包含英文字母、数字及 *@#!()-_ 特殊字符")
+		}
+	}
+	if !hasLetter {
+		logger.Warn("密码验证失败：密码必须包含英文字母")
+		return errors.New("密码必须包含英文字母")
+	}
+	if !hasDigit {
+		logger.Warn("密码验证失败：密码必须包含数字")
+		return errors.New("密码必须包含数字")
+	}
+	runes := []rune(password)
+	for i := 2; i < len(runes); i++ {
+		a, b, c := runes[i-2], runes[i-1], runes[i]
+		if a == b && b == c {
+			logger.Warn("密码验证失败：密码不能包含 3 个及以上相同连续字符（如 aaa、111）")
+			return errors.New("密码不能包含 3 个及以上相同连续字符（如 aaa、111）")
+		}
+		al, bl, cl := toLowerRune(a), toLowerRune(b), toLowerRune(c)
+		if (isAlphaRune(a) && isAlphaRune(b) && isAlphaRune(c)) ||
+			(isDigitRune(a) && isDigitRune(b) && isDigitRune(c)) {
+			if (bl == al+1 && cl == bl+1) || (bl == al-1 && cl == bl-1) {
+				logger.Warn("密码验证失败：密码不能包含 3 个及以上连续递增或递减字符（如 abc、123）")
+				return errors.New("密码不能包含 3 个及以上连续递增或递减字符（如 abc、123）")
+			}
+		}
+	}
+	return nil
+}
+
+func validateUsername(username string) error {
+	if len(username) < 3 || len(username) > 32 {
+		logger.Warn("用户名验证失败：用户名长度必须在 3 到 32 位之间")
+		return errors.New("用户名长度必须在 3 到 32 位之间")
+	}
+	for _, r := range username {
+		switch {
+		case isAlphaRune(r), isDigitRune(r):
+		case strings.ContainsRune(allowedSpecial, r):
+		default:
+			logger.Warn("用户名验证失败：用户名只能包含英文字母、数字及 *@#!()-_ 特殊字符")
+			return errors.New("用户名只能包含英文字母、数字及 *@#!()-_ 特殊字符")
+		}
+	}
+	return nil
+}
+
+// ── warning helpers ─────────────────────────────────────────────────────────
+
+func (a *App) InitWarnings() {
+	settings, _ := a.store.PublicSettings()
+	a.syncSMTPWarnings(settings)
+	a.syncRecoveryEmailWarning()
+}
+
+func (a *App) syncSMTPWarnings(settings model.PublicSettings) {
+	authCode := a.store.Setting("smtp_auth_code")
+	configured := settings.SMTPHost != "" && settings.SMTPFrom != "" &&
+		settings.SMTPTo != "" && authCode != ""
+	if !configured {
+		_ = a.store.SetWarning("smtp_not_configured", "SMTP 邮件未配置，将无法收到任何告警通知")
+		_ = a.store.ClearWarning("smtp_not_verified")
+	} else {
+		_ = a.store.ClearWarning("smtp_not_configured")
+		if a.store.Setting("smtp_verified") != "true" {
+			_ = a.store.SetWarning("smtp_not_verified", "SMTP 邮件配置未验证，请发送测试邮件确认配置正确")
+		} else {
+			_ = a.store.ClearWarning("smtp_not_verified")
+		}
+	}
+}
+
+func (a *App) syncRecoveryEmailWarning() {
+	u, err := a.store.GetUser()
+	if err != nil || u.RecoveryEmail == "" {
+		_ = a.store.SetWarning("user_no_recovery_email", "未设置密码找回邮箱，忘记密码时将无法重置账户凭据")
+	} else {
+		_ = a.store.ClearWarning("user_no_recovery_email")
+	}
+}
+
+func (a *App) syncProxyWarnings(proxies []model.ProxyTraffic) {
+	for _, p := range proxies {
+		key := "proxy_offline:" + p.Type + ":" + p.Name
+		if !p.Online {
+			msg := fmt.Sprintf("代理 %s（类型：%s）已离线，请检查客户端连接状态", p.Name, p.Type)
+			_ = a.store.SetWarning(key, msg)
+		} else {
+			_ = a.store.ClearWarning(key)
+		}
+	}
+}
+
+func (a *App) syncCertWarnings(settings model.PublicSettings, certs []model.CertStatus) {
+	threshold := settings.AlertCertDays
+	if threshold <= 0 {
+		threshold = 15
+	}
+	for _, c := range certs {
+		key := "cert_expiry:" + c.Domain
+		if c.Present && c.DaysLeft != nil && *c.DaysLeft <= threshold {
+			msg := fmt.Sprintf("域名 %s 的 SSL 证书将在 %d 天后到期（到期时间：%s）", c.Domain, *c.DaysLeft, c.ExpiresAt)
+			_ = a.store.SetWarning(key, msg)
+		} else {
+			_ = a.store.ClearWarning(key)
+		}
+	}
+}
+
+func (a *App) syncTrafficWarnings(settings model.PublicSettings, monthIn, monthOut uint64) {
+	total := monthIn + monthOut
+	if settings.AlertInGB > 0 && monthIn >= mail.GBToBytes(settings.AlertInGB) {
+		msg := fmt.Sprintf("本月上行流量已超出阈值（当前：%s，阈值：%.2f GB）", mail.HumanBytes(monthIn), settings.AlertInGB)
+		_ = a.store.SetWarning("traffic_in", msg)
+	} else {
+		_ = a.store.ClearWarning("traffic_in")
+	}
+	if settings.AlertOutGB > 0 && monthOut >= mail.GBToBytes(settings.AlertOutGB) {
+		msg := fmt.Sprintf("本月下行流量已超出阈值（当前：%s，阈值：%.2f GB）", mail.HumanBytes(monthOut), settings.AlertOutGB)
+		_ = a.store.SetWarning("traffic_out", msg)
+	} else {
+		_ = a.store.ClearWarning("traffic_out")
+	}
+	if settings.AlertTotalGB > 0 && total >= mail.GBToBytes(settings.AlertTotalGB) {
+		msg := fmt.Sprintf("本月总流量已超出阈值（当前：%s，阈值：%.2f GB）", mail.HumanBytes(total), settings.AlertTotalGB)
+		_ = a.store.SetWarning("traffic_total", msg)
+	} else {
+		_ = a.store.ClearWarning("traffic_total")
+	}
+}
+
+func (a *App) handleWarnings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	warnings, err := a.store.GetWarnings()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, warnings)
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

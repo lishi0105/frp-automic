@@ -1,15 +1,44 @@
 package store
 
 import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"math"
 	"strconv"
 	"strings"
 	"time"
 
+	"frps-status-app.local/status/src/logger"
 	"frps-status-app.local/status/src/model"
+	"github.com/google/uuid"
 )
+
+type User struct {
+	ID                string
+	Username          string
+	PasswordHash      string
+	PasswordSalt      string
+	RecoveryEmail     string
+	IsInitialPassword bool
+}
+
+func HashPassword(salt, password string) string {
+	mac := hmac.New(sha256.New, []byte(salt))
+	mac.Write([]byte(password))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func GenerateSalt() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
 
 type Store struct {
 	db *sql.DB
@@ -27,17 +56,20 @@ func (s *Store) InitDB() error {
 		`CREATE TABLE IF NOT EXISTS daily_traffic (day TEXT NOT NULL, proxy_name TEXT NOT NULL, proxy_type TEXT NOT NULL, in_bytes INTEGER NOT NULL DEFAULT 0, out_bytes INTEGER NOT NULL DEFAULT 0, peak_conns INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(day,proxy_name,proxy_type))`,
 		`CREATE TABLE IF NOT EXISTS alert_state (month TEXT NOT NULL, direction TEXT NOT NULL, sent_at TEXT NOT NULL, PRIMARY KEY(month,direction))`,
 		`CREATE TABLE IF NOT EXISTS event_alert_state (key TEXT PRIMARY KEY, sent_at TEXT NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, password_salt TEXT NOT NULL, recovery_email TEXT NOT NULL DEFAULT '', is_initial_password INTEGER NOT NULL DEFAULT 1)`,
+		`CREATE TABLE IF NOT EXISTS warnings (key TEXT PRIMARY KEY, message TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.Exec(stmt); err != nil {
-			return err
+			return logStoreErr("init database schema", err)
 		}
 	}
 	_, _ = s.db.Exec(`ALTER TABLE daily_traffic ADD COLUMN peak_conns INTEGER NOT NULL DEFAULT 0`)
-	defaults := map[string]string{"alert_in_gb": "0", "alert_out_gb": "0", "alert_total_gb": "0", "smtp_port": "465", "smtp_enabled": "false", "alert_proxy_offline": "false", "alert_cert_expiry": "false", "alert_cert_days": "15"}
+	_, _ = s.db.Exec(`ALTER TABLE users ADD COLUMN is_initial_password INTEGER NOT NULL DEFAULT 1`)
+	defaults := map[string]string{"alert_in_gb": "0", "alert_out_gb": "0", "alert_total_gb": "0", "smtp_port": "465", "smtp_enabled": "false", "alert_proxy_offline": "false", "alert_cert_expiry": "false", "alert_cert_days": "15", "smtp_verified": "false"}
 	for k, v := range defaults {
 		if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)`, k, v); err != nil {
-			return err
+			return logStoreErr("init default setting "+k, err)
 		}
 	}
 	return nil
@@ -51,24 +83,24 @@ func (s *Store) Setting(key string) string {
 
 func (s *Store) SaveSetting(key, value string) error {
 	_, err := s.db.Exec(`INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
-	return err
+	return logStoreErr("save setting "+key, err)
 }
 
 func (s *Store) PublicSettings() (model.PublicSettings, error) {
 	return model.PublicSettings{
-		AlertInGB:       parseFloat(s.Setting("alert_in_gb")),
-		AlertOutGB:      parseFloat(s.Setting("alert_out_gb")),
-		AlertTotalGB:    parseFloat(s.Setting("alert_total_gb")),
-		SMTPHost:        s.Setting("smtp_host"),
-		SMTPPort:        int(parseFloatDefault(s.Setting("smtp_port"), 465)),
-		SMTPUser:        s.Setting("smtp_user"),
-		SMTPFrom:        s.Setting("smtp_from"),
-		SMTPTo:          s.Setting("smtp_to"),
-		SMTPEnabled:        strings.EqualFold(s.Setting("smtp_enabled"), "true"),
-		SMTPAuthCode:       s.Setting("smtp_auth_code"),
-		AlertProxyOffline:  strings.EqualFold(s.Setting("alert_proxy_offline"), "true"),
-		AlertCertExpiry:    strings.EqualFold(s.Setting("alert_cert_expiry"), "true"),
-		AlertCertDays:      int(parseFloatDefault(s.Setting("alert_cert_days"), 15)),
+		AlertInGB:         parseFloat(s.Setting("alert_in_gb")),
+		AlertOutGB:        parseFloat(s.Setting("alert_out_gb")),
+		AlertTotalGB:      parseFloat(s.Setting("alert_total_gb")),
+		SMTPHost:          s.Setting("smtp_host"),
+		SMTPPort:          int(parseFloatDefault(s.Setting("smtp_port"), 465)),
+		SMTPUser:          s.Setting("smtp_user"),
+		SMTPFrom:          s.Setting("smtp_from"),
+		SMTPTo:            s.Setting("smtp_to"),
+		SMTPEnabled:       strings.EqualFold(s.Setting("smtp_enabled"), "true"),
+		SMTPAuthCode:      s.Setting("smtp_auth_code"),
+		AlertProxyOffline: strings.EqualFold(s.Setting("alert_proxy_offline"), "true"),
+		AlertCertExpiry:   strings.EqualFold(s.Setting("alert_cert_expiry"), "true"),
+		AlertCertDays:     int(parseFloatDefault(s.Setting("alert_cert_days"), 15)),
 	}, nil
 }
 
@@ -78,7 +110,7 @@ func (s *Store) RecordTraffic(proxies []model.ProxyTraffic) error {
 	cutoff := now.AddDate(0, 0, -30).Format("2006-01-02")
 	tx, err := s.db.Begin()
 	if err != nil {
-		return err
+		return logStoreErr("begin record traffic transaction", err)
 	}
 	defer tx.Rollback()
 	for _, p := range proxies {
@@ -87,40 +119,40 @@ func (s *Store) RecordTraffic(proxies []model.ProxyTraffic) error {
 		if errors.Is(err, sql.ErrNoRows) {
 			_, err = tx.Exec(`INSERT INTO proxy_counters(name,type,last_in,last_out,updated_at) VALUES(?,?,?,?,?)`, p.Name, p.Type, p.CurrentIn, p.CurrentOut, now.UTC().Format(time.RFC3339))
 			if err != nil {
-				return err
+				return logStoreErr("insert proxy counter "+p.Type+"/"+p.Name, err)
 			}
 			continue
 		}
 		if err != nil {
-			return err
+			return logStoreErr("query proxy counter "+p.Type+"/"+p.Name, err)
 		}
 		deltaIn, deltaOut := deltaCounter(lastIn, p.CurrentIn), deltaCounter(lastOut, p.CurrentOut)
 		_, err = tx.Exec(`INSERT INTO daily_traffic(day,proxy_name,proxy_type,in_bytes,out_bytes,peak_conns) VALUES(?,?,?,?,?,?)
 ON CONFLICT(day,proxy_name,proxy_type) DO UPDATE SET in_bytes=in_bytes+excluded.in_bytes,out_bytes=out_bytes+excluded.out_bytes,peak_conns=MAX(daily_traffic.peak_conns,excluded.peak_conns)`, day, p.Name, p.Type, deltaIn, deltaOut, p.CurConns)
 		if err != nil {
-			return err
+			return logStoreErr("upsert daily traffic "+p.Type+"/"+p.Name, err)
 		}
 		_, err = tx.Exec(`UPDATE proxy_counters SET last_in=?, last_out=?, updated_at=? WHERE name=? AND type=?`, p.CurrentIn, p.CurrentOut, now.UTC().Format(time.RFC3339), p.Name, p.Type)
 		if err != nil {
-			return err
+			return logStoreErr("update proxy counter "+p.Type+"/"+p.Name, err)
 		}
 	}
 	if _, err := tx.Exec(`DELETE FROM daily_traffic WHERE day < ?`, cutoff); err != nil {
-		return err
+		return logStoreErr("delete expired daily traffic", err)
 	}
-	return tx.Commit()
+	return logStoreErr("commit record traffic transaction", tx.Commit())
 }
 
 func (s *Store) MonthTotals(month string) (uint64, uint64, error) {
 	var in, out int64
 	err := s.db.QueryRow(`SELECT COALESCE(SUM(in_bytes),0), COALESCE(SUM(out_bytes),0) FROM daily_traffic WHERE day LIKE ?`, month+"-%").Scan(&in, &out)
-	return uint64(clampZero(in)), uint64(clampZero(out)), err
+	return uint64(clampZero(in)), uint64(clampZero(out)), logStoreErr("query month totals "+month, err)
 }
 
 func (s *Store) MonthTotalForProxy(name, typ, month string) (uint64, uint64, error) {
 	var in, out int64
 	err := s.db.QueryRow(`SELECT COALESCE(SUM(in_bytes),0), COALESCE(SUM(out_bytes),0) FROM daily_traffic WHERE proxy_name=? AND proxy_type=? AND day LIKE ?`, name, typ, month+"-%").Scan(&in, &out)
-	return uint64(clampZero(in)), uint64(clampZero(out)), err
+	return uint64(clampZero(in)), uint64(clampZero(out)), logStoreErr("query month total for proxy "+typ+"/"+name, err)
 }
 
 func (s *Store) AlertSent(month, direction string) bool {
@@ -131,7 +163,7 @@ func (s *Store) AlertSent(month, direction string) bool {
 
 func (s *Store) MarkAlertSent(month, direction string) error {
 	_, err := s.db.Exec(`INSERT OR REPLACE INTO alert_state(month,direction,sent_at) VALUES(?,?,?)`, month, direction, time.Now().UTC().Format(time.RFC3339))
-	return err
+	return logStoreErr("mark alert sent "+month+"/"+direction, err)
 }
 
 func (s *Store) EventAlertSent(key string) bool {
@@ -142,24 +174,24 @@ func (s *Store) EventAlertSent(key string) bool {
 
 func (s *Store) SetEventAlert(key string) error {
 	_, err := s.db.Exec(`INSERT OR REPLACE INTO event_alert_state(key,sent_at) VALUES(?,?)`, key, time.Now().UTC().Format(time.RFC3339))
-	return err
+	return logStoreErr("set event alert "+key, err)
 }
 
 func (s *Store) ClearEventAlert(key string) error {
 	_, err := s.db.Exec(`DELETE FROM event_alert_state WHERE key=?`, key)
-	return err
+	return logStoreErr("clear event alert "+key, err)
 }
 
 func (s *Store) Vacuum() error {
 	_, err := s.db.Exec(`VACUUM`)
-	return err
+	return logStoreErr("vacuum database", err)
 }
 
 func (s *Store) Purge(days int) (int64, error) {
 	cutoff := time.Now().AddDate(0, 0, -days).Format("2006-01-02")
 	res, err := s.db.Exec(`DELETE FROM daily_traffic WHERE day < ?`, cutoff)
 	if err != nil {
-		return 0, err
+		return 0, logStoreErr("purge daily traffic", err)
 	}
 	n, _ := res.RowsAffected()
 	return n, nil
@@ -168,7 +200,7 @@ func (s *Store) Purge(days int) (int64, error) {
 func (s *Store) DailyTraffic() ([]map[string]any, error) {
 	rows, err := s.db.Query(`SELECT day,proxy_name,proxy_type,in_bytes,out_bytes,peak_conns FROM daily_traffic ORDER BY day,proxy_name,proxy_type`)
 	if err != nil {
-		return nil, err
+		return nil, logStoreErr("query daily traffic", err)
 	}
 	defer rows.Close()
 	var data []map[string]any
@@ -176,7 +208,7 @@ func (s *Store) DailyTraffic() ([]map[string]any, error) {
 		var day, name, typ string
 		var in, out, peak int64
 		if err := rows.Scan(&day, &name, &typ, &in, &out, &peak); err != nil {
-			return nil, err
+			return nil, logStoreErr("scan daily traffic row", err)
 		}
 		data = append(data, map[string]any{"day": day, "name": name, "type": typ, "in": clampZero(in), "out": clampZero(out), "peak_conns": clampZero(peak)})
 	}
@@ -211,4 +243,93 @@ func parseFloatDefault(v string, fallback float64) float64 {
 		return fallback
 	}
 	return f
+}
+
+type Warning struct {
+	Key       string `json:"key"`
+	Message   string `json:"message"`
+	CreatedAt string `json:"created_at"`
+}
+
+func (s *Store) SetWarning(key, message string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.db.Exec(
+		`INSERT INTO warnings(key,message,created_at,updated_at) VALUES(?,?,?,?)
+         ON CONFLICT(key) DO UPDATE SET message=excluded.message, updated_at=excluded.updated_at`,
+		key, message, now, now,
+	)
+	return logStoreErr("set warning "+key, err)
+}
+
+func (s *Store) ClearWarning(key string) error {
+	_, err := s.db.Exec(`DELETE FROM warnings WHERE key=?`, key)
+	return logStoreErr("clear warning "+key, err)
+}
+
+func (s *Store) GetWarnings() ([]Warning, error) {
+	rows, err := s.db.Query(`SELECT key,message,created_at FROM warnings ORDER BY created_at`)
+	if err != nil {
+		return nil, logStoreErr("query warnings", err)
+	}
+	defer rows.Close()
+	var out []Warning
+	for rows.Next() {
+		var w Warning
+		if err := rows.Scan(&w.Key, &w.Message, &w.CreatedAt); err != nil {
+			return nil, logStoreErr("scan warning row", err)
+		}
+		out = append(out, w)
+	}
+	if out == nil {
+		out = []Warning{}
+	}
+	return out, nil
+}
+
+// SeedUser creates the single admin user if none exists yet.
+// Called on startup using credentials from environment variables.
+func (s *Store) SeedUser(username, password string) error {
+	var count int
+	_ = s.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count)
+	if count > 0 {
+		return nil
+	}
+	salt, err := GenerateSalt()
+	if err != nil {
+		return logStoreErr("generate initial user salt", err)
+	}
+	_, err = s.db.Exec(
+		`INSERT INTO users(id,username,password_hash,password_salt,recovery_email,is_initial_password) VALUES(?,?,?,?,'',1)`,
+		uuid.New().String(), username, HashPassword(salt, password), salt,
+	)
+	return logStoreErr("seed initial user", err)
+}
+
+func (s *Store) GetUser() (User, error) {
+	var u User
+	var isInitial int
+	err := s.db.QueryRow(`SELECT id,username,password_hash,password_salt,recovery_email,is_initial_password FROM users LIMIT 1`).
+		Scan(&u.ID, &u.Username, &u.PasswordHash, &u.PasswordSalt, &u.RecoveryEmail, &isInitial)
+	u.IsInitialPassword = isInitial == 1
+	return u, logStoreErr("get user", err)
+}
+
+func (s *Store) UpdateUserCredentials(id, username, passwordHash, passwordSalt string) error {
+	_, err := s.db.Exec(
+		`UPDATE users SET username=?,password_hash=?,password_salt=?,is_initial_password=0 WHERE id=?`,
+		username, passwordHash, passwordSalt, id,
+	)
+	return logStoreErr("update user credentials "+username, err)
+}
+
+func (s *Store) UpdateUserRecoveryEmail(id, email string) error {
+	_, err := s.db.Exec(`UPDATE users SET recovery_email=? WHERE id=?`, email, id)
+	return logStoreErr("update user recovery email", err)
+}
+
+func logStoreErr(op string, err error) error {
+	if err != nil {
+		logger.Error("数据库操作失败 操作=%s 错误=%v", op, err)
+	}
+	return err
 }

@@ -84,7 +84,7 @@
           </div>
           <div class="notify-foot">
             <button class="btn btn-outline btn-sm" :disabled="testingEmail" @click="testEmail">{{ testingEmail ? '发送中…' : '测试邮件' }}</button>
-            <button class="btn btn-dark btn-sm" @click="smtpModalOpen = true">配置邮件</button>
+            <button class="btn btn-dark btn-sm" @click="openSMTPModal">配置邮件</button>
           </div>
           <div v-if="smtpMsg" class="alert mt-3" :class="smtpMsg.ok ? 'alert-success' : 'alert-error'">{{ smtpMsg.text }}</div>
         </section>
@@ -118,7 +118,7 @@
       :smtp-msg="smtpMsg"
       :saving-smtp="savingSMTP"
       :testing-email="testingEmail"
-      @close="smtpModalOpen = false"
+      @close="closeSMTPModal"
       @save="saveSMTP"
       @test="testEmail"
     />
@@ -163,6 +163,7 @@ const smtpMsg = ref(null)
 const eventMsg = ref(null)
 const vacuumMsg = ref(null)
 const purgeMsg = ref(null)
+const savedSettings = ref(null)
 
 const smtpReady = computed(() =>
   Boolean(form.smtp_host && form.smtp_from && form.smtp_to && form.smtp_auth_code)
@@ -192,7 +193,11 @@ function fillForm(s) {
   form.alert_cert_days = s.alert_cert_days || 15
 }
 
-watch(() => props.status?.settings, fillForm, { immediate: true })
+watch(() => props.status?.settings, (settings) => {
+  if (smtpModalOpen.value) return
+  savedSettings.value = settings || savedSettings.value
+  fillForm(settings)
+}, { immediate: true })
 
 function flash(msgRef, ok, text, ms = 4000) {
   msgRef.value = { ok, text }
@@ -217,6 +222,16 @@ function makeSMTPPayload() {
   }
 }
 
+function openSMTPModal() {
+  smtpMsg.value = null
+  smtpModalOpen.value = true
+}
+
+function closeSMTPModal() {
+  smtpModalOpen.value = false
+  fillForm(savedSettings.value || props.status?.settings)
+}
+
 async function saveThreshold() {
   savingThreshold.value = true
   try {
@@ -233,6 +248,7 @@ async function saveSMTP() {
   savingSMTP.value = true
   try {
     const saved = await api.saveSettings(makeSMTPPayload())
+    savedSettings.value = saved
     fillForm(saved)
     flash(smtpMsg, true, 'SMTP 配置已保存')
   } catch (e) {

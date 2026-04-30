@@ -68,13 +68,13 @@
       </div>
 
       <div class="smtp-modal-foot">
-        <button class="btn-test" :class="{ 'is-busy': testingEmail }" :disabled="testingEmail" @click="$emit('test')">
+        <button class="btn btn-outline btn-sm smtp-action" :class="{ 'is-busy': testingEmail }" :disabled="testingEmail" @click="$emit('test')">
           <span v-if="testingEmail" class="btn-spinner"></span>
           {{ testingEmail ? '发送中…' : '发送测试邮件' }}
         </button>
         <div class="foot-right">
-          <button class="btn-plain" @click="$emit('close')">取消</button>
-          <button class="btn-dark" :class="{ 'is-busy': savingSMTP }" :disabled="savingSMTP" @click="$emit('save')">
+          <button class="btn btn-outline btn-sm smtp-action" @click="$emit('close')">取消</button>
+          <button class="btn btn-dark btn-sm smtp-action" :class="{ 'is-busy': savingSMTP }" :disabled="savingSMTP" @click="$emit('save')">
             <span v-if="savingSMTP" class="btn-spinner"></span>
             {{ savingSMTP ? '确定中…' : '确定' }}
           </button>
@@ -103,11 +103,12 @@ function toggleSMTP() {
 </script>
 
 <style scoped>
-.smtp-mask { position: fixed; inset: 0; background: rgba(2, 6, 23, .7); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 60; }
-.smtp-modal { width: min(640px, 100%); max-height: 90vh; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
-.smtp-modal-head { height: 70px; border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; justify-content: space-between; align-items: center; }
+.smtp-mask { position: fixed; inset: 0; background: rgba(15, 23, 42, .56); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 60; }
+.smtp-modal { width: min(640px, 100%); max-height: 90vh; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 24px 80px rgba(15, 23, 42, .34); }
+.smtp-modal-head { height: 62px; border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; justify-content: space-between; align-items: center; }
 .smtp-modal-head h3 { font-size: 18px; font-weight: 700; color: var(--text); }
-.smtp-close { border: 0; background: transparent; color: var(--text-2); font-size: 24px; line-height: 1; cursor: pointer; }
+.smtp-close { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-2); font-size: 22px; line-height: 1; cursor: pointer; }
+.smtp-close:hover { background: var(--surface-2); color: var(--text); }
 .smtp-modal-body { padding: 20px 24px 12px; overflow-y: auto; flex: 1; }
 .smtp-line { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 12px; margin-bottom: 10px; }
 .smtp-line-top { align-items: flex-start; }
@@ -124,12 +125,11 @@ function toggleSMTP() {
 .switch-btn.on { background: #10b981; }
 .switch-btn.on span { transform: translateX(26px); }
 .smtp-tips { margin: 4px 0 10px 124px; color: var(--text-2); font-size: 13px; line-height: 1.7; }
-.smtp-modal-foot { background: var(--surface-2); height: 70px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
-.btn-test, .btn-plain { border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.smtp-modal-foot { background: var(--surface-2); min-height: 62px; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .foot-right { display: flex; gap: 10px; }
-.btn-test, .btn-dark { display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease; }
-.btn-dark { border: 1px solid var(--primary); background: var(--primary); color: #fff; }
-.btn-test.is-busy, .btn-dark.is-busy { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(15, 23, 42, .16); }
+.smtp-action { min-width: 72px; height: 32px; }
+.btn-dark { border-color: var(--primary); background: var(--primary); color: #fff; }
+.smtp-action.is-busy { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(15, 23, 42, .16); }
 .btn-spinner { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: btnspin .7s linear infinite; }
 @keyframes btnspin { to { transform: rotate(360deg); } }
 @media (max-width: 640px) {

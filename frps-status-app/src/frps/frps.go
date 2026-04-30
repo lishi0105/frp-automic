@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"frps-status-app.local/status/src/logger"
 	"frps-status-app.local/status/src/model"
 )
 
@@ -21,6 +22,7 @@ func CheckTCP(host string, port int) model.TCPCheck {
 	start := time.Now()
 	conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, strconv.Itoa(port)), 2*time.Second)
 	if err != nil {
+		logger.Warn("TCP 连通性检测失败 主机=%s 端口=%d 错误=%v", host, port, err)
 		return model.TCPCheck{OK: false, Error: err.Error()}
 	}
 	_ = conn.Close()
@@ -33,16 +35,19 @@ func Certificates(certDir string, domains []string) []model.CertStatus {
 	for _, domain := range domains {
 		raw, err := os.ReadFile(filepath.Join(certDir, domain, "cert.pem"))
 		if err != nil {
+			logger.Warn("证书文件不存在 域名=%s 路径=%s 错误=%v", domain, filepath.Join(certDir, domain, "cert.pem"), err)
 			out = append(out, model.CertStatus{Domain: domain, Present: false, OK: false, Error: "cert.pem not found"})
 			continue
 		}
 		block, _ := pem.Decode(raw)
 		if block == nil {
+			logger.Warn("证书 PEM 解码失败 域名=%s", domain)
 			out = append(out, model.CertStatus{Domain: domain, Present: true, OK: false, Error: "parse certificate failed"})
 			continue
 		}
 		cert, err := x509.ParseCertificate(block.Bytes)
 		if err != nil {
+			logger.Warn("证书解析失败 域名=%s 错误=%v", domain, err)
 			out = append(out, model.CertStatus{Domain: domain, Present: true, OK: false, Error: "parse certificate failed"})
 			continue
 		}
@@ -70,14 +75,18 @@ func (c *Client) FetchProxies(ctx context.Context) ([]model.ProxyTraffic, error)
 	for _, typ := range []string{"tcp", "http", "https", "tcpmux", "stcp", "xtcp", "udp"} {
 		items, err := c.fetchProxyType(ctx, typ)
 		if err != nil {
+			logger.Warn("获取代理类型数据失败 类型=%s 错误=%v", typ, err)
 			lastErr = err
 			continue
 		}
+		logger.Info("获取代理类型成功 类型=%s 数量=%d", typ, len(items))
 		all = append(all, items...)
 	}
 	if len(all) == 0 && lastErr != nil {
+		logger.Error("获取代理列表失败，无有效数据 最后错误=%v", lastErr)
 		return all, lastErr
 	}
+	logger.Info("获取代理列表完成 数量=%d", len(all))
 	return all, nil
 }
 
@@ -85,6 +94,7 @@ func (c *Client) fetchProxyType(ctx context.Context, typ string) ([]model.ProxyT
 	url := fmt.Sprintf("http://%s/api/proxy/%s", net.JoinHostPort(c.host, strconv.Itoa(c.dashboardPort)), typ)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
+		logger.Error("创建 FRPS 请求失败 地址=%s 错误=%v", url, err)
 		return nil, err
 	}
 	if c.user != "" || c.pass != "" {
@@ -92,17 +102,22 @@ func (c *Client) fetchProxyType(ctx context.Context, typ string) ([]model.ProxyT
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		logger.Warn("FRPS 面板请求失败 地址=%s 错误=%v", url, err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
+		logger.Info("FRPS 代理接口不存在 类型=%s 地址=%s", typ, url)
 		return nil, nil
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("%s returned %s", url, resp.Status)
+		err := fmt.Errorf("%s returned %s", url, resp.Status)
+		logger.Warn("FRPS 面板返回非成功状态 地址=%s 状态=%s", url, resp.Status)
+		return nil, err
 	}
 	var raw any
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		logger.Error("解析 FRPS 面板响应失败 地址=%s 错误=%v", url, err)
 		return nil, err
 	}
 	var out []model.ProxyTraffic

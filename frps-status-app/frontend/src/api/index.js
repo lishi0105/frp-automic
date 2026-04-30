@@ -27,5 +27,12 @@ export const api = {
   testEmail: () => post('api/settings/test-email'),
   vacuum: () => post('api/db/vacuum'),
   purge: (days) => post('api/db/purge', { days }),
-  exportCSVUrl: 'api/daily/export'
+  exportCSVUrl: 'api/daily/export',
+  getCurrentLog: () => request('api/logs/current'),
+  clearCurrentLog: () => post('api/logs/clear'),
+  getWarnings: () => request('api/warnings'),
+  getUser: () => request('api/user'),
+  changeCredentials: (data) => post('api/user/credentials', data),
+  changeRecoveryEmail: (data) => post('api/user/recovery-email', data),
+  forgotPassword: (data) => post('api/user/forgot-password', data)
 }
