@@ -19,7 +19,6 @@
         <div>
           <div class="section-title">所选时间范围</div>
           <div class="text-muted text-sm">{{ startDate || minDay || '-' }} 至 {{ endDate || maxDay || '-' }} · {{ selectedProxyName || '全部代理汇总' }}</div>
-          <div class="analytics-overview-bar"><div class="analytics-overview-bar-inner stats-overview-fill"></div></div>
         </div>
         <div class="analytics-overview-metrics">
           <div><b>{{ humanBytes(totalTraffic) }}</b><small>总流量</small></div>
@@ -243,7 +242,6 @@ onUnmounted(() => {
   min-height: 0;
   overflow: hidden;
 }
-.stats-overview-fill { width: 72%; }
 .stats-filter-grid { grid-template-columns: 150px 150px 1fr auto auto auto; }
 .stats-filter-spacer { min-width: 0; }
 .stats-main {

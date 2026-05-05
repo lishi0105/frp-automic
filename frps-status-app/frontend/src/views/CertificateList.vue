@@ -18,7 +18,6 @@
         <div>
           <div class="section-title">证书健康概览</div>
           <div class="text-muted text-sm">共 {{ certs.length }} 张证书，{{ warnCount }} 张临期，{{ failCount }} 张异常</div>
-          <div class="analytics-overview-bar"><div class="analytics-overview-bar-inner cert-overview-fill"></div></div>
         </div>
         <div class="analytics-overview-metrics">
           <div><b>{{ okCount }}</b><span>/ {{ certs.length }}</span><small>正常证书</small></div>
@@ -264,7 +263,6 @@ watch(sortedFiltered, (arr) => {
   flex-direction: column;
   min-height: 0;
 }
-.cert-overview-fill { width: 75%; }
 .cert-filters-grid {
   display: grid;
   grid-template-columns: minmax(240px, 1fr) 130px 160px auto auto;

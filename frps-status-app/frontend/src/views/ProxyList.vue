@@ -19,7 +19,6 @@
         <div>
           <div class="section-title">代理运行概览</div>
           <div class="text-muted text-sm">共 {{ totalProxies }} 个代理，{{ onlineCount }} 个在线</div>
-          <div class="analytics-overview-bar"><div class="analytics-overview-bar-inner" :style="{ width: onlineRatio + '%' }"></div></div>
         </div>
         <div class="analytics-overview-metrics">
           <div><b>{{ onlineCount }}</b><span>/ {{ totalProxies }}</span><small>在线代理</small></div>
@@ -217,7 +216,6 @@ const proxies = computed(() => props.status?.proxies ?? [])
 const certs = computed(() => props.status?.certificates ?? [])
 const onlineCount = computed(() => proxies.value.filter(p => p.online).length)
 const totalProxies = computed(() => proxies.value.length)
-const onlineRatio = computed(() => totalProxies.value ? Math.round((onlineCount.value / totalProxies.value) * 100) : 0)
 const curConnsTotal = computed(() => proxies.value.reduce((s, p) => s + Number(p.cur_conns || 0), 0))
 const monthTotal = computed(() => proxies.value.reduce((s, p) => s + Number(p.month_in || 0) + Number(p.month_out || 0), 0))
 const types = computed(() => [...new Set(proxies.value.map(p => p.type))].sort())
