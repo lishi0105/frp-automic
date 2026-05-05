@@ -55,6 +55,11 @@ def tcp_remote_ports() -> List[int]:
     return sorted({remote_port(s) for s in tcp_services()})
 
 
+def force_all_services_tcp() -> None:
+    for item in config.SERVICES:
+        item["mode"] = "tcp"
+
+
 def http_domains(root_domain: str) -> List[str]:
     return [f"{s['alias']}.{root_domain}" for s in http_services()]
 

@@ -11,13 +11,13 @@ FRP 服务端一体化部署与监控工具集。包含两个组件：
 
 ### 1. 配置
 
-复制并编辑配置文件：
+生成并编辑配置文件：
 
 ```bash
-cp frps-config.json.example frps-config.json
+python3 vps-install-frps.py
 ```
 
-未指定 `-c/--config` 时，脚本读取当前目录的 `frps-config.json`；如果该文件不存在会直接报错。需要使用其他路径时通过 `-c/--config` 指定。
+未指定 `-c/--config` 时，脚本读取当前目录的 `frps-config.json`；如果该文件不存在会生成默认配置文件并退出，效果等同于 `-c frps-config.json`。需要使用其他路径时通过 `-c/--config` 指定；指定路径不存在时同样会生成默认配置文件并退出。
 
 `frps-config.json` 主要字段：
 
@@ -37,6 +37,7 @@ cp frps-config.json.example frps-config.json
 | `services` | 服务列表，见下方说明 |
 
 需要将所有 HTTP 服务域名，以及 `frps.<root_domain>`、`status.<root_domain>` 的 A 记录解析到 VPS 公网 IP。禁用 `status.enabled` 时不需要配置 `status.<root_domain>`。
+启动 frps 前脚本会检查 `frps.server_port/tcp` 是否被本机占用，并检查常见本机防火墙是否放行；云服务器还需要在云厂商安全组中放行该 TCP 端口。
 
 服务列表示例：
 
@@ -74,6 +75,9 @@ python3 vps-install-frps.py
 
 # 生成配置 + 申请证书 + 启动所有容器（等价：--run）
 python3 vps-install-frps.py -r
+
+# 只更新/启动代理相关配置，不自动申请证书；所有服务强制按 TCP 代理处理
+python3 vps-install-frps.py -p
 
 # 仅编译 frps-status-app 镜像（等价：--build）
 python3 vps-install-frps.py -b
@@ -115,6 +119,8 @@ https://<alias>.<root_domain>
 ```text
 <VPS_IP>:<services[].port>
 ```
+
+使用 `-p/--proxy` 时不会申请证书，也不会改写现有 Nginx HTTPS 配置；此时所有服务都会忽略配置文件中的 `mode` 和 `expose_http_port`，强制按 TCP 代理处理并开放 `VPS_IP:port` 直连入口。
 
 TCP 模式服务始终开放：
 

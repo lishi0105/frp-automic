@@ -14,9 +14,10 @@ from frps_deploy.certs import (
 from frps_deploy.clean import clean_all
 from frps_deploy.config import ConfigFileCreated, load_runtime_config
 from frps_deploy.console import print, eprint, prompt_input
-from frps_deploy.constants import STATUS_APP_DIR
+from frps_deploy.constants import BASE_DIR, STATUS_APP_DIR
 from frps_deploy.docker_env import (
-    check_docker_compose, check_docker_permission, check_required_ports,
+    check_docker_compose, check_docker_permission, check_frps_server_port,
+    check_required_ports,
     get_latest_frp_version, get_public_ip,
 )
 from frps_deploy.generator import (
@@ -26,8 +27,8 @@ from frps_deploy.generator import (
     remove_https_confs, write_generated_info, write_status_app_env,
 )
 from frps_deploy.models import DeployContext
-from frps_deploy.output import print_generate_only_result, print_result
-from frps_deploy.services import all_remote_ports, validate_services
+from frps_deploy.output import print_generate_only_result, print_proxy_only_result, print_result
+from frps_deploy.services import all_remote_ports, force_all_services_tcp, validate_services
 from frps_deploy.utils import (
     random_free_port_excluding, random_letters, random_password, run,
     validate_ipv4,
@@ -52,6 +53,11 @@ def parse_args() -> argparse.Namespace:
         help="只编译 frps-status-app 的 Docker 镜像，不执行其他部署步骤",
     )
     parser.add_argument(
+        "-p", "--proxy",
+        action="store_true",
+        help="只更新/启动代理相关配置，不自动申请证书；所有服务强制按 TCP 代理处理",
+    )
+    parser.add_argument(
         "--clean",
         action="store_true",
         help="清理生成的容器、本地镜像和文件夹（先通过 docker 修正权限再删除）",
@@ -66,7 +72,7 @@ def set_config_file(path_text: str | None) -> None:
     config.CONFIG_FILE = path.resolve()
 
 
-def prompt_user() -> tuple[str, str]:
+def prompt_user(require_email: bool = True) -> tuple[str, str]:
     root_domain = config.ROOT_DOMAIN
     if root_domain:
         print(f"使用配置文件中的主域名：{root_domain}")
@@ -77,6 +83,11 @@ def prompt_user() -> tuple[str, str]:
         sys.exit(1)
 
     email = config.CERT_EMAIL
+    if not require_email:
+        if email:
+            print(f"使用配置文件中的证书邮箱：{email}")
+        return root_domain, email
+
     if email:
         print(f"使用配置文件中的证书邮箱：{email}")
     else:
@@ -125,7 +136,10 @@ def build_context(root_domain: str, email: str) -> DeployContext:
     )
 
 
-def generate_files(ctx: DeployContext) -> None:
+def generate_files(
+    ctx: DeployContext,
+    include_challenge: bool = True,
+) -> None:
     ensure_dirs()
     print("\n生成 frps.toml...")
     generate_frps_toml(ctx)
@@ -140,9 +154,21 @@ def generate_files(ctx: DeployContext) -> None:
     if config.STATUS_APP_ENABLED:
         print("写入 frps-status-app/.env...")
         write_status_app_env(ctx)
-    print("\n生成临时 HTTP challenge 配置...")
-    remove_https_confs()
-    generate_http_challenge_conf(ctx)
+    if include_challenge:
+        print("\n生成临时 HTTP challenge 配置...")
+        remove_https_confs()
+        generate_http_challenge_conf(ctx)
+
+
+def apply_proxy_only(ctx: DeployContext) -> None:
+    check_docker_compose()
+    check_docker_permission()
+    check_frps_server_port(ctx.bind_port)
+    print("\n启动/更新 frps 代理服务...")
+    run(["docker", "compose", "up", "-d", "frps"], cwd=BASE_DIR)
+    if config.STATUS_APP_ENABLED:
+        print("\n编译并启动状态服务工程...")
+        docker_compose_up_status_app()
 
 
 def build_status_app() -> None:
@@ -172,13 +198,11 @@ def main() -> None:
     print("=== FRPS + Nginx + Certbot 自动部署脚本 ===")
     set_config_file(args.config)
     print(f"使用配置文件：{config.CONFIG_FILE}")
-    if args.config is None and not config.CONFIG_FILE.exists():
-        eprint(f"配置文件不存在：{config.CONFIG_FILE}")
-        eprint("请先创建 frps-config.json，或使用 -c/--config 指定配置文件。")
-        sys.exit(1)
 
     try:
         load_runtime_config()
+        if args.proxy:
+            force_all_services_tcp()
         validate_services()
     except ConfigFileCreated:
         print("已只生成默认配置文件，本次不执行部署。")
@@ -187,13 +211,18 @@ def main() -> None:
         eprint(f"配置错误：{exc}")
         sys.exit(1)
 
-    root_domain, email = prompt_user()
+    root_domain, email = prompt_user(require_email=not args.proxy)
     try:
         ctx = build_context(root_domain, email)
     except Exception as exc:
         eprint(f"配置错误：{exc}")
         sys.exit(1)
-    generate_files(ctx)
+    generate_files(ctx, include_challenge=not args.proxy)
+
+    if args.proxy:
+        apply_proxy_only(ctx)
+        print_proxy_only_result(ctx)
+        return
 
     if not args.run:
         print_generate_only_result(ctx)
@@ -201,7 +230,7 @@ def main() -> None:
 
     check_docker_compose()
     check_docker_permission()
-    check_required_ports()
+    check_required_ports(ctx.bind_port)
 
     print("\n启动 frps + nginx，用于证书 HTTP 验证...")
     docker_compose_up_initial()

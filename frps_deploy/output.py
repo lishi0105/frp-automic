@@ -127,3 +127,22 @@ def print_generate_only_result(ctx: DeployContext) -> None:
     print(f"需要继续执行部署启动时，请重新运行：")
     print(f"  vps-install-frps.py -c {config.CONFIG_FILE} -r")
     print_frpc_config(ctx)
+
+
+def print_proxy_only_result(ctx: DeployContext) -> None:
+    print("\n================ 代理更新完成 ================")
+    print(f"生成目录：{BASE_DIR}")
+    print(f"配置记录：{GENERATED_INFO_FILE}")
+    print(f"frps 配置：{FRPS_TOML_FILE}")
+    print(f"frpc 配置：{FRPC_TOML_FILE}")
+    print("\n本次未执行证书申请，也未改写现有 Nginx HTTPS 站点配置。")
+    print("所有服务已强制按 TCP 代理处理，忽略配置文件中的 mode 和 expose_http_port。")
+    if tcp_services():
+        print("\n代理直通端口：")
+        for item in tcp_services():
+            print(f"  {item.get('comment', item['alias'])}: {ctx.vps_public_ip}:{remote_port(item)} -> {local_ip(item)}:{local_port(item)}")
+    print("\nfrps 客户端连接信息：")
+    print(f"  serverPort = {ctx.bind_port}")
+    print(f"  auth.token = {ctx.token}")
+    print("==============================================")
+    print_frpc_config(ctx)
