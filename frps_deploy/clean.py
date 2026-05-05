@@ -82,3 +82,11 @@ def clean_all() -> None:
     _remove_file(STATUS_APP_ENV_FILE)
 
     print("\n清理完成。")
+
+
+def stop_all() -> None:
+    print("=== 停止部署服务 ===")
+    _compose_down(STATUS_APP_DIR)
+    _compose_down(BASE_DIR)
+    _compose_down(FRPC_BASE_DIR)
+    print("\n已停止所有已生成的 Docker Compose 服务。")

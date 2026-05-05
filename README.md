@@ -85,6 +85,9 @@ python3 vps-install-frps.py -b
 # 清理脚本生成的容器、镜像和目录
 python3 vps-install-frps.py --clean
 
+# 停止所有已启动的 Docker Compose 服务，不删除文件或镜像
+python3 vps-install-frps.py -s
+
 # 指定配置文件
 python3 vps-install-frps.py -c /path/to/frps-config.json -r
 ```

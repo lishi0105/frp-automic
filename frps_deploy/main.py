@@ -11,7 +11,7 @@ from frps_deploy.certs import (
     docker_compose_up_status_app, docker_compose_restart_nginx,
     issue_certs,
 )
-from frps_deploy.clean import clean_all
+from frps_deploy.clean import clean_all, stop_all
 from frps_deploy.config import ConfigFileCreated, load_runtime_config
 from frps_deploy.console import print, eprint, prompt_input
 from frps_deploy.constants import BASE_DIR, STATUS_APP_DIR
@@ -56,6 +56,11 @@ def parse_args() -> argparse.Namespace:
         "-p", "--proxy",
         action="store_true",
         help="只更新/启动代理相关配置，不自动申请证书；所有服务强制按 TCP 代理处理",
+    )
+    parser.add_argument(
+        "-s", "--stop",
+        action="store_true",
+        help="停止所有已启动的 Docker Compose 服务，不删除文件或镜像",
     )
     parser.add_argument(
         "--clean",
@@ -189,6 +194,10 @@ def main() -> None:
 
     if args.clean:
         clean_all()
+        return
+
+    if args.stop:
+        stop_all()
         return
 
     if args.build:
