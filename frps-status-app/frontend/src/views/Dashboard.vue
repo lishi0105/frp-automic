@@ -77,15 +77,14 @@
             <table class="top5-table">
               <thead>
                 <tr>
-                  <th class="col-rank">排名</th><th class="col-name">代理名称</th><th class="col-type">类型</th><th class="col-num">上行</th><th class="col-num">下行</th><th class="col-num">总流量</th>
+                  <th class="col-rank">排名</th><th class="col-name">代理名称</th><th class="col-num">上行</th><th class="col-num">下行</th><th class="col-num">总流量</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!topProxies.length"><td colspan="6" class="empty">暂无数据</td></tr>
+                <tr v-if="!topProxies.length"><td colspan="5" class="empty">暂无数据</td></tr>
                 <tr v-for="(p, i) in topProxies" :key="p.name + p.type">
                   <td class="col-rank"><b>#{{ i + 1 }}</b></td>
                   <td class="col-name"><code>{{ p.name }}</code></td>
-                  <td class="col-type"><span class="badge badge-ok">{{ p.type }}</span></td>
                   <td class="col-num">{{ humanBytes(p.month_in) }}</td>
                   <td class="col-num">{{ humanBytes(p.month_out) }}</td>
                   <td class="col-num"><b>{{ humanBytes((p.total != null ? p.total : (p.month_in + p.month_out))) }}</b></td>
@@ -807,7 +806,6 @@ onUnmounted(() => {
   background: #f8fafc;
 }
 .col-rank { width: 54px; }
-.col-type { width: 68px; }
 .col-name { width: auto; }
 .col-num { width: 88px; text-align: right !important; }
 .top5-table .col-rank b,
