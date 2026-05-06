@@ -470,4 +470,87 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 600;
 }
+
+@media (max-width: 900px) {
+  .layout {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+  .sidebar {
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+  }
+  .sidebar-logo {
+    padding: 12px 14px;
+    font-size: 15px;
+  }
+  .sidebar-user {
+    margin: 8px 10px 4px;
+    padding: 8px 10px;
+  }
+  .sidebar nav {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 8px 10px 10px;
+    scrollbar-width: thin;
+  }
+  .nav-group {
+    display: flex;
+    margin: 0;
+  }
+  .nav-row {
+    gap: 0;
+  }
+  .nav-item {
+    margin-bottom: 0;
+    min-height: 34px;
+    white-space: nowrap;
+  }
+  .nav-parent {
+    min-width: max-content;
+  }
+  .nav-toggle {
+    width: 26px;
+    height: 34px;
+  }
+  .nav-children {
+    position: absolute;
+    top: 100%;
+    left: 10px;
+    right: 10px;
+    margin: 4px 0 0;
+    padding: 6px;
+    border: 1px solid rgba(148, 163, 184, .24);
+    border-radius: 8px;
+    background: #111827;
+    z-index: 3;
+    max-height: 42vh;
+    overflow: auto;
+  }
+  .sidebar-footer {
+    padding: 8px 12px 10px;
+  }
+  .main-wrap {
+    min-height: 0;
+  }
+  .initial-password-banner {
+    margin: 10px 12px 0;
+    font-size: 12px;
+    gap: 8px;
+  }
+  .warn-anchor {
+    top: 66px;
+    right: 12px;
+  }
+  .warn-anchor.with-initial-banner {
+    top: 116px;
+  }
+  .warn-panel {
+    width: min(92vw, 360px);
+  }
+}
 </style>

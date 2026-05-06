@@ -656,6 +656,82 @@ code { font-family: var(--mono); font-size: 12px; background: var(--surface-2); 
 }
 
 @media (max-width: 760px) {
+  .main-wrap {
+    overflow-x: hidden;
+  }
+  .page-header {
+    padding: 12px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .page-title {
+    font-size: 18px;
+  }
+  .page-sub {
+    font-size: 12px;
+  }
+  .page-body {
+    padding: 12px;
+  }
+  .analytics-page {
+    gap: 10px;
+  }
+  .analytics-overview {
+    padding: 10px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .analytics-overview-metrics {
+    width: 100%;
+    gap: 10px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .analytics-overview-metrics b {
+    font-size: 18px;
+  }
+  .analytics-overview-metrics span,
+  .analytics-overview-metrics small {
+    font-size: 11px;
+  }
+  .analytics-main-2col {
+    gap: 10px;
+  }
+  .analytics-filters {
+    padding: 10px;
+  }
+  .section-head {
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .section-title {
+    font-size: 14px;
+  }
+  .btn,
+  .btn.btn-sm {
+    min-height: 30px;
+    font-size: 12px;
+  }
+  .table-wrap {
+    overflow-x: auto;
+  }
+  table {
+    min-width: 620px;
+  }
+  th, td {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .analytics-pager {
+    justify-content: flex-start;
+    padding: 8px 0 10px;
+  }
+  .form-input, .form-select {
+    height: 34px;
+  }
   .login-page {
     grid-template-columns: 1fr;
     background: var(--bg);
