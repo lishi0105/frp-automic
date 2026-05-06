@@ -6,50 +6,62 @@
         <div class="page-sub">{{ updatedAt ? '最后更新：' + updatedAt : '加载中…' }}</div>
       </div>
       <div class="page-actions">
-        <button class="btn btn-outline btn-sm" @click="openLogModal">日志</button>
+        <button class="btn btn-outline btn-sm" @click="openLogModal"><span class="btn-doc-icon" aria-hidden="true"></span>日志</button>
         <button class="btn btn-outline btn-sm" :disabled="loading" @click="$emit('refresh')">
           <span v-if="loading" class="spinner"></span>
-          <span v-else>↻</span> 刷新
+          <span v-else class="btn-refresh-icon" aria-hidden="true">↻</span>刷新
         </button>
       </div>
     </div>
 
     <div class="page-body dashboard-page">
-      <div class="dashboard-rings">
-        <section class="ring-card">
-          <div class="ring-title">FRPS 服务</div>
-          <div class="ring-wrap">
-            <div class="metric-ring" :style="{ '--ring': servicePct + '%' }"><div class="ring-center">{{ bindOk ? '在线' : '离线' }}</div></div>
+      <div class="dashboard-summary">
+        <section class="summary-card service-card">
+          <div class="summary-title">FRPS 服务</div>
+          <div class="service-body">
+            <div class="summary-icon server-icon" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div>
+              <div class="service-status"><i class="status-dot" :class="bindOk ? 'ok' : 'bad'"></i>{{ bindOk ? '在线' : '离线' }}</div>
+              <div class="summary-sub">{{ bindLatency }}ms · Dashboard {{ dashOk ? dashLatency + 'ms' : '离线' }}</div>
+            </div>
           </div>
-          <div class="ring-sub">{{ bindLatency }}ms · Dashboard {{ dashOk ? dashLatency + 'ms' : '离线' }}</div>
         </section>
-        <section class="ring-card">
-          <div class="ring-title">本月上行</div>
-          <div class="ring-wrap">
-            <div class="metric-ring blue" :style="{ '--ring': inPct + '%' }"><div class="ring-center">{{ inPct }}%</div></div>
+
+        <section class="summary-card throughput-card">
+          <div class="summary-title">本月流量吞吐</div>
+          <div class="traffic-bars">
+            <div class="traffic-line">
+              <div class="traffic-label"><span>上行</span><b>{{ humanBytes(status?.month_totals?.in) }} ({{ inPct }}%)</b></div>
+              <div class="thin-progress"><div class="blue" :style="{ width: inPct + '%' }"></div></div>
+            </div>
+            <div class="traffic-line">
+              <div class="traffic-label"><span>下行</span><b>{{ humanBytes(status?.month_totals?.out) }} ({{ outPct }}%)</b></div>
+              <div class="thin-progress"><div class="green" :style="{ width: outPct + '%' }"></div></div>
+            </div>
           </div>
-          <div class="ring-sub">{{ humanBytes(status?.month_totals?.in) }}</div>
         </section>
-        <section class="ring-card">
-          <div class="ring-title">本月下行</div>
-          <div class="ring-wrap">
-            <div class="metric-ring green" :style="{ '--ring': outPct + '%' }"><div class="ring-center">{{ outPct }}%</div></div>
+
+        <section class="summary-card online-card">
+          <div class="summary-title">代理在线</div>
+          <div class="online-head">
+            <div><b>{{ onlineProxies }}</b><span>/ {{ totalProxies }}</span></div>
+            <div class="summary-icon chart-icon" aria-hidden="true"></div>
           </div>
-          <div class="ring-sub">{{ humanBytes(status?.month_totals?.out) }}</div>
+          <div class="summary-sub">在线率 {{ onlinePct }}%</div>
+          <div class="wide-progress"><div :style="{ width: onlinePct + '%' }"></div></div>
+          <div class="summary-sub">TCP {{ proxyTypeMap.tcp || 0 }} · HTTP {{ proxyTypeMap.http || 0 }} · HTTPS {{ proxyTypeMap.https || 0 }}</div>
         </section>
-        <section class="ring-card">
-          <div class="ring-title">代理在线</div>
-          <div class="ring-wrap">
-            <div class="metric-ring teal" :style="{ '--ring': onlinePct + '%' }"><div class="ring-center">{{ onlineProxies }}/{{ totalProxies }}</div></div>
+
+        <section class="summary-card cert-card">
+          <div class="summary-title">证书状态</div>
+          <span class="cert-pill" :class="certHealthClass">{{ certHealthText }}</span>
+          <div class="cert-body">
+            <div class="summary-icon shield-icon" aria-hidden="true"></div>
+            <div>
+              <div class="cert-days"><b>{{ certSummary.min_days_left ?? '-' }}</b><span>天</span></div>
+              <div class="summary-sub">WARN {{ certSummary.warn || 0 }} · FAIL {{ certSummary.fail || 0 }}</div>
+            </div>
           </div>
-          <div class="ring-sub">TCP {{ proxyTypeMap.tcp || 0 }} · HTTP {{ proxyTypeMap.http || 0 }} · HTTPS {{ proxyTypeMap.https || 0 }}</div>
-        </section>
-        <section class="ring-card">
-          <div class="ring-title">证书风险</div>
-          <div class="ring-wrap">
-            <div class="metric-ring amber" :style="{ '--ring': certRiskPct + '%' }"><div class="ring-center">{{ certSummary.min_days_left ?? '-' }}天</div></div>
-          </div>
-          <div class="ring-sub">WARN {{ certSummary.warn || 0 }} · FAIL {{ certSummary.fail || 0 }}</div>
         </section>
       </div>
 
@@ -193,7 +205,6 @@ const alertInGB = computed(() => props.status?.settings?.alert_in_gb || 0)
 const alertOutGB = computed(() => props.status?.settings?.alert_out_gb || 0)
 const inPct = computed(() => percent(props.status?.month_totals?.in, alertInGB.value))
 const outPct = computed(() => percent(props.status?.month_totals?.out, alertOutGB.value))
-const servicePct = computed(() => bindOk.value ? 100 : 0)
 
 const proxies = computed(() => props.status?.proxies ?? [])
 const onlineProxies = computed(() => proxies.value.filter(p => p.online).length)
@@ -353,19 +364,16 @@ const certSummary = computed(() => props.status?.dashboard?.certificate || {
   min_days_left: certs.value[0]?.days_left ?? null
 })
 
-const certRiskPct = computed(() => {
-  const total = certSummary.value.total || 0
-  if (!total) return 0
-  const risk = (certSummary.value.warn || 0) + (certSummary.value.fail || 0)
-  return Math.round((risk / total) * 100)
+const certHealthText = computed(() => {
+  if ((certSummary.value.fail || 0) > 0) return '异常'
+  if ((certSummary.value.warn || 0) > 0) return '预警'
+  return '正常'
 })
-
-function certColor(days) {
-  if (days == null) return 'var(--danger)'
-  if (days < 7) return 'var(--danger)'
-  if (days < 15) return 'var(--warning)'
-  return 'var(--success)'
-}
+const certHealthClass = computed(() => {
+  if ((certSummary.value.fail || 0) > 0) return 'bad'
+  if ((certSummary.value.warn || 0) > 0) return 'warn'
+  return 'ok'
+})
 
 function buildChart(daily) {
   if (!chart) return
@@ -381,7 +389,6 @@ function buildChart(daily) {
     byDay[r.day].out += Number(r.out)
   }
   const days = Object.keys(byDay).sort().slice(-30)
-  const isDark = true
   chart.setOption({
     backgroundColor: 'transparent',
     tooltip: {
@@ -391,13 +398,26 @@ function buildChart(daily) {
         return `${d}<br/>${params.map(p => `${p.marker}${p.seriesName}: <b>${humanBytes(p.value)}</b>`).join('<br/>')}`
       }
     },
-    legend: { data: ['上行', '下行'], top: 0, textStyle: { color: isDark ? '#94a3b8' : '#475569' } },
-    grid: { left: 56, right: 16, top: 38, bottom: 34 },
-    xAxis: { type: 'category', data: days, axisLabel: { color: isDark ? '#94a3b8' : '#475569', fontSize: 11 }, axisLine: { lineStyle: { color: isDark ? '#334155' : '#e2e8f0' } } },
-    yAxis: { type: 'value', axisLabel: { color: isDark ? '#94a3b8' : '#475569', fontSize: 11, formatter: v => humanBytes(v) }, splitLine: { lineStyle: { color: isDark ? '#1e293b' : '#f1f5f9' } } },
+    legend: { data: ['上行', '下行'], top: 0, left: 'center', textStyle: { color: '#334155', fontSize: 13 }, itemWidth: 22, itemHeight: 10 },
+    grid: { left: 74, right: 22, top: 48, bottom: 42 },
+    xAxis: {
+      type: 'category',
+      data: days,
+      boundaryGap: false,
+      axisLabel: { color: '#64748b', fontSize: 12 },
+      axisLine: { lineStyle: { color: '#475569' } },
+      axisTick: { show: false }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#64748b', fontSize: 12, formatter: v => humanBytes(v) },
+      splitLine: { lineStyle: { color: '#dbe3ee', type: 'dashed' } },
+      axisLine: { show: false },
+      axisTick: { show: false }
+    },
     series: [
-      { name: '上行', type: 'line', smooth: true, data: days.map(d => byDay[d].in), itemStyle: { color: '#3b82f6' }, areaStyle: { color: 'rgba(59,130,246,.12)' } },
-      { name: '下行', type: 'line', smooth: true, data: days.map(d => byDay[d].out), itemStyle: { color: '#10b981' }, areaStyle: { color: 'rgba(16,185,129,.12)' } }
+      { name: '上行', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => byDay[d].in), itemStyle: { color: '#1f7ae0' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(31,122,224,.08)' } },
+      { name: '下行', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => byDay[d].out), itemStyle: { color: '#12b76a' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(18,183,106,.15)' } }
     ]
   })
 }
@@ -407,8 +427,7 @@ const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => char
 
 onMounted(async () => {
   await nextTick()
-  const isDark = true
-  chart = echarts.init(chartEl.value, isDark ? 'dark' : null)
+  chart = echarts.init(chartEl.value)
   if (props.daily?.length) buildChart(props.daily)
   ro?.observe(chartEl.value)
 })
@@ -423,11 +442,12 @@ onUnmounted(() => {
 <style scoped>
 .dashboard-page {
   display: grid;
-  gap: 10px;
+  gap: 16px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
   grid-template-rows: auto minmax(0, 1fr);
+  background: #f7f9fc;
 }
 .dashboard-shell {
   display: flex;
@@ -435,72 +455,298 @@ onUnmounted(() => {
   flex-direction: column;
   min-height: 0;
 }
+.dashboard-shell :deep(.page-header) {
+  min-height: 98px;
+  padding: 24px 28px;
+}
+.dashboard-shell :deep(.page-title) {
+  font-size: 26px;
+  line-height: 1.15;
+  font-weight: 800;
+}
+.dashboard-shell :deep(.page-sub) {
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 15px;
+}
 .page-actions {
   display: flex;
   align-items: center;
+  gap: 12px;
+}
+.page-actions .btn {
+  height: 38px;
+  padding: 0 16px;
   gap: 8px;
+  border-color: #d7e1ed;
+  background: #fff;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 650;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, .04);
 }
-.dashboard-rings {
+.btn-doc-icon {
+  width: 14px;
+  height: 17px;
+  display: inline-block;
+  position: relative;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+}
+.btn-doc-icon::before,
+.btn-doc-icon::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  height: 2px;
+  background: currentColor;
+}
+.btn-doc-icon::before { top: 4px; }
+.btn-doc-icon::after { top: 9px; }
+.btn-refresh-icon {
+  display: inline-block;
+  font-size: 18px;
+  line-height: 1;
+}
+.dashboard-summary {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
 }
-.ring-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 8px 10px;
-  box-shadow: var(--shadow);
+.summary-card {
+  position: relative;
+  min-height: 150px;
   min-width: 0;
+  padding: 18px 22px;
+  background: #fff;
+  border: 1px solid #dfe7f1;
+  border-radius: 8px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, .08);
+}
+.summary-title,
+.section-title {
+  color: #0f172a;
+}
+.summary-title {
+  font-size: 16px;
+  font-weight: 750;
+}
+.summary-sub {
+  color: #475569;
+  font-size: 14px;
+}
+.summary-icon {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  background: #e7f6eb;
+  color: #166534;
+  flex: 0 0 auto;
+}
+.service-body {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 34px;
+}
+.server-icon {
   display: grid;
-  align-content: start;
+  place-content: center;
   gap: 6px;
 }
-.ring-title { font-size: 12px; font-weight: 650; color: var(--text-2); line-height: 1.2; }
-.ring-wrap { display: grid; place-items: center; }
-.metric-ring {
-  --ring: 0%;
-  width: 96px; height: 96px; border-radius: 50%;
-  background: conic-gradient(#2563eb var(--ring), #334155 0);
-  display: grid; place-items: center;
+.server-icon span {
+  display: block;
+  width: 36px;
+  height: 12px;
+  border: 3px solid currentColor;
+  border-radius: 5px;
+  position: relative;
 }
-.metric-ring::before {
-  content: '';
-  width: 72px; height: 72px; border-radius: 50%;
-  background: var(--surface);
-}
-.metric-ring.blue { background: conic-gradient(#2563eb var(--ring), #334155 0); }
-.metric-ring.green { background: conic-gradient(#10b981 var(--ring), #334155 0); }
-.metric-ring.teal { background: conic-gradient(#0ea5a4 var(--ring), #334155 0); }
-.metric-ring.amber { background: conic-gradient(#f59e0b var(--ring), #334155 0); }
-.ring-center {
+.server-icon span::before {
+  content: "";
   position: absolute;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text);
+  left: 5px;
+  top: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
 }
-.ring-sub {
-  font-size: 11px;
-  color: var(--text-2);
-  text-align: center;
-  white-space: nowrap;
+.service-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+}
+.status-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-dot.ok { background: #12b76a; }
+.status-dot.bad { background: #ef4444; }
+.traffic-bars {
+  display: grid;
+  gap: 22px;
+  margin-top: 32px;
+}
+.traffic-line {
+  display: grid;
+  gap: 8px;
+}
+.traffic-label {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  color: #0f172a;
+  font-size: 14px;
+}
+.traffic-label b {
+  font-weight: 500;
+}
+.thin-progress,
+.wide-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+.thin-progress div,
+.wide-progress div {
+  height: 100%;
+  border-radius: inherit;
+}
+.thin-progress .blue { background: linear-gradient(90deg, #1f7ae0, #248af0); }
+.thin-progress .green,
+.wide-progress div { background: linear-gradient(90deg, #12b76a, #16a34a); }
+.online-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+}
+.online-head b {
+  font-size: 36px;
+  line-height: 1;
+  color: #0f172a;
+}
+.online-head span {
+  margin-left: 7px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.online-card .summary-sub {
+  margin-top: 10px;
+}
+.online-card .wide-progress {
+  margin: 12px 0 14px;
+}
+.chart-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  position: relative;
+}
+.chart-icon::before {
+  content: "";
+  position: absolute;
+  inset: 18px 16px 16px;
+  border: 3px solid currentColor;
+  border-radius: 4px;
+}
+.chart-icon::after {
+  content: "";
+  position: absolute;
+  left: 20px;
+  top: 31px;
+  width: 22px;
+  height: 14px;
+  border-left: 3px solid currentColor;
+  border-bottom: 3px solid currentColor;
+  transform: skewX(-22deg);
+}
+.cert-pill {
+  position: absolute;
+  top: 54px;
+  right: 22px;
+  min-width: 58px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 750;
+}
+.cert-pill.ok { background: #dcfce7; color: #16a34a; }
+.cert-pill.warn { background: #fef3c7; color: #b45309; }
+.cert-pill.bad { background: #fee2e2; color: #dc2626; }
+.cert-body {
+  display: flex;
+  align-items: center;
+  gap: 34px;
+  margin-top: 34px;
+}
+.shield-icon {
+  position: relative;
+}
+.shield-icon::before {
+  content: "";
+  position: absolute;
+  left: 24px;
+  top: 18px;
+  width: 28px;
+  height: 34px;
+  border: 4px solid currentColor;
+  border-radius: 8px 8px 14px 14px;
+  clip-path: polygon(50% 0, 100% 18%, 100% 62%, 50% 100%, 0 62%, 0 18%);
+}
+.shield-icon::after {
+  content: "";
+  position: absolute;
+  left: 32px;
+  top: 34px;
+  width: 15px;
+  height: 8px;
+  border-left: 4px solid currentColor;
+  border-bottom: 4px solid currentColor;
+  transform: rotate(-45deg);
+}
+.cert-days {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: #0f172a;
+}
+.cert-days b {
+  font-size: 36px;
+  line-height: 1;
+}
+.cert-days span {
+  font-size: 20px;
+  font-weight: 750;
 }
 .dashboard-main {
   display: grid;
-  grid-template-columns: 3fr 2fr;
+  grid-template-columns: minmax(0, 1fr) minmax(520px, .98fr);
   grid-template-rows: 1fr;
-  gap: 10px;
+  gap: 16px;
   min-height: 0;
   height: 100%;
   overflow: hidden;
 }
 .card-area {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  box-shadow: var(--shadow);
+  background: #fff;
+  border: 1px solid #dfe7f1;
+  border-radius: 8px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, .08);
 }
 .chart-block {
   display: flex;
@@ -512,16 +758,16 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 14px 8px;
+  padding: 18px 22px 8px;
 }
 .card-head .section-title {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
 }
 .trend-chart {
   flex: 1;
   min-height: 0;
-  padding: 0 10px 6px;
+  padding: 0 14px 18px;
 }
 .top5-block { display: grid; grid-template-rows: auto 1fr; min-height: 0; height: 100%; }
 .chip {
@@ -536,7 +782,7 @@ onUnmounted(() => {
   min-height: 0;
   height: 100%;
   overflow: auto;
-  padding: 0 10px 8px;
+  padding: 0 16px 16px;
 }
 .top5-table {
   width: 100%;
@@ -545,32 +791,46 @@ onUnmounted(() => {
 }
 .top5-table th,
 .top5-table td {
-  padding: 8px 8px;
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
+  height: 54px;
+  padding: 10px 8px;
+  border-bottom: 1px solid #dfe7f1;
+  font-size: 14px;
   text-align: left;
 }
 .top5-table th {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--surface);
-  font-size: 12px;
-  font-weight: 650;
-  color: var(--text-2);
+  height: 42px;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 750;
+  color: #334155;
 }
 .top5-table tbody tr:hover td {
-  background: var(--surface-2);
+  background: #f8fafc;
 }
-.col-rank { width: 48px; }
-.col-type { width: 56px; }
+.col-rank { width: 54px; }
+.col-type { width: 76px; }
 .col-name { width: auto; }
-.col-num { width: 86px; text-align: right !important; }
+.col-num { width: 104px; text-align: right !important; }
+.top5-table .col-rank b,
+.top5-table .col-num b {
+  color: #0f172a;
+  font-size: 15px;
+}
 .top5-table .col-name code {
   display: block;
+  width: 136px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #f1f5f9, #eef2f7);
+  color: #0f172a;
+  font-size: 14px;
 }
 .log-modal-mask {
   position: fixed;
@@ -797,12 +1057,23 @@ onUnmounted(() => {
 }
 @media (max-width: 1200px) {
   .dashboard-page { height: auto; grid-template-rows: auto auto; overflow: visible; padding-bottom: 0; }
-  .dashboard-rings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dashboard-main { grid-template-columns: 1fr; }
   .trend-chart { flex: none; height: 300px; }
   .top5-scroll { height: auto; max-height: 260px; }
 }
 @media (max-width: 640px) {
+  .dashboard-summary { grid-template-columns: 1fr; }
+  .service-body,
+  .cert-body {
+    gap: 18px;
+  }
+  .top5-scroll {
+    overflow-x: auto;
+  }
+  .top5-table {
+    min-width: 620px;
+  }
   .page-actions { flex-wrap: wrap; justify-content: flex-end; }
   .log-modal-mask { padding: 12px; }
   .log-modal { height: calc(100vh - 24px); }

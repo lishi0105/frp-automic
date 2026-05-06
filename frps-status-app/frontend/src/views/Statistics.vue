@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <div class="page-title">{{ selectedProxyName ? '历史统计 / ' + selectedProxyName : '历史统计' }}</div>
-        <div class="page-sub">{{ selectedProxyName ? '代理分项视角' : '全部代理汇总视角' }}</div>
       </div>
       <div class="flex-center">
         <a class="btn btn-outline btn-sm" :href="exportUrl">⬇ 导出 CSV</a>
