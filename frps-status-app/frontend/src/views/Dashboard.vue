@@ -377,8 +377,8 @@ function buildChart(daily) {
   if (!chart) return
   const rows = Array.isArray(daily) ? daily : []
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-  const today = now.toISOString().slice(0, 10)
+  const monthStart = formatLocalDate(new Date(now.getFullYear(), now.getMonth(), 1))
+  const today = formatLocalDate(now)
   const monthRows = rows.filter(r => r.day >= monthStart && r.day <= today)
   if (!monthRows.length) {
     chart.clear()
@@ -422,6 +422,13 @@ function buildChart(daily) {
       { name: '下行', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => byDay[d].out), itemStyle: { color: '#12b76a' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(18,183,106,.15)' } }
     ]
   })
+}
+
+function formatLocalDate(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 watch(() => props.daily, (d) => buildChart(d))

@@ -169,20 +169,27 @@ watch(filteredRows, () => { page.value = 1 })
 function quickRange(days) {
   const end = new Date()
   const start = new Date(Date.now() - (days - 1) * 86400000)
-  endDate.value = end.toISOString().slice(0, 10)
-  startDate.value = start.toISOString().slice(0, 10)
+  endDate.value = formatLocalDate(end)
+  startDate.value = formatLocalDate(start)
 }
 
 function quickThisMonth() {
   const now = new Date()
   const start = new Date(now.getFullYear(), now.getMonth(), 1)
-  startDate.value = start.toISOString().slice(0, 10)
-  endDate.value = now.toISOString().slice(0, 10)
+  startDate.value = formatLocalDate(start)
+  endDate.value = formatLocalDate(now)
 }
 
 function resetFilter() {
   startDate.value = ''
   endDate.value = ''
+}
+
+function formatLocalDate(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function buildChart() {
