@@ -21,59 +21,10 @@
           <div class="text-muted text-sm">共 {{ totalProxies }} 个代理，{{ onlineCount }} 个在线</div>
         </div>
         <div class="analytics-overview-metrics">
-          <div><b>{{ onlineCount }}</b><span>/ {{ totalProxies }}</span><small>在线代理</small></div>
+          <div class="metric-inline"><b>{{ onlineCount }}</b><span>/ {{ totalProxies }}</span><small>在线代理</small></div>
           <div><b>{{ curConnsTotal }}</b><small>当前连接数</small></div>
           <div><b>{{ humanBytes(monthTotal) }}</b><small>本月总流量</small></div>
         </div>
-      </section>
-
-      <section class="analytics-filters proxy-filters-grid">
-        <input class="form-input" v-model="search" placeholder="搜索代理名称、域名或端口" />
-        <select class="form-select" v-model="filterType">
-          <option value="">全部类型</option>
-          <option v-for="t in types" :key="t" :value="t">{{ t }}</option>
-        </select>
-        <select class="form-select" v-model="filterOnline">
-          <option value="">全部状态</option>
-          <option value="online">在线</option>
-          <option value="offline">离线</option>
-        </select>
-        <button class="btn btn-outline btn-sm" :class="{ 'btn-on': filterOnline === 'online' }" @click="filterOnline = filterOnline === 'online' ? '' : 'online'">在线</button>
-        <button class="btn btn-outline btn-sm" :class="{ 'btn-on': filterOnline === 'offline' }" @click="filterOnline = filterOnline === 'offline' ? '' : 'offline'">离线</button>
-        <button class="btn btn-outline btn-sm" :class="{ 'btn-on': showAdvanced }" @click="showAdvanced = !showAdvanced">高级筛选</button>
-      </section>
-      <section v-if="showAdvanced" class="analytics-filters proxy-filters-advanced">
-        <label class="form-field-inline">
-          <span>最小总流量(GB)</span>
-          <input class="form-input" type="number" min="0" step="1" v-model.number="minTotalGB" />
-        </label>
-        <label class="form-field-inline">
-          <span>最小连接数</span>
-          <input class="form-input" type="number" min="0" step="1" v-model.number="minConns" />
-        </label>
-        <label class="form-field-inline">
-          <span>证书剩余天数</span>
-          <select class="form-select" v-model="certDaysMode">
-            <option value="">全部</option>
-            <option value="lt7">少于 7 天</option>
-            <option value="lt15">少于 15 天</option>
-            <option value="ge15">15 天及以上</option>
-            <option value="none">无证书</option>
-          </select>
-        </label>
-        <label class="form-field-inline">
-          <span>域名绑定</span>
-          <select class="form-select" v-model="domainMode">
-            <option value="">全部</option>
-            <option value="with">有域名</option>
-            <option value="without">无域名</option>
-          </select>
-        </label>
-        <label class="form-field-inline">
-          <input type="checkbox" v-model="onlyCertRisk" />
-          <span>仅证书临期/异常</span>
-        </label>
-        <button class="btn btn-outline btn-sm adv-reset" @click="resetAdvanced">重置高级筛选</button>
       </section>
 
       <div class="proxy-main analytics-main-2col proxy-main-custom">
@@ -208,15 +159,6 @@ import { humanBytes } from '../utils/format.js'
 const props = defineProps({ status: Object, loading: Boolean })
 defineEmits(['refresh'])
 
-const search = ref('')
-const filterType = ref('')
-const filterOnline = ref('')
-const minTotalGB = ref(0)
-const minConns = ref(0)
-const showAdvanced = ref(false)
-const onlyCertRisk = ref(false)
-const certDaysMode = ref('')
-const domainMode = ref('')
 const selectedProxy = ref(null)
 const sortKey = ref('total')
 const sortDir = ref('desc')
@@ -230,47 +172,14 @@ const onlineCount = computed(() => proxies.value.filter(p => p.online).length)
 const totalProxies = computed(() => proxies.value.length)
 const curConnsTotal = computed(() => proxies.value.reduce((s, p) => s + Number(p.cur_conns || 0), 0))
 const monthTotal = computed(() => proxies.value.reduce((s, p) => s + Number(p.month_in || 0) + Number(p.month_out || 0), 0))
-const types = computed(() => [...new Set(proxies.value.map(p => p.type))].sort())
 function proxyTotal(p) { return Number(p.month_in || 0) + Number(p.month_out || 0) }
 function proxyCerts(p) {
   const ds = (p.domains || []).filter(Boolean)
   if (!ds.length) return []
   return certs.value.filter(c => ds.includes(c.domain))
 }
-function minCertDays(p) {
-  const days = proxyCerts(p).map(c => c.days_left).filter(v => v != null).map(Number)
-  if (!days.length) return null
-  return Math.min(...days)
-}
-const filtered = computed(() => proxies.value.filter(p => {
-  if (search.value) {
-    const q = search.value.toLowerCase()
-    const domainText = (p.domains || []).join(',').toLowerCase()
-    const portText = String(p.remote_port || p.local_port || '')
-    if (!p.name.toLowerCase().includes(q) && !domainText.includes(q) && !portText.includes(q)) return false
-  }
-  if (filterType.value && p.type !== filterType.value) return false
-  if (filterOnline.value === 'online' && !p.online) return false
-  if (filterOnline.value === 'offline' && p.online) return false
-  if (minTotalGB.value > 0 && (proxyTotal(p) / (1024 ** 3)) < minTotalGB.value) return false
-  if (minConns.value > 0 && Number(p.cur_conns || 0) < minConns.value) return false
-  if (domainMode.value === 'with' && !(p.domains || []).length) return false
-  if (domainMode.value === 'without' && (p.domains || []).length) return false
-  if (certDaysMode.value) {
-    const d = minCertDays(p)
-    if (certDaysMode.value === 'none' && d != null) return false
-    if (certDaysMode.value === 'lt7' && !(d != null && d < 7)) return false
-    if (certDaysMode.value === 'lt15' && !(d != null && d < 15)) return false
-    if (certDaysMode.value === 'ge15' && !(d != null && d >= 15)) return false
-  }
-  if (onlyCertRisk.value) {
-    const hit = proxyCerts(p).some(c => c.days_left == null || !c.ok || Number(c.days_left) < 15)
-    if (!hit) return false
-  }
-  return true
-}))
 const sortedFiltered = computed(() => {
-  const list = [...filtered.value]
+  const list = [...proxies.value]
   const sign = sortDir.value === 'asc' ? 1 : -1
   const getter = (p) => {
     if (sortKey.value === 'conn') return Number(p.cur_conns || 0)
@@ -348,13 +257,6 @@ function sortClass(key) {
   if (sortKey.value !== key) return 'sort-idle'
   return sortDir.value === 'asc' ? 'sort-asc' : 'sort-desc'
 }
-function resetAdvanced() {
-  minTotalGB.value = 0
-  minConns.value = 0
-  certDaysMode.value = ''
-  domainMode.value = ''
-  onlyCertRisk.value = false
-}
 function applyJump() {
   const p = Number(jumpPage.value || 1)
   if (!Number.isFinite(p)) return
@@ -392,28 +294,34 @@ watch(sortedFiltered, (arr) => {
   flex-direction: column;
   min-height: 0;
 }
-.proxy-filters-grid {
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr) 130px 130px auto auto auto;
-  gap: 10px;
+.analytics-overview {
+  padding: 10px 14px;
+  gap: 12px;
   align-items: center;
 }
-.proxy-filters-advanced {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+.analytics-overview-metrics {
   gap: 14px;
-  align-items: center;
 }
-.form-field-inline {
-  display: grid;
-  gap: 6px;
+.analytics-overview-metrics > div {
+  gap: 0;
 }
-.form-field-inline span {
-  color: var(--text-2);
+.analytics-overview-metrics b {
+  font-size: 18px;
+}
+.analytics-overview-metrics span {
   font-size: 12px;
 }
-.adv-reset {
-  align-self: end;
+.analytics-overview-metrics small {
+  font-size: 11px;
+}
+.metric-inline {
+  display: flex !important;
+  align-items: baseline;
+  gap: 4px;
+}
+.metric-inline small {
+  margin-left: 6px;
+  white-space: nowrap;
 }
 .proxy-table-wrap, .proxy-detail {
   background: var(--surface);
@@ -593,13 +501,8 @@ watch(sortedFiltered, (arr) => {
 .sort-asc, .sort-desc { font-size: 0; }
 @media (max-width: 1200px) {
   .proxy-page { flex: none; min-height: auto; }
-  .proxy-filters-grid { grid-template-columns: 1fr 1fr 1fr; }
-  .proxy-filters-advanced { grid-template-columns: 1fr 1fr; }
   .proxy-main-custom { grid-template-columns: 1fr; }
   .table-scroll { max-height: 480px; }
   .proxy-detail { max-height: 520px; }
-}
-@media (max-width: 760px) {
-  .proxy-filters-advanced { grid-template-columns: 1fr; }
 }
 </style>

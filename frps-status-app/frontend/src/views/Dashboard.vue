@@ -48,7 +48,6 @@
             <div class="summary-icon chart-icon" aria-hidden="true"></div>
           </div>
           <div class="summary-sub">在线率 {{ onlinePct }}%</div>
-          <div class="wide-progress"><div :style="{ width: onlinePct + '%' }"></div></div>
           <div class="summary-sub">TCP {{ proxyTypeMap.tcp || 0 }} · HTTP {{ proxyTypeMap.http || 0 }} · HTTPS {{ proxyTypeMap.https || 0 }}</div>
         </section>
 
@@ -442,7 +441,7 @@ onUnmounted(() => {
 <style scoped>
 .dashboard-page {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -456,18 +455,18 @@ onUnmounted(() => {
   min-height: 0;
 }
 .dashboard-shell :deep(.page-header) {
-  min-height: 98px;
-  padding: 24px 28px;
+  min-height: 86px;
+  padding: 18px 24px;
 }
 .dashboard-shell :deep(.page-title) {
-  font-size: 26px;
-  line-height: 1.15;
-  font-weight: 800;
+  font-size: 19px;
+  line-height: 1.2;
+  font-weight: 600;
 }
 .dashboard-shell :deep(.page-sub) {
-  margin-top: 8px;
+  margin-top: 6px;
   color: #64748b;
-  font-size: 15px;
+  font-size: 12px;
 }
 .page-actions {
   display: flex;
@@ -512,13 +511,13 @@ onUnmounted(() => {
 .dashboard-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 .summary-card {
   position: relative;
-  min-height: 150px;
+  min-height: 122px;
   min-width: 0;
-  padding: 18px 22px;
+  padding: 14px 18px;
   background: #fff;
   border: 1px solid #dfe7f1;
   border-radius: 8px;
@@ -529,16 +528,16 @@ onUnmounted(() => {
   color: #0f172a;
 }
 .summary-title {
-  font-size: 16px;
-  font-weight: 750;
+  font-size: 13px;
+  font-weight: 650;
 }
 .summary-sub {
   color: #475569;
-  font-size: 14px;
+  font-size: 12px;
 }
 .summary-icon {
-  width: 74px;
-  height: 74px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   background: #e7f6eb;
   color: #166534;
@@ -547,8 +546,8 @@ onUnmounted(() => {
 .service-body {
   display: flex;
   align-items: center;
-  gap: 24px;
-  margin-top: 34px;
+  gap: 14px;
+  margin-top: 12px;
 }
 .server-icon {
   display: grid;
@@ -557,9 +556,9 @@ onUnmounted(() => {
 }
 .server-icon span {
   display: block;
-  width: 36px;
-  height: 12px;
-  border: 3px solid currentColor;
+  width: 28px;
+  height: 9px;
+  border: 2px solid currentColor;
   border-radius: 5px;
   position: relative;
 }
@@ -577,14 +576,14 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 10px;
-  font-size: 24px;
+  margin-bottom: 6px;
+  font-size: 14px;
   font-weight: 800;
   color: #0f172a;
 }
 .status-dot {
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   display: inline-block;
 }
@@ -592,8 +591,8 @@ onUnmounted(() => {
 .status-dot.bad { background: #ef4444; }
 .traffic-bars {
   display: grid;
-  gap: 22px;
-  margin-top: 32px;
+  gap: 12px;
+  margin-top: 10px;
 }
 .traffic-line {
   display: grid;
@@ -602,16 +601,16 @@ onUnmounted(() => {
 .traffic-label {
   display: flex;
   align-items: baseline;
-  gap: 16px;
+  gap: 10px;
   color: #0f172a;
-  font-size: 14px;
+  font-size: 12px;
 }
 .traffic-label b {
   font-weight: 500;
 }
 .thin-progress,
 .wide-progress {
-  height: 8px;
+  height: 6px;
   border-radius: 999px;
   background: #e5e7eb;
   overflow: hidden;
@@ -628,60 +627,57 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 14px;
+  margin-top: 8px;
 }
 .online-head b {
-  font-size: 36px;
+  font-size: 28px;
   line-height: 1;
   color: #0f172a;
 }
 .online-head span {
   margin-left: 7px;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
   color: #0f172a;
 }
 .online-card .summary-sub {
-  margin-top: 10px;
-}
-.online-card .wide-progress {
-  margin: 12px 0 14px;
+  margin-top: 6px;
 }
 .chart-icon {
-  width: 58px;
-  height: 58px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   position: relative;
 }
 .chart-icon::before {
   content: "";
   position: absolute;
-  inset: 18px 16px 16px;
-  border: 3px solid currentColor;
+  inset: 12px 11px 11px;
+  border: 2px solid currentColor;
   border-radius: 4px;
 }
 .chart-icon::after {
   content: "";
   position: absolute;
-  left: 20px;
-  top: 31px;
-  width: 22px;
-  height: 14px;
-  border-left: 3px solid currentColor;
-  border-bottom: 3px solid currentColor;
+  left: 14px;
+  top: 22px;
+  width: 16px;
+  height: 10px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
   transform: skewX(-22deg);
 }
 .cert-pill {
   position: absolute;
-  top: 54px;
-  right: 22px;
-  min-width: 58px;
-  height: 28px;
+  top: 32px;
+  right: 18px;
+  min-width: 46px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 750;
 }
 .cert-pill.ok { background: #dcfce7; color: #16a34a; }
@@ -690,8 +686,8 @@ onUnmounted(() => {
 .cert-body {
   display: flex;
   align-items: center;
-  gap: 34px;
-  margin-top: 34px;
+  gap: 14px;
+  margin-top: 10px;
 }
 .shield-icon {
   position: relative;
@@ -699,45 +695,45 @@ onUnmounted(() => {
 .shield-icon::before {
   content: "";
   position: absolute;
-  left: 24px;
-  top: 18px;
-  width: 28px;
-  height: 34px;
-  border: 4px solid currentColor;
+  left: 18px;
+  top: 12px;
+  width: 20px;
+  height: 24px;
+  border: 3px solid currentColor;
   border-radius: 8px 8px 14px 14px;
   clip-path: polygon(50% 0, 100% 18%, 100% 62%, 50% 100%, 0 62%, 0 18%);
 }
 .shield-icon::after {
   content: "";
   position: absolute;
-  left: 32px;
-  top: 34px;
-  width: 15px;
-  height: 8px;
-  border-left: 4px solid currentColor;
-  border-bottom: 4px solid currentColor;
+  left: 24px;
+  top: 24px;
+  width: 10px;
+  height: 6px;
+  border-left: 3px solid currentColor;
+  border-bottom: 3px solid currentColor;
   transform: rotate(-45deg);
 }
 .cert-days {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: 6px;
+  margin-bottom: 4px;
   color: #0f172a;
 }
 .cert-days b {
-  font-size: 36px;
+  font-size: 28px;
   line-height: 1;
 }
 .cert-days span {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 750;
 }
 .dashboard-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(520px, .98fr);
+  grid-template-columns: minmax(0, 2fr) minmax(420px, 1fr);
   grid-template-rows: 1fr;
-  gap: 16px;
+  gap: 12px;
   min-height: 0;
   height: 100%;
   overflow: hidden;
@@ -758,16 +754,16 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 18px 22px 8px;
+  padding: 14px 16px 6px;
 }
 .card-head .section-title {
-  font-size: 20px;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 650;
 }
 .trend-chart {
   flex: 1;
   min-height: 0;
-  padding: 0 14px 18px;
+  padding: 0 8px 8px;
 }
 .top5-block { display: grid; grid-template-rows: auto 1fr; min-height: 0; height: 100%; }
 .chip {
@@ -782,7 +778,7 @@ onUnmounted(() => {
   min-height: 0;
   height: 100%;
   overflow: auto;
-  padding: 0 16px 16px;
+  padding: 0 12px 10px;
 }
 .top5-table {
   width: 100%;
@@ -791,37 +787,37 @@ onUnmounted(() => {
 }
 .top5-table th,
 .top5-table td {
-  height: 54px;
-  padding: 10px 8px;
+  height: 46px;
+  padding: 8px 8px;
   border-bottom: 1px solid #dfe7f1;
-  font-size: 14px;
+  font-size: 13px;
   text-align: left;
 }
 .top5-table th {
   position: sticky;
   top: 0;
   z-index: 1;
-  height: 42px;
+  height: 38px;
   background: #fff;
-  font-size: 14px;
-  font-weight: 750;
+  font-size: 13px;
+  font-weight: 650;
   color: #334155;
 }
 .top5-table tbody tr:hover td {
   background: #f8fafc;
 }
 .col-rank { width: 54px; }
-.col-type { width: 76px; }
+.col-type { width: 68px; }
 .col-name { width: auto; }
-.col-num { width: 104px; text-align: right !important; }
+.col-num { width: 88px; text-align: right !important; }
 .top5-table .col-rank b,
 .top5-table .col-num b {
   color: #0f172a;
-  font-size: 15px;
+  font-size: 13px;
 }
 .top5-table .col-name code {
   display: block;
-  width: 136px;
+  width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -830,7 +826,7 @@ onUnmounted(() => {
   border-radius: 5px;
   background: linear-gradient(90deg, #f1f5f9, #eef2f7);
   color: #0f172a;
-  font-size: 14px;
+  font-size: 12px;
 }
 .log-modal-mask {
   position: fixed;

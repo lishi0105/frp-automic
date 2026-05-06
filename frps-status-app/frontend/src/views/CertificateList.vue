@@ -20,29 +20,10 @@
           <div class="text-muted text-sm">共 {{ certs.length }} 张证书，{{ warnCount }} 张临期，{{ failCount }} 张异常</div>
         </div>
         <div class="analytics-overview-metrics">
-          <div><b>{{ okCount }}</b><span>/ {{ certs.length }}</span><small>正常证书</small></div>
+          <div class="metric-inline"><b>{{ okCount }}</b><span>/ {{ certs.length }}</span><small>正常证书</small></div>
           <div><b>{{ warnCount }}</b><small>15天内到期</small></div>
           <div><b>{{ minDaysLabel }}</b><small>最快过期</small></div>
         </div>
-      </section>
-
-      <section class="analytics-filters cert-filters-grid">
-        <input class="form-input" v-model="search" placeholder="搜索域名、关联代理" />
-        <select class="form-select" v-model="filterStatus">
-          <option value="">全部状态</option>
-          <option value="ok">有效</option>
-          <option value="warn">临期</option>
-          <option value="fail">异常</option>
-        </select>
-        <select class="form-select" v-model="filterDays">
-          <option value="">全部剩余天数</option>
-          <option value="lt7">少于 7 天</option>
-          <option value="lt15">少于 15 天</option>
-          <option value="ge15">15 天及以上</option>
-          <option value="unknown">未知</option>
-        </select>
-        <button class="btn btn-outline btn-sm" :class="{ 'btn-on': filterStatus === 'ok' }" @click="filterStatus = filterStatus === 'ok' ? '' : 'ok'">有效</button>
-        <button class="btn btn-outline btn-sm" :class="{ 'btn-on warn': filterStatus === 'warn' }" @click="filterStatus = filterStatus === 'warn' ? '' : 'warn'">临期</button>
       </section>
 
       <div class="proxy-main analytics-main-2col cert-main-custom">
@@ -134,9 +115,6 @@ import { fmtDate } from '../utils/format.js'
 const props = defineProps({ status: Object, loading: Boolean })
 defineEmits(['refresh'])
 
-const search = ref('')
-const filterStatus = ref('')
-const filterDays = ref('')
 const selected = ref(null)
 const page = ref(1)
 const pageSize = ref(10)
@@ -202,29 +180,8 @@ function daysText(days) {
   return `${days} 天`
 }
 
-const filtered = computed(() => certs.value.filter(c => {
-  if (search.value) {
-    const q = search.value.toLowerCase()
-    if (!c.domain.toLowerCase().includes(q) && !(c.relatedProxy || '').toLowerCase().includes(q)) return false
-  }
-  if (filterStatus.value) {
-    const t = certText(c).toLowerCase()
-    if (filterStatus.value === 'ok' && t !== 'ok') return false
-    if (filterStatus.value === 'warn' && t !== 'warn') return false
-    if (filterStatus.value === 'fail' && t !== 'fail') return false
-  }
-  if (filterDays.value) {
-    const d = c.days_left
-    if (filterDays.value === 'unknown' && d != null) return false
-    if (filterDays.value === 'lt7' && !(d != null && d < 7)) return false
-    if (filterDays.value === 'lt15' && !(d != null && d < 15)) return false
-    if (filterDays.value === 'ge15' && !(d != null && d >= 15)) return false
-  }
-  return true
-}))
-
 const sortedFiltered = computed(() => {
-  const list = [...filtered.value]
+  const list = [...certs.value]
   const sign = sortDir.value === 'asc' ? 1 : -1
   return list.sort((a, b) => {
     const da = a.days_left == null ? 99999 : Number(a.days_left)
@@ -282,11 +239,34 @@ watch(sortedFiltered, (arr) => {
   flex-direction: column;
   min-height: 0;
 }
-.cert-filters-grid {
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr) 130px 160px auto auto;
-  gap: 10px;
+.analytics-overview {
+  padding: 10px 14px;
+  gap: 12px;
   align-items: center;
+}
+.analytics-overview-metrics {
+  gap: 14px;
+}
+.analytics-overview-metrics > div {
+  gap: 0;
+}
+.analytics-overview-metrics b {
+  font-size: 18px;
+}
+.analytics-overview-metrics span {
+  font-size: 12px;
+}
+.analytics-overview-metrics small {
+  font-size: 11px;
+}
+.metric-inline {
+  display: flex !important;
+  align-items: baseline;
+  gap: 4px;
+}
+.metric-inline small {
+  margin-left: 6px;
+  white-space: nowrap;
 }
 .cert-main-custom {
   flex: 1;
@@ -313,8 +293,6 @@ watch(sortedFiltered, (arr) => {
 .table-wrap th { font-size: 12px; font-weight: 650; color: var(--text-2); padding: 11px 10px; }
 .table-wrap td { padding: 12px 10px; font-size: 13px; vertical-align: middle; }
 .table-wrap tbody tr:hover td, .selected td { background: var(--surface-2); }
-.btn-on { color: #bfdbfe; border-color: #1d4ed8; background: #172554; }
-.btn-on.warn { color: #fde68a; border-color: #92400e; background: #451a03; }
 .proxy-detail { display: grid; align-content: start; gap: 10px; min-height: 0; overflow: auto; }
 .detail-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
 .detail-row span { color: var(--text-2); font-size: 12px; }
@@ -334,7 +312,6 @@ watch(sortedFiltered, (arr) => {
 .page-num.active { color: #bfdbfe; border-color: #1d4ed8; background: #172554; }
 @media (max-width: 1200px) {
   .cert-page { flex: none; min-height: auto; }
-  .cert-filters-grid { grid-template-columns: 1fr 1fr 1fr; }
   .cert-main-custom { grid-template-columns: 1fr; }
   .table-scroll { max-height: 480px; }
   .proxy-detail { max-height: 520px; }
