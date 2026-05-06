@@ -16,6 +16,9 @@ type Config struct {
 	FRPSDashboardUser string
 	FRPSDashboardPass string
 	CertDir           string
+	HostPublicIP      string
+	HostIface         string
+	HostNetStatsDir   string
 	Domains           []string
 	StatusUser        string
 	StatusPassword    string
@@ -35,6 +38,9 @@ func Load() Config {
 		FRPSDashboardUser: frpsUser,
 		FRPSDashboardPass: frpsPass,
 		CertDir:           env("CERT_DIR", "/etc/letsencrypt/live"),
+		HostPublicIP:      env("HOST_PUBLIC_IP", ""),
+		HostIface:         env("HOST_IFACE", ""),
+		HostNetStatsDir:   env("HOST_NET_STATS_DIR", "/host-net-stats"),
 		Domains:           SplitCSV(os.Getenv("STATUS_DOMAINS")),
 		StatusUser:        env("STATUS_USER", frpsUser),
 		StatusPassword:    env("STATUS_PASSWORD", frpsPass),

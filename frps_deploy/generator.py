@@ -125,9 +125,13 @@ def generate_frps_compose(ctx: DeployContext) -> None:
       STATUS_PASSWORD: "{ctx.status_password}"
       CERT_DIR: "/etc/letsencrypt/live"
       POLL_SECONDS: "60"
+      HOST_PUBLIC_IP: "{ctx.vps_public_ip}"
+      HOST_IFACE: "{ctx.host_iface}"
+      HOST_NET_STATS_DIR: "/host-net-stats"
     volumes:
       - ./frps-status/data:/data
       - ./certbot/conf:/etc/letsencrypt:ro
+      - /sys/class/net/{ctx.host_iface}/statistics:/host-net-stats:ro
 """
 
     compose = f"""services:
@@ -420,6 +424,10 @@ def write_status_app_env(ctx: DeployContext) -> None:
         f"STATUS_PASSWORD={ctx.dashboard_password}",
         "CERT_DIR=/etc/letsencrypt/live",
         "POLL_SECONDS=60",
+        f"HOST_PUBLIC_IP={ctx.vps_public_ip}",
+        f"HOST_IFACE={ctx.host_iface}",
+        "HOST_NET_STATS_DIR=/host-net-stats",
+        f"HOST_NET_STATS_MOUNT=/sys/class/net/{ctx.host_iface}/statistics",
         f"FRPS_CERTBOT_CONF_DIR={CERTBOT_CONF_DIR}",
         "",
     ]

@@ -20,9 +20,13 @@ services:
       STATUS_PASSWORD: "${STATUS_PASSWORD:-}"
       CERT_DIR: "${CERT_DIR:-/etc/letsencrypt/live}"
       POLL_SECONDS: "${POLL_SECONDS:-60}"
+      HOST_PUBLIC_IP: "${HOST_PUBLIC_IP:-}"
+      HOST_IFACE: "${HOST_IFACE:-}"
+      HOST_NET_STATS_DIR: "${HOST_NET_STATS_DIR:-/host-net-stats}"
     volumes:
       - ./data:/data
       - ${FRPS_CERTBOT_CONF_DIR:-../frps/certbot/conf}:/etc/letsencrypt:ro
+      - ${HOST_NET_STATS_MOUNT:-/sys/class/net/eth0/statistics}:/host-net-stats:ro
     networks:
       - frps_net
 

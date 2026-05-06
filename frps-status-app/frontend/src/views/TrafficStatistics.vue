@@ -3,6 +3,7 @@
     <div class="page-header">
       <div>
         <div class="page-title">流量统计</div>
+        <div class="page-sub">公网IP：{{ currentPublicIP || '-' }} · 网卡：{{ currentIface || '-' }}</div>
       </div>
       <div class="flex-center">
         <button class="btn btn-outline btn-sm" :disabled="loadingData" @click="fetchRows">↻ 刷新</button>
@@ -13,7 +14,7 @@
       <section class="analytics-overview">
         <div>
           <div class="section-title">所选时间范围</div>
-          <div class="text-muted text-sm">{{ startDate }} 至 {{ endDate }}</div>
+          <div class="text-muted text-sm">{{ startDate }} 至 {{ endDate }} · {{ currentPublicIP || '-' }} / {{ currentIface || '-' }}</div>
         </div>
         <div class="analytics-overview-metrics">
           <div><b>{{ humanBytesKB(totalRxKB) }}</b><small>上行</small></div>
@@ -26,7 +27,6 @@
         <div class="analytics-filter-grid traffic-filter-grid">
           <input class="form-input" type="date" v-model="startDate" />
           <input class="form-input" type="date" v-model="endDate" />
-          <input class="form-input" v-model.trim="ipKeyword" placeholder="公网IP筛选（可选）" />
           <button class="btn btn-outline btn-sm" @click="quickThisMonth">本月</button>
           <button class="btn btn-outline btn-sm" @click="fetchRows">查询</button>
         </div>
@@ -88,7 +88,8 @@ const loadingData = ref(false)
 const rows = ref([])
 const page = ref(1)
 const PAGE_SIZE = 15
-const ipKeyword = ref('')
+const hostPublicIP = ref('')
+const hostIface = ref('')
 
 const startDate = ref('')
 const endDate = ref('')
@@ -129,11 +130,23 @@ async function fetchRows() {
   }
 }
 
-const filteredRows = computed(() => {
-  const keyword = ipKeyword.value.trim().toLowerCase()
-  const list = rows.value.filter(r => !keyword || String(r.public_ip || '').toLowerCase().includes(keyword))
-  return list.sort((a, b) => (a.day === b.day ? String(a.iface).localeCompare(String(b.iface)) : b.day.localeCompare(a.day)))
-})
+async function fetchHostNetwork() {
+  try {
+    const info = await api.getHostNetwork()
+    hostPublicIP.value = info?.public_ip || ''
+    hostIface.value = info?.iface || ''
+  } catch {
+    hostPublicIP.value = ''
+    hostIface.value = ''
+  }
+}
+
+const currentPublicIP = computed(() => hostPublicIP.value || rows.value[0]?.public_ip || '')
+const currentIface = computed(() => hostIface.value || rows.value[0]?.iface || '')
+const filteredRows = computed(() =>
+  rows.value
+    .slice()
+    .sort((a, b) => (a.day === b.day ? String(a.iface).localeCompare(String(b.iface)) : b.day.localeCompare(a.day))))
 
 const totalRxKB = computed(() => filteredRows.value.reduce((s, r) => s + Number(r.rx_kb || 0), 0))
 const totalTxKB = computed(() => filteredRows.value.reduce((s, r) => s + Number(r.tx_kb || 0), 0))
@@ -194,6 +207,7 @@ const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => char
 
 onMounted(async () => {
   quickThisMonth()
+  await fetchHostNetwork()
   await fetchRows()
   await nextTick()
   chart = echarts.init(chartEl.value)
@@ -220,7 +234,7 @@ onUnmounted(() => {
   min-height: 0;
   overflow: hidden;
 }
-.traffic-filter-grid { grid-template-columns: 150px 150px minmax(220px, 1fr) auto auto; }
+.traffic-filter-grid { grid-template-columns: 150px 150px auto auto; }
 .stats-main {
   flex: 1;
   grid-template-columns: 3fr 2fr;

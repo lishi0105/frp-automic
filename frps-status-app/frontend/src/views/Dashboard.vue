@@ -23,6 +23,7 @@
             <div>
               <div class="service-status"><i class="status-dot" :class="bindOk ? 'ok' : 'bad'"></i>{{ bindOk ? '在线' : '离线' }}</div>
               <div class="summary-sub">{{ bindLatency }}ms · Dashboard {{ dashOk ? dashLatency + 'ms' : '离线' }}</div>
+              <div class="summary-sub">公网IP {{ hostPublicIP || '-' }} · 网卡 {{ hostIface || '-' }}</div>
             </div>
           </div>
         </section>
@@ -245,6 +246,8 @@ const logMeta = computed(() => {
   if (!logPath.value) return '当前日志文件'
   return `${logPath.value} · ${humanBytes(logSize.value)}`
 })
+const hostPublicIP = ref('')
+const hostIface = ref('')
 const ifaceMonthInKB = ref(0)
 const ifaceMonthOutKB = ref(0)
 
@@ -463,8 +466,20 @@ async function loadIfaceMonthSummary() {
   }
 }
 
+async function loadHostNetwork() {
+  try {
+    const info = await api.getHostNetwork()
+    hostPublicIP.value = info?.public_ip || ''
+    hostIface.value = info?.iface || ''
+  } catch {
+    hostPublicIP.value = ''
+    hostIface.value = ''
+  }
+}
+
 watch(() => props.daily, (d) => buildChart(d))
 watch(() => props.status?.generated_at, () => {
+  loadHostNetwork()
   loadIfaceMonthSummary()
 })
 const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => chart?.resize()) : null
@@ -473,6 +488,7 @@ onMounted(async () => {
   await nextTick()
   chart = echarts.init(chartEl.value)
   if (props.daily?.length) buildChart(props.daily)
+  loadHostNetwork()
   loadIfaceMonthSummary()
   ro?.observe(chartEl.value)
 })

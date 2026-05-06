@@ -90,3 +90,45 @@ def get_public_ip() -> str:
         except Exception:
             continue
     raise RuntimeError("无法自动获取 VPS 公网 IP，请在 frps-config.json 中填写 vps_public_ip")
+
+
+def get_iface_by_ip(ip: str) -> str:
+    """
+    Resolve host interface name by IPv4 address.
+    Prefer `ip route get <ip>` output, fallback to `ip -o -4 addr show`.
+    """
+    try:
+        ret = subprocess.run(
+            ["ip", "route", "get", ip],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if ret.returncode == 0:
+            parts = ret.stdout.strip().split()
+            if "dev" in parts:
+                idx = parts.index("dev")
+                if idx + 1 < len(parts):
+                    iface = parts[idx + 1].strip()
+                    if iface:
+                        return iface
+    except Exception:
+        pass
+
+    ret = subprocess.run(
+        ["ip", "-o", "-4", "addr", "show"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if ret.returncode != 0:
+        raise RuntimeError(f"无法识别公网IP对应网卡（ip -o -4 addr show 执行失败）：{ret.stderr.strip()}")
+    for line in ret.stdout.splitlines():
+        # Example: 2: eth0    inet 1.2.3.4/24 brd ...
+        cols = line.split()
+        if len(cols) >= 4 and cols[2] == "inet":
+            iface = cols[1]
+            addr = cols[3].split("/")[0]
+            if addr == ip:
+                return iface
+    raise RuntimeError(f"无法识别公网IP对应网卡：{ip}")

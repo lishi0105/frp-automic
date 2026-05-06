@@ -31,6 +31,7 @@ export const api = {
   logout: () => post('api/logout'),
   getSession: () => request('api/session'),
   getStatus: () => request('api/status'),
+  getHostNetwork: () => request('api/host-network'),
   getProxies: (params) => request(withQuery('api/proxies', params)),
   getCertificates: (params) => request(withQuery('api/certificates', params)),
   getDaily: () => request('api/daily'),

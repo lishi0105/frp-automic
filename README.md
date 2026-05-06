@@ -104,11 +104,9 @@ frps/
 frpc/
   docker-compose.yml
   frpc.toml
-frps-status-app/.env
-frps-status-app/data/
 ```
 
-将 `frpc/` 目录复制到内网机器，运行 `docker compose up -d` 即可连接。
+将 `frpc/` 目录复制到需要做内网穿透的机器，运行 `docker compose up -d` 即可连接。
 
 ### 3. 访问方式
 
@@ -157,9 +155,11 @@ https://frps.<root_domain>
 
 | 页面 | 内容 |
 |------|------|
-| 数据看板 | frps 在线状态、本月流量进度条、证书预警、代理统计、30 天趋势图 |
-| 代理列表 | 代理在线状态、连接数、月度流量，支持搜索与过滤 |
-| 历史统计 | 每日流量明细、本月 Top 5、趋势柱状图、导出 CSV |
+| 数据看板 | frps 在线状态、本月流量与网卡流量汇总、证书预警、代理统计、本月趋势图 |
+| 代理列表 | 代理在线状态、连接数、月度流量、证书关联，后端分页/排序/筛选 |
+| 证书列表 | 证书有效期、剩余天数、公网 TLS 握手状态、关联代理与异常信息 |
+| 历史统计 | 每日流量明细、本月 Top 5、趋势折线图、导出 CSV |
+| 流量统计 | 公网 IP/网卡维度日流量汇总，支持按日期查询上行、下行与总量趋势 |
 | 系统配置 | SMTP 告警（含测试发送）、流量阈值、数据库压缩与清理 |
 
 ### 环境变量
@@ -187,10 +187,15 @@ cp .env.example .env
 | `STATUS_PASSWORD` | — | 面板登录密码 |
 | `CERT_DIR` | `/etc/letsencrypt/live` | 证书目录 |
 | `POLL_SECONDS` | `60` | 数据轮询间隔（秒） |
+| `HOST_PUBLIC_IP` | — | 宿主机公网 IPv4（用于网卡流量统计；部署脚本会自动写入） |
+| `HOST_IFACE` | — | 公网 IP 对应网卡名（如 `eth0`，部署脚本会自动写入） |
+| `HOST_NET_STATS_DIR` | `/host-net-stats` | 容器内网卡统计目录 |
+| `HOST_NET_STATS_MOUNT` | `/sys/class/net/eth0/statistics` | 宿主机映射路径（手动部署时需按实际网卡调整） |
 
 ### Docker 部署（推荐）
 
 通常由 `vps-install-frps.py --run` 自动写入 `.env` 并启动。状态服务默认加入 `frps_default` Docker 网络，供 Nginx 通过容器内网反代；单独部署前需确保 frps 侧 compose 已启动并创建该网络。
+为采集宿主机网卡日流量，部署脚本会自动识别公网 IP 对应网卡并将其统计目录只读挂载到容器（`/host-net-stats`）。
 
 单独部署时：
 
@@ -228,15 +233,21 @@ npm run build  # 输出至 ../web/
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
+| POST | `/api/login` | 面板登录 |
+| POST | `/api/logout` | 退出登录 |
+| GET | `/api/session` | 会话状态 |
 | GET | `/api/status` | 完整快照（frps、代理、证书、流量） |
+| GET | `/api/proxies` | 代理分页列表（`page/page_size/sort/order/keyword/type/online`） |
+| GET | `/api/certificates` | 证书分页列表（`page/page_size/sort/order/keyword/status/tls`） |
 | GET | `/api/daily` | 每日流量明细 |
+| GET | `/api/daily/interface` | 网卡/公网IP维度日流量（`from/to`） |
 | GET | `/api/daily/export` | 导出 CSV |
 | GET/POST | `/api/settings` | 读取 / 保存配置 |
 | POST | `/api/settings/test-email` | 发送测试邮件 |
 | POST | `/api/db/vacuum` | SQLite VACUUM |
 | POST | `/api/db/purge` | 清理旧数据 `{"days": 60}` |
 
-所有接口均使用 HTTP Basic Auth（与面板登录凭据相同）。
+除 `/api/login`、`/api/session`、`/api/user/forgot-password` 外，其余接口需要登录态（会话 Cookie）。
 
 ---
 
@@ -253,7 +264,7 @@ frp-automic/
 │   ├── .env.example
 │   ├── frontend/             # Vue 3 + Vite 源码
 │   │   └── src/
-│   │       ├── views/        # Dashboard / ProxyList / Statistics / Settings
+│   │       ├── views/        # Dashboard / ProxyList / CertificateList / Statistics / TrafficStatistics / Settings / Login
 │   │       ├── api/          # API 封装
 │   │       └── utils/        # 格式化工具
 │   ├── src/                  # Go 包

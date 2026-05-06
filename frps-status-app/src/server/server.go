@@ -59,6 +59,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/api/user/recovery-email", a.withAuth(a.handleChangeRecoveryEmail))
 	mux.HandleFunc("/api/warnings", a.withAuth(a.handleWarnings))
 	mux.HandleFunc("/api/status", a.withAuth(a.handleStatus))
+	mux.HandleFunc("/api/host-network", a.withAuth(a.handleHostNetwork))
 	mux.HandleFunc("/api/proxies", a.withAuth(a.handleProxies))
 	mux.HandleFunc("/api/certificates", a.withAuth(a.handleCertificates))
 	mux.HandleFunc("/api/daily", a.withAuth(a.handleDaily))
@@ -138,21 +139,32 @@ func (a *App) Refresh(ctx context.Context) error {
 }
 
 func (a *App) collectInterfaceTraffic() {
-	publicIP, err := detectOutboundPublicIP()
-	if err != nil || publicIP == "" {
-		if err != nil {
-			logger.Warn("识别公网出口IP失败: %v", err)
+	publicIP := strings.TrimSpace(a.cfg.HostPublicIP)
+	iface := strings.TrimSpace(a.cfg.HostIface)
+
+	if publicIP == "" {
+		detectedIP, err := detectOutboundPublicIP()
+		if err != nil || detectedIP == "" {
+			if err != nil {
+				logger.Warn("识别公网出口IP失败: %v", err)
+			}
+			return
 		}
-		return
+		publicIP = detectedIP
 	}
-	iface, err := interfaceByIP(publicIP)
-	if err != nil || iface == "" {
-		if err != nil {
-			logger.Warn("根据公网IP匹配网卡失败 IP=%s 错误=%v", publicIP, err)
+
+	if iface == "" {
+		detectedIface, err := interfaceByIP(publicIP)
+		if err != nil || detectedIface == "" {
+			if err != nil {
+				logger.Warn("根据公网IP匹配网卡失败 IP=%s 错误=%v", publicIP, err)
+			}
+			return
 		}
-		return
+		iface = detectedIface
 	}
-	rxBytes, txBytes, err := readInterfaceCounters(iface)
+
+	rxBytes, txBytes, err := readInterfaceCounters(a.cfg.HostNetStatsDir, iface)
 	if err != nil {
 		logger.Warn("读取网卡计数失败 网卡=%s 错误=%v", iface, err)
 		return
@@ -903,6 +915,32 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s)
 }
 
+func (a *App) handleHostNetwork(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	publicIP := strings.TrimSpace(a.cfg.HostPublicIP)
+	iface := strings.TrimSpace(a.cfg.HostIface)
+
+	if publicIP == "" {
+		ip, err := detectOutboundPublicIP()
+		if err == nil {
+			publicIP = ip
+		}
+	}
+	if iface == "" && publicIP != "" {
+		name, err := interfaceByIP(publicIP)
+		if err == nil {
+			iface = name
+		}
+	}
+	writeJSON(w, map[string]any{
+		"public_ip": publicIP,
+		"iface":     iface,
+	})
+}
+
 func (a *App) handleProxies(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -1280,8 +1318,15 @@ func interfaceByIP(ipStr string) (string, error) {
 	return "", errors.New("no interface bound with ip")
 }
 
-func readInterfaceCounters(iface string) (uint64, uint64, error) {
-	base := filepath.Join("/sys/class/net", iface, "statistics")
+func readInterfaceCounters(statsDir, iface string) (uint64, uint64, error) {
+	base := strings.TrimSpace(statsDir)
+	if base == "" {
+		base = "/host-net-stats"
+	}
+	// Backward compatible fallback: if mounted path is not available, read host sysfs directly.
+	if _, err := os.Stat(base); err != nil {
+		base = filepath.Join("/sys/class/net", iface, "statistics")
+	}
 	rxRaw, err := os.ReadFile(filepath.Join(base, "rx_bytes"))
 	if err != nil {
 		return 0, 0, err
