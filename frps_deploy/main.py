@@ -134,6 +134,8 @@ def build_context(root_domain: str, email: str) -> DeployContext:
         token=config.FRPS_TOKEN or random_password(32),
         dashboard_user="admin",
         dashboard_password=random_password(16),
+        status_user=config.STATUS_APP_USER,
+        status_password=config.STATUS_APP_PASSWORD,
         suffix=random_letters(16),
     )
 

@@ -25,9 +25,11 @@ VPS_PUBLIC_IP = ""
 FRPS_SERVER_PORT   = 0
 FRPS_TOKEN         = ""
 FRPS_DASHBOARD_HTTP = False
-STATUS_APP_ENABLED = True
-STATUS_APP_PORT    = 0
-STATUS_APP_HTTP    = False
+STATUS_APP_ENABLED   = True
+STATUS_APP_PORT      = 0
+STATUS_APP_HTTP      = False
+STATUS_APP_USER      = "admin"
+STATUS_APP_PASSWORD  = "admin123"
 
 
 def clone_default_config() -> Dict[str, Any]:
@@ -75,7 +77,7 @@ def _bool_config(value: Any, default: bool = False) -> bool:
 
 
 def load_runtime_config() -> None:
-    global CONFIG, SERVICES, ROOT_DOMAIN, CERT_EMAIL, VPS_PUBLIC_IP, FRPS_SERVER_PORT, FRPS_TOKEN, FRPS_DASHBOARD_HTTP, STATUS_APP_ENABLED, STATUS_APP_PORT, STATUS_APP_HTTP
+    global CONFIG, SERVICES, ROOT_DOMAIN, CERT_EMAIL, VPS_PUBLIC_IP, FRPS_SERVER_PORT, FRPS_TOKEN, FRPS_DASHBOARD_HTTP, STATUS_APP_ENABLED, STATUS_APP_PORT, STATUS_APP_HTTP, STATUS_APP_USER, STATUS_APP_PASSWORD
 
     CONFIG = load_config_file()
 
@@ -112,3 +114,5 @@ def load_runtime_config() -> None:
     except (TypeError, ValueError) as exc:
         raise ValueError(f"status.port 必须是整数：{raw_status_port!r}") from exc
     STATUS_APP_HTTP = _bool_config(status_config.get("http", False), default=False)
+    STATUS_APP_USER     = str(status_config.get("user") or "admin").strip() or "admin"
+    STATUS_APP_PASSWORD = str(status_config.get("password") or "admin123").strip() or "admin123"

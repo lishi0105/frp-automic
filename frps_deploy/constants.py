@@ -47,6 +47,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "enabled": True,
         "port": 0,
         "http": False,
+        "user": "admin",
+        "password": "admin123",
     },
     "services": DEFAULT_SERVICES,
 }

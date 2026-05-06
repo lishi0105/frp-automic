@@ -55,6 +55,8 @@ def print_result(ctx: DeployContext) -> None:
         else:
             print(f"  http://127.0.0.1:{ctx.status_port}  （仅本机）")
         print(f"  https://{status_domain(ctx.root_domain)}")
+        print(f"  user     = {ctx.status_user}")
+        print(f"  password = {ctx.status_password}")
 
     if tcp_services():
         print("\nTCP 直通端口：")

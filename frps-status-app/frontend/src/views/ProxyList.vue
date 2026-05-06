@@ -156,11 +156,15 @@
           <div class="text-muted text-sm" v-if="selectedProxy">{{ selectedProxy.name }} · {{ selectedProxy.type }}</div>
           <div class="text-muted text-sm" v-else>未选择代理</div>
           <template v-if="selectedProxy">
-            <div class="detail-row"><span>在线状态</span><b :class="selectedProxy.online ? 'ok-t' : 'bad-t'">{{ selectedProxy.online ? '在线' : '离线' }}</b></div>
-            <div class="detail-row"><span>最近心跳</span><b>{{ selectedProxy.online ? '正常' : '中断' }}</b></div>
+            <div class="detail-pair">
+              <div class="detail-row"><span>在线状态</span><b :class="selectedProxy.online ? 'ok-t' : 'bad-t'">{{ selectedProxy.online ? '在线' : '离线' }}</b></div>
+              <div class="detail-row"><span>最近心跳</span><b>{{ selectedProxy.online ? '正常' : '中断' }}</b></div>
+            </div>
             <div class="detail-row"><span>当前连接</span><b>{{ selectedProxy.cur_conns }}</b></div>
-            <div class="detail-row"><span>上行</span><b>{{ humanBytes(selectedProxy.month_in) }}</b></div>
-            <div class="detail-row"><span>下行</span><b>{{ humanBytes(selectedProxy.month_out) }}</b></div>
+            <div class="detail-pair">
+              <div class="detail-row"><span>上行</span><b>{{ humanBytes(selectedProxy.month_in) }}</b></div>
+              <div class="detail-row"><span>下行</span><b>{{ humanBytes(selectedProxy.month_out) }}</b></div>
+            </div>
             <div class="detail-row"><span>总流量</span><b>{{ humanBytes(selectedProxy.month_in + selectedProxy.month_out) }}</b></div>
             <div class="detail-progress">
               <div class="in" :style="{ width: selectedTotal ? ((selectedProxy.month_in / selectedTotal) * 100).toFixed(1) + '%' : '0%' }"></div>
@@ -465,32 +469,43 @@ watch(sortedFiltered, (arr) => {
   background: #172554;
 }
 .selected td { background: var(--surface-2); }
-.proxy-detail { display: grid; align-content: start; gap: 10px; }
+.proxy-detail { display: grid; align-content: start; gap: 8px; }
 .proxy-detail {
   min-height: 0;
-  overflow: auto;
+  overflow: visible;
 }
-.detail-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.detail-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 14px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+.detail-pair .detail-row {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.detail-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
 .detail-row span { color: var(--text-2); font-size: 12px; }
-.detail-row b { font-size: 13px; }
+.detail-row b { font-size: 13px; white-space: nowrap; }
 .ok-t { color: var(--success); }
 .bad-t { color: var(--danger); }
 .detail-progress { display: flex; height: 8px; border-radius: 8px; overflow: hidden; background: var(--border); }
 .detail-progress .in { background: #2563eb; }
 .detail-progress .out { background: #10b981; }
-.detail-legend { display: flex; gap: 14px; color: var(--text-2); font-size: 12px; }
+.detail-legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--text-2); font-size: 12px; }
 .detail-legend .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
 .detail-legend .dot.in { background: #2563eb; }
 .detail-legend .dot.out { background: #10b981; }
-.detail-cert-title { margin-top: 6px; font-size: 13px; font-weight: 600; }
-.detail-certs { display: grid; gap: 8px; }
+.detail-cert-title { margin-top: 2px; font-size: 13px; font-weight: 600; }
+.detail-certs { display: grid; gap: 6px; }
 .cert-item {
   display: flex;
   justify-content: space-between;
   gap: 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 7px 9px;
 }
 .cert-item code {
   font-size: 12px;

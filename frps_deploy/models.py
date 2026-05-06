@@ -16,4 +16,6 @@ class DeployContext:
     token: str
     dashboard_user: str
     dashboard_password: str
+    status_user: str
+    status_password: str
     suffix: str

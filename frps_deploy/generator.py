@@ -121,8 +121,8 @@ def generate_frps_compose(ctx: DeployContext) -> None:
       FRPS_DASHBOARD_USER: "{ctx.dashboard_user}"
       FRPS_DASHBOARD_PASSWORD: "{ctx.dashboard_password}"
       STATUS_DOMAINS: "{domains_str}"
-      STATUS_USER: "{ctx.dashboard_user}"
-      STATUS_PASSWORD: "{ctx.dashboard_password}"
+      STATUS_USER: "{ctx.status_user}"
+      STATUS_PASSWORD: "{ctx.status_password}"
       CERT_DIR: "/etc/letsencrypt/live"
       POLL_SECONDS: "60"
     volumes:

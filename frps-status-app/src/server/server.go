@@ -98,6 +98,7 @@ func (a *App) Refresh(ctx context.Context) error {
 	settings, _ := a.store.PublicSettings()
 	monthIn, monthOut, _ := a.store.MonthTotals(month)
 	certs := frps.Certificates(a.cfg.CertDir, a.cfg.Domains)
+	inferProxyCertificateDomains(proxies, certs)
 	_ = a.checkAlerts(settings, month, monthIn, monthOut)
 	if fetchErr == nil {
 		a.checkProxyAlerts(settings, proxies)
@@ -128,6 +129,65 @@ func (a *App) Refresh(ctx context.Context) error {
 	a.latest = s
 	a.mu.Unlock()
 	return fetchErr
+}
+
+func inferProxyCertificateDomains(proxies []model.ProxyTraffic, certs []model.CertStatus) {
+	certDomainsByAlias := make(map[string][]string, len(certs))
+	for _, cert := range certs {
+		domain := strings.TrimSpace(strings.ToLower(cert.Domain))
+		if domain == "" {
+			continue
+		}
+		alias := domain
+		if dot := strings.IndexByte(domain, '.'); dot >= 0 {
+			alias = domain[:dot]
+		}
+		for _, key := range aliasMatchKeys(alias) {
+			certDomainsByAlias[key] = append(certDomainsByAlias[key], domain)
+		}
+	}
+
+	for i := range proxies {
+		seen := make(map[string]struct{}, len(proxies[i].Domains))
+		for _, domain := range proxies[i].Domains {
+			domain = strings.TrimSpace(strings.ToLower(domain))
+			if domain == "" {
+				continue
+			}
+			seen[domain] = struct{}{}
+		}
+		for _, key := range aliasMatchKeys(proxies[i].Name) {
+			for _, domain := range certDomainsByAlias[key] {
+				seen[domain] = struct{}{}
+			}
+		}
+		if len(seen) == 0 {
+			continue
+		}
+		domains := make([]string, 0, len(seen))
+		for domain := range seen {
+			domains = append(domains, domain)
+		}
+		sort.Strings(domains)
+		proxies[i].Domains = domains
+	}
+}
+
+func aliasMatchKeys(alias string) []string {
+	alias = strings.TrimSpace(strings.ToLower(alias))
+	if alias == "" {
+		return nil
+	}
+	keys := []string{alias}
+	hyphen := strings.ReplaceAll(alias, "_", "-")
+	if hyphen != alias {
+		keys = append(keys, hyphen)
+	}
+	underscore := strings.ReplaceAll(alias, "-", "_")
+	if underscore != alias && underscore != hyphen {
+		keys = append(keys, underscore)
+	}
+	return keys
 }
 
 func buildTopProxies(proxies []model.ProxyTraffic, limit int) []model.DashboardTopProxy {
