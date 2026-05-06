@@ -8,7 +8,7 @@ import urllib.request
 
 from frps_deploy.console import print, eprint
 from frps_deploy.constants import DEFAULT_FRP_VERSION
-from frps_deploy.utils import capture, command_exists, is_port_free
+from frps_deploy.utils import command_exists, is_port_free
 
 
 def check_docker_compose() -> None:
@@ -43,60 +43,11 @@ def check_docker_permission() -> None:
     print("Docker 权限检查通过。")
 
 
-def _ufw_allows_tcp_port(port: int) -> bool | None:
-    if not command_exists("ufw"):
-        return None
-    ret = capture(["ufw", "status"], check=False)
-    output = f"{ret.stdout}\n{ret.stderr}"
-    if "Status: inactive" in output:
-        return True
-    if "Status: active" not in output:
-        return None
-    for line in output.splitlines():
-        if "ALLOW" not in line.upper():
-            continue
-        fields = line.split()
-        if not fields:
-            continue
-        rule = fields[0].lower()
-        if rule in {str(port), f"{port}/tcp"}:
-            return True
-    return False
-
-
-def _firewalld_allows_tcp_port(port: int) -> bool | None:
-    if not command_exists("firewall-cmd"):
-        return None
-    state = capture(["firewall-cmd", "--state"], check=False)
-    if state.returncode != 0 or state.stdout.strip() != "running":
-        return None
-    ret = capture(["firewall-cmd", "--quiet", f"--query-port={port}/tcp"], check=False)
-    return ret.returncode == 0
-
-
 def check_frps_server_port(port: int) -> None:
     if not is_port_free(port, host="127.0.0.1"):
         eprint(f"错误：frps server_port {port}/tcp 已被本机占用，Docker 将无法绑定该端口。")
         eprint("请更换 frps.server_port，或停止占用该端口的服务后重试。")
         sys.exit(1)
-
-    ufw_allowed = _ufw_allows_tcp_port(port)
-    if ufw_allowed is False:
-        eprint(f"错误：检测到 ufw 已启用，但未放行 frps server_port：{port}/tcp。")
-        eprint(f"请先执行：sudo ufw allow {port}/tcp")
-        sys.exit(1)
-
-    firewalld_allowed = _firewalld_allows_tcp_port(port)
-    if firewalld_allowed is False:
-        eprint(f"错误：检测到 firewalld 已运行，但未放行 frps server_port：{port}/tcp。")
-        eprint(f"请先执行：sudo firewall-cmd --permanent --add-port={port}/tcp && sudo firewall-cmd --reload")
-        sys.exit(1)
-
-    if ufw_allowed is None and firewalld_allowed is None:
-        eprint(f"提示：未能自动确认本机防火墙是否放行 {port}/tcp。")
-        eprint("如使用云服务器，还需要在云厂商安全组中放行该 TCP 端口。")
-    else:
-        print(f"frps server_port {port}/tcp 本机防火墙检查通过。")
 
 
 def check_required_ports(frps_server_port: int) -> None:

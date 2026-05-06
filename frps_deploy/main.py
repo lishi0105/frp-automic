@@ -12,7 +12,7 @@ from frps_deploy.certs import (
 )
 from frps_deploy.clean import clean_all, stop_all
 from frps_deploy.config import ConfigFileCreated, load_runtime_config
-from frps_deploy.console import print, eprint, prompt_input
+from frps_deploy.console import print, eprint, prompt_input, COLOR_RED
 from frps_deploy.constants import BASE_DIR
 from frps_deploy.docker_env import (
     check_docker_compose, check_docker_permission, check_frps_server_port,
@@ -27,7 +27,10 @@ from frps_deploy.generator import (
 )
 from frps_deploy.models import DeployContext
 from frps_deploy.output import print_generate_only_result, print_proxy_only_result, print_result
-from frps_deploy.services import all_remote_ports, force_all_services_tcp, validate_services
+from frps_deploy.services import (
+    all_remote_ports, exposed_http_remote_ports, force_all_services_tcp,
+    tcp_remote_ports, validate_services,
+)
 from frps_deploy.utils import (
     random_free_port_excluding, random_letters, random_password, run,
     validate_ipv4,
@@ -156,6 +159,31 @@ def generate_files(
         generate_http_challenge_conf(ctx)
 
 
+def prompt_firewall_confirmation(ctx: DeployContext) -> None:
+    ports = [
+        ("80/tcp",  "Nginx HTTP"),
+        ("443/tcp", "Nginx HTTPS"),
+        (f"{ctx.bind_port}/tcp", "frps 客户端连接"),
+    ]
+    for p in tcp_remote_ports():
+        ports.append((f"{p}/tcp", "TCP 直通服务"))
+    for p in exposed_http_remote_ports():
+        ports.append((f"{p}/tcp", "HTTP 服务直通"))
+    if config.FRPS_DASHBOARD_HTTP:
+        ports.append((f"{ctx.dashboard_port}/tcp", "frps dashboard 公网访问"))
+    if config.STATUS_APP_ENABLED and config.STATUS_APP_HTTP:
+        ports.append((f"{ctx.status_port}/tcp", "状态页公网访问"))
+
+    print("\n以下端口需要在服务器防火墙/云安全组中放行：")
+    for port, desc in ports:
+        print(f"  {port:<16} # {desc}", color=COLOR_RED)
+
+    answer = prompt_input("\n确认已放行以上端口？继续部署请输入 y：")
+    if answer.strip().lower() != "y":
+        eprint("已取消部署。")
+        sys.exit(0)
+
+
 def apply_proxy_only(ctx: DeployContext) -> None:
     check_docker_compose()
     check_docker_permission()
@@ -213,6 +241,7 @@ def main() -> None:
     check_docker_compose()
     check_docker_permission()
     check_required_ports(ctx.bind_port)
+    prompt_firewall_confirmation(ctx)
 
     print("\n启动 frps + nginx，用于证书 HTTP 验证...")
     docker_compose_up_initial()
