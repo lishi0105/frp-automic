@@ -31,11 +31,10 @@ FRPS + Nginx + Certbot 一体化部署脚本
 - 可用 -c/--config 指定配置文件路径；
 - 配置文件不存在时只生成默认配置文件，然后退出。
 - 默认只生成相关配置文件，不启动容器、不申请证书；加 -r/--run 才执行部署启动流程。
-- 使用 -b/--build 时只编译 frps-status-app 的 Docker 镜像，不执行其他部署步骤。
 - 使用 -p/--proxy 时只更新/启动代理相关配置，不自动申请证书，所有服务强制按 TCP 代理处理。
 - 使用 -s/--stop 时停止所有已启动的 Docker Compose 服务，不删除文件或镜像。
-- 使用 --clean 时停止并删除所有生成的容器（status-app 本地镜像一并删除），先通过 docker alpine
-  容器将 frps/、frpc/、frps-status-app/data/ 的权限修改为 777，再删除这些目录以及 frps-status-app/.env。
+- 使用 --clean 时停止并删除所有生成的容器（frps-status 本地镜像一并删除），先通过 docker alpine
+  容器将 frps/、frpc/、frps-status-app/data/ 的权限修改为 777，再删除这些目录。
 """
 
 from frps_deploy.main import main

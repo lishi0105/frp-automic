@@ -3,25 +3,22 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 from frps_deploy.console import eprint, print
 from frps_deploy.constants import (
-    BASE_DIR, FRPC_BASE_DIR, FRPC_COMPOSE_FILE,
-    COMPOSE_FILE, STATUS_APP_DIR, STATUS_APP_DATA_DIR, STATUS_APP_ENV_FILE,
+    BASE_DIR, FRPC_BASE_DIR,
+    STATUS_APP_DATA_DIR, STATUS_APP_ENV_FILE,
 )
 
 
-def _compose_down(cwd: Path, rmi_local: bool = False) -> None:
+def _compose_down(cwd: Path) -> None:
     if not cwd.exists():
         return
     compose_file = cwd / "docker-compose.yml"
     if not compose_file.exists():
         return
     cmd = ["docker", "compose", "down"]
-    if rmi_local:
-        cmd += ["--rmi", "local"]
     print(f"\n$ {' '.join(cmd)}  (cwd={cwd})")
     subprocess.run(cmd, cwd=str(cwd), check=False)
 
@@ -66,8 +63,7 @@ def _remove_file(path: Path) -> None:
 def clean_all() -> None:
     print("=== 清理部署资源 ===")
 
-    # 1. 停止并删除容器（status-app 顺带删除本地构建镜像）
-    _compose_down(STATUS_APP_DIR, rmi_local=True)
+    # 1. 停止并删除容器
     _compose_down(BASE_DIR)
     _compose_down(FRPC_BASE_DIR)
 
@@ -86,7 +82,6 @@ def clean_all() -> None:
 
 def stop_all() -> None:
     print("=== 停止部署服务 ===")
-    _compose_down(STATUS_APP_DIR)
     _compose_down(BASE_DIR)
     _compose_down(FRPC_BASE_DIR)
     print("\n已停止所有已生成的 Docker Compose 服务。")

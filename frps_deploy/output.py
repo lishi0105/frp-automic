@@ -6,7 +6,6 @@ from frps_deploy.console import print
 from frps_deploy.constants import (
     BASE_DIR, COMPOSE_FILE, FRPC_BASE_DIR, FRPC_COMPOSE_FILE, FRPC_TOML_FILE,
     FRPS_TOML_FILE, GENERATED_INFO_FILE, NGINX_CONF_DIR,
-    STATUS_APP_DIR, STATUS_APP_ENV_FILE,
 )
 from frps_deploy.models import DeployContext
 from frps_deploy.services import (
@@ -83,8 +82,7 @@ def print_result(ctx: DeployContext) -> None:
     print(f"  cd {FRPC_BASE_DIR}")
     print("  docker compose up -d")
     if config.STATUS_APP_ENABLED:
-        print(f"  cd {STATUS_APP_DIR}")
-        print("  docker compose build && docker compose up -d")
+        print("  docker compose logs -f frps-status")
     print_frpc_config(ctx)
     print("\n注意：")
     print("1. http 模式服务只在 Docker 内部 expose 给 nginx，外网不能直接用 IP:端口访问。")
@@ -102,8 +100,6 @@ def print_generate_only_result(ctx: DeployContext) -> None:
     print(f"Docker Compose：{COMPOSE_FILE}")
     print(f"Nginx 配置目录：{NGINX_CONF_DIR}")
     if config.STATUS_APP_ENABLED:
-        print(f"状态服务工程：{STATUS_APP_DIR}")
-        print(f"状态服务环境：{STATUS_APP_ENV_FILE}")
         if config.STATUS_APP_HTTP:
             print(f"状态页 HTTP：http://{ctx.vps_public_ip}:{ctx.status_port}")
         else:

@@ -8,13 +8,12 @@ from pathlib import Path
 from frps_deploy import config
 from frps_deploy.certs import (
     docker_compose_up_all, docker_compose_up_initial,
-    docker_compose_up_status_app, docker_compose_restart_nginx,
-    issue_certs,
+    docker_compose_restart_nginx, issue_certs,
 )
 from frps_deploy.clean import clean_all, stop_all
 from frps_deploy.config import ConfigFileCreated, load_runtime_config
 from frps_deploy.console import print, eprint, prompt_input
-from frps_deploy.constants import BASE_DIR, STATUS_APP_DIR
+from frps_deploy.constants import BASE_DIR
 from frps_deploy.docker_env import (
     check_docker_compose, check_docker_permission, check_frps_server_port,
     check_required_ports,
@@ -24,7 +23,7 @@ from frps_deploy.generator import (
     ensure_dirs, generate_frpc_compose, generate_frpc_toml,
     generate_frps_compose, generate_frps_toml,
     generate_http_challenge_conf, generate_https_nginx_confs,
-    remove_https_confs, write_generated_info, write_status_app_env,
+    remove_https_confs, write_generated_info,
 )
 from frps_deploy.models import DeployContext
 from frps_deploy.output import print_generate_only_result, print_proxy_only_result, print_result
@@ -48,11 +47,6 @@ def parse_args() -> argparse.Namespace:
         help="生成相关文件后继续执行证书申请和容器启动；默认只生成文件",
     )
     parser.add_argument(
-        "-b", "--build",
-        action="store_true",
-        help="只编译 frps-status-app 的 Docker 镜像，不执行其他部署步骤",
-    )
-    parser.add_argument(
         "-p", "--proxy",
         action="store_true",
         help="只更新/启动代理相关配置，不自动申请证书；所有服务强制按 TCP 代理处理",
@@ -65,7 +59,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--clean",
         action="store_true",
-        help="清理生成的容器、本地镜像和文件夹（先通过 docker 修正权限再删除）",
+        help="清理生成的容器、本地镜像和文件夹（慎用！）",
     )
     return parser.parse_args()
 
@@ -156,9 +150,6 @@ def generate_files(
     generate_frpc_compose(ctx)
     print("写入部署信息记录...")
     write_generated_info(ctx)
-    if config.STATUS_APP_ENABLED:
-        print("写入 frps-status-app/.env...")
-        write_status_app_env(ctx)
     if include_challenge:
         print("\n生成临时 HTTP challenge 配置...")
         remove_https_confs()
@@ -172,21 +163,7 @@ def apply_proxy_only(ctx: DeployContext) -> None:
     print("\n启动/更新 frps 代理服务...")
     run(["docker", "compose", "up", "-d", "frps"], cwd=BASE_DIR)
     if config.STATUS_APP_ENABLED:
-        print("\n编译并启动状态服务工程...")
-        docker_compose_up_status_app()
-
-
-def build_status_app() -> None:
-    print("=== 编译 frps-status-app Docker 镜像 ===")
-    check_docker_compose()
-    check_docker_permission()
-    if not STATUS_APP_DIR.exists():
-        eprint(f"错误：未找到 frps-status-app 目录：{STATUS_APP_DIR}")
-        sys.exit(1)
-    run(["docker", "compose", "build"], cwd=STATUS_APP_DIR)
-    print(f"\n编译完成。启动容器请执行：")
-    print(f"  cd {STATUS_APP_DIR}")
-    print("  docker compose up -d")
+        run(["docker", "compose", "up", "-d", "frps-status"], cwd=BASE_DIR)
 
 
 def main() -> None:
@@ -198,10 +175,6 @@ def main() -> None:
 
     if args.stop:
         stop_all()
-        return
-
-    if args.build:
-        build_status_app()
         return
 
     print("=== FRPS + Nginx + Certbot 自动部署脚本 ===")
@@ -250,14 +223,10 @@ def main() -> None:
     print("\n生成正式 HTTPS Nginx 反代配置...")
     generate_https_nginx_confs(ctx)
 
-    if config.STATUS_APP_ENABLED:
-        print("\n编译并启动状态服务工程...")
-        docker_compose_up_status_app()
-
     print("\n重启 Nginx 应用 HTTPS 配置...")
     docker_compose_restart_nginx()
 
-    print("\n启动 certbot 自动续期容器...")
+    print("\n启动所有容器（含 certbot 续期、frps-status）...")
     docker_compose_up_all()
 
     print_result(ctx)

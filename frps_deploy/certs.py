@@ -7,7 +7,7 @@ import urllib.request
 from typing import Optional
 
 from frps_deploy.console import print
-from frps_deploy.constants import BASE_DIR, CERTBOT_WWW_DIR, STATUS_APP_DIR
+from frps_deploy.constants import BASE_DIR, CERTBOT_WWW_DIR
 from frps_deploy.models import DeployContext
 from frps_deploy.services import managed_domains
 from frps_deploy.utils import capture, run
@@ -121,6 +121,3 @@ def docker_compose_up_all() -> None:
     run(["docker", "compose", "up", "-d"], cwd=BASE_DIR)
 
 
-def docker_compose_up_status_app() -> None:
-    run(["docker", "compose", "build"], cwd=STATUS_APP_DIR)
-    run(["docker", "compose", "up", "-d"], cwd=STATUS_APP_DIR)

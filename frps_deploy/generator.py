@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from frps_deploy import config
-from frps_deploy.console import print
 from frps_deploy.constants import (
     CERTBOT_CONF_DIR, CERTBOT_WWW_DIR, COMPOSE_FILE, FRPC_BASE_DIR,
     FRPC_COMPOSE_FILE, FRPC_TOML_FILE, FRPS_TOML_FILE, GENERATED_INFO_FILE,
@@ -100,6 +99,37 @@ def generate_frps_compose(ctx: DeployContext) -> None:
         expose_lines = "\n".join(f'      - "{p}"' for p in http_remote_ports())
         expose_section = f"\n    expose:\n{expose_lines}"
 
+    status_section = ""
+    if config.STATUS_APP_ENABLED:
+        status_bind = "0.0.0.0" if config.STATUS_APP_HTTP else "127.0.0.1"
+        domains_str = ",".join(managed_domains(ctx.root_domain))
+        status_section = f"""
+  frps-status:
+    image: frps-status:latest
+    container_name: frps_status_{ctx.suffix}
+    restart: unless-stopped
+    depends_on:
+      - frps
+    ports:
+      - "{status_bind}:{ctx.status_port}:8080"
+    environment:
+      LISTEN: "0.0.0.0:8080"
+      DB_PATH: "/data/frps-status.sqlite"
+      FRPS_HOST: "frps"
+      FRPS_BIND_PORT: "{ctx.bind_port}"
+      FRPS_DASHBOARD_PORT: "{ctx.dashboard_port}"
+      FRPS_DASHBOARD_USER: "{ctx.dashboard_user}"
+      FRPS_DASHBOARD_PASSWORD: "{ctx.dashboard_password}"
+      STATUS_DOMAINS: "{domains_str}"
+      STATUS_USER: "{ctx.dashboard_user}"
+      STATUS_PASSWORD: "{ctx.dashboard_password}"
+      CERT_DIR: "/etc/letsencrypt/live"
+      POLL_SECONDS: "60"
+    volumes:
+      - ../frps-status-app/data:/data
+      - ./certbot/conf:/etc/letsencrypt:ro
+"""
+
     compose = f"""services:
   frps:
     image: fatedier/frps:{ctx.frp_version}
@@ -144,7 +174,7 @@ def generate_frps_compose(ctx: DeployContext) -> None:
         certbot renew --webroot -w /var/www/certbot --quiet;
         sleep 12h & wait $${{!}};
       done"
-"""
+{status_section}"""
     COMPOSE_FILE.write_text(compose, encoding="utf-8")
 
 
@@ -256,7 +286,7 @@ server {{
     client_max_body_size 0;
 
     location / {{
-        proxy_pass http://frps_status:8080;
+        proxy_pass http://frps-status:8080;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
