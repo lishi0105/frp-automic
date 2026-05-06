@@ -192,7 +192,6 @@ function buildChart() {
     chart.clear()
     return
   }
-  const isDark = true
   chart.setOption({
     backgroundColor: 'transparent',
     tooltip: {
@@ -202,13 +201,26 @@ function buildChart() {
         return `${d}<br/>${params.map(p => `${p.marker}${p.seriesName}: <b>${humanBytes(p.value)}</b>`).join('<br/>')}`
       }
     },
-    legend: { data: ['上行', '下行'], top: 0, textStyle: { color: isDark ? '#94a3b8' : '#475569' } },
-    grid: { left: 56, right: 20, top: 38, bottom: 38 },
-    xAxis: { type: 'category', data: days.map(d => d.day), axisLabel: { color: isDark ? '#94a3b8' : '#475569', fontSize: 11 } },
-    yAxis: { type: 'value', axisLabel: { color: isDark ? '#94a3b8' : '#475569', fontSize: 11, formatter: v => humanBytes(v) }, splitLine: { lineStyle: { color: isDark ? '#1e293b' : '#f1f5f9' } } },
+    legend: { data: ['上行', '下行'], top: 0, left: 'center', textStyle: { color: '#334155', fontSize: 13 }, itemWidth: 22, itemHeight: 10 },
+    grid: { left: 74, right: 22, top: 48, bottom: 42 },
+    xAxis: {
+      type: 'category',
+      data: days.map(d => d.day),
+      boundaryGap: false,
+      axisLabel: { color: '#64748b', fontSize: 12 },
+      axisLine: { lineStyle: { color: '#475569' } },
+      axisTick: { show: false }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#64748b', fontSize: 12, formatter: v => humanBytes(v) },
+      splitLine: { lineStyle: { color: '#dbe3ee', type: 'dashed' } },
+      axisLine: { show: false },
+      axisTick: { show: false }
+    },
     series: [
-      { name: '上行', type: 'line', smooth: true, data: days.map(d => d.in), itemStyle: { color: '#3b82f6' }, areaStyle: { color: 'rgba(59,130,246,.1)' } },
-      { name: '下行', type: 'line', smooth: true, data: days.map(d => d.out), itemStyle: { color: '#10b981' }, areaStyle: { color: 'rgba(16,185,129,.1)' } }
+      { name: '上行', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => d.in), itemStyle: { color: '#1f7ae0' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(31,122,224,.08)' } },
+      { name: '下行', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => d.out), itemStyle: { color: '#12b76a' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(18,183,106,.15)' } }
     ]
   })
 }
@@ -217,7 +229,8 @@ watch(filteredRows, buildChart)
 const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => chart?.resize()) : null
 onMounted(async () => {
   await nextTick()
-  chart = echarts.init(chartEl.value, 'dark')
+  quickThisMonth()
+  chart = echarts.init(chartEl.value)
   buildChart()
   ro?.observe(chartEl.value)
 })

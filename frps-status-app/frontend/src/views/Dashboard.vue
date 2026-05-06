@@ -83,7 +83,7 @@
               <tbody>
                 <tr v-if="!topProxies.length"><td colspan="5" class="empty">暂无数据</td></tr>
                 <tr v-for="(p, i) in topProxies" :key="p.name + p.type">
-                  <td class="col-rank"><b>#{{ i + 1 }}</b></td>
+                  <td class="col-rank"><b>{{ i + 1 }}</b></td>
                   <td class="col-name"><code>{{ p.name }}</code></td>
                   <td class="col-num">{{ humanBytes(p.month_in) }}</td>
                   <td class="col-num">{{ humanBytes(p.month_out) }}</td>
@@ -376,17 +376,21 @@ const certHealthClass = computed(() => {
 function buildChart(daily) {
   if (!chart) return
   const rows = Array.isArray(daily) ? daily : []
-  if (!rows.length) {
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+  const today = now.toISOString().slice(0, 10)
+  const monthRows = rows.filter(r => r.day >= monthStart && r.day <= today)
+  if (!monthRows.length) {
     chart.clear()
     return
   }
   const byDay = {}
-  for (const r of rows) {
+  for (const r of monthRows) {
     byDay[r.day] ??= { in: 0, out: 0 }
     byDay[r.day].in += Number(r.in)
     byDay[r.day].out += Number(r.out)
   }
-  const days = Object.keys(byDay).sort().slice(-30)
+  const days = Object.keys(byDay).sort()
   chart.setOption({
     backgroundColor: 'transparent',
     tooltip: {
@@ -473,15 +477,15 @@ onUnmounted(() => {
   gap: 12px;
 }
 .page-actions .btn {
-  height: 38px;
-  padding: 0 16px;
-  gap: 8px;
+  height: 30px;
+  padding: 0 10px;
+  gap: 6px;
   border-color: #d7e1ed;
   background: #fff;
   color: #0f172a;
-  font-size: 14px;
-  font-weight: 650;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, .04);
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: none;
 }
 .btn-doc-icon {
   width: 14px;
@@ -504,7 +508,7 @@ onUnmounted(() => {
 .btn-doc-icon::after { top: 9px; }
 .btn-refresh-icon {
   display: inline-block;
-  font-size: 18px;
+  font-size: 14px;
   line-height: 1;
 }
 .dashboard-summary {
@@ -756,8 +760,8 @@ onUnmounted(() => {
   padding: 14px 16px 6px;
 }
 .card-head .section-title {
-  font-size: 18px;
-  font-weight: 650;
+  font-size: 15px;
+  font-weight: 600;
 }
 .trend-chart {
   flex: 1;
