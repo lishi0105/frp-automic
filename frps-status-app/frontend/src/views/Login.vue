@@ -33,7 +33,22 @@
 
         <label class="login-field">
           <span>密码</span>
-          <input v-model="form.password" type="password" autocomplete="current-password" placeholder="请输入密码" />
+          <span class="password-field">
+            <input
+              v-model="form.password"
+              :type="showPassword ? 'text' : 'password'"
+              autocomplete="current-password"
+              placeholder="请输入密码"
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+              @click="showPassword = !showPassword"
+            >
+              {{ showPassword ? '隐' : '显' }}
+            </button>
+          </span>
         </label>
 
         <p v-if="error" class="login-error">{{ error }}</p>
@@ -84,6 +99,7 @@ const router = useRouter()
 const loading = ref(false)
 const error = ref('')
 const form = reactive({ username: '', password: '' })
+const showPassword = ref(false)
 
 const showForgot = ref(false)
 const forgotEmail = ref('')
@@ -129,6 +145,32 @@ async function submitForgot() {
 </script>
 
 <style scoped>
+.password-field {
+  position: relative;
+  display: block;
+}
+.password-field input {
+  padding-right: 42px;
+  width: 100%;
+}
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border, #334155);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.password-toggle:hover {
+  background: rgba(148, 163, 184, .12);
+}
 .login-forgot-link {
   text-align: center;
   margin-top: 4px;
