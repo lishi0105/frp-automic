@@ -101,6 +101,7 @@ func (a *App) Refresh(ctx context.Context) error {
 	inferProxyCertificateDomains(proxies, certs)
 	_ = a.checkAlerts(settings, month, monthIn, monthOut)
 	if fetchErr == nil {
+		a.enrichProxyHealth(proxies)
 		a.checkProxyAlerts(settings, proxies)
 		a.syncProxyWarnings(proxies)
 	}
@@ -130,6 +131,11 @@ func (a *App) Refresh(ctx context.Context) error {
 	a.mu.Unlock()
 	return fetchErr
 }
+
+const (
+	proxyOfflineAlertThreshold = 3
+	certIssueAlertThreshold    = 2
+)
 
 func inferProxyCertificateDomains(proxies []model.ProxyTraffic, certs []model.CertStatus) {
 	certDomainsByAlias := make(map[string][]string, len(certs))
@@ -291,18 +297,39 @@ func (a *App) checkProxyAlerts(settings model.PublicSettings, proxies []model.Pr
 	}
 	for _, p := range proxies {
 		key := "proxy_offline:" + p.Type + ":" + p.Name
-		if !p.Online {
-			if !a.store.EventAlertSent(key) {
-				subject := fmt.Sprintf("FRPS 代理离线告警 - %s", p.Name)
-				body := fmt.Sprintf("代理 %s（类型：%s）已离线，请检查客户端连接状态。", p.Name, p.Type)
+		st, err := a.store.GetEventState(key)
+		if err != nil {
+			continue
+		}
+		if p.Online {
+			if st.Active {
+				subject := fmt.Sprintf("FRPS 代理恢复通知 - %s", p.Name)
+				body := fmt.Sprintf("代理 %s（类型：%s）已恢复在线。", p.Name, p.Type)
 				if err := mail.Send(settings, authCode, subject, body); err != nil {
-					logger.Error("发送代理离线告警邮件失败: %v", err)
+					logger.Error("发送代理恢复通知邮件失败: %v", err)
 					continue
 				}
-				_ = a.store.SetEventAlert(key)
+				st.Active = false
+				st.SentAt = ""
+				if err := a.store.SaveEventState(st); err != nil {
+					logger.Error("保存代理恢复状态失败 key=%s 错误=%v", key, err)
+				}
 			}
-		} else {
-			_ = a.store.ClearEventAlert(key)
+			continue
+		}
+		if p.Health.ConsecutiveOffline < proxyOfflineAlertThreshold || st.Active {
+			continue
+		}
+		subject := fmt.Sprintf("FRPS 代理离线告警 - %s", p.Name)
+		body := fmt.Sprintf("代理 %s（类型：%s）连续 %d 次轮询离线，离线时长约 %d 秒，请检查客户端连接状态。", p.Name, p.Type, p.Health.ConsecutiveOffline, p.Health.OfflineSeconds)
+		if err := mail.Send(settings, authCode, subject, body); err != nil {
+			logger.Error("发送代理离线告警邮件失败: %v", err)
+			continue
+		}
+		st.Active = true
+		st.SentAt = time.Now().UTC().Format(time.RFC3339)
+		if err := a.store.SaveEventState(st); err != nil {
+			logger.Error("保存代理离线告警状态失败 key=%s 错误=%v", key, err)
 		}
 	}
 }
@@ -321,19 +348,154 @@ func (a *App) checkCertAlerts(settings model.PublicSettings, certs []model.CertS
 	}
 	for _, c := range certs {
 		key := "cert_expiry:" + c.Domain
-		if c.Present && c.DaysLeft != nil && *c.DaysLeft <= threshold {
-			if !a.store.EventAlertSent(key) {
-				subject := fmt.Sprintf("FRPS SSL证书即将到期 - %s", c.Domain)
-				body := fmt.Sprintf("域名 %s 的 SSL 证书将在 %d 天后到期（到期时间：%s），请及时续期。", c.Domain, *c.DaysLeft, c.ExpiresAt)
-				if err := mail.Send(settings, authCode, subject, body); err != nil {
-					logger.Error("发送证书到期告警邮件失败: %v", err)
-					continue
-				}
-				_ = a.store.SetEventAlert(key)
-			}
-		} else if c.Present && c.DaysLeft != nil && *c.DaysLeft > threshold {
-			_ = a.store.ClearEventAlert(key)
+		hasIssue := certHasIssue(c, threshold)
+		st, err := a.store.GetEventState(key)
+		if err != nil {
+			continue
 		}
+		if hasIssue {
+			st.FailStreak++
+			if st.FirstFailAt == "" {
+				st.FirstFailAt = time.Now().UTC().Format(time.RFC3339)
+			}
+		} else {
+			st.FailStreak = 0
+			st.FirstFailAt = ""
+		}
+		st.LastSeenAt = time.Now().UTC().Format(time.RFC3339)
+		if hasIssue {
+			if st.FailStreak < certIssueAlertThreshold {
+				_ = a.store.SaveEventState(st)
+				continue
+			}
+			if st.Active {
+				_ = a.store.SaveEventState(st)
+				continue
+			}
+			subject := fmt.Sprintf("FRPS SSL证书异常告警 - %s", c.Domain)
+			body := certAlertMessage(c, threshold)
+			if err := mail.Send(settings, authCode, subject, body); err != nil {
+				logger.Error("发送证书告警邮件失败: %v", err)
+				_ = a.store.SaveEventState(st)
+				continue
+			}
+			st.Active = true
+			st.SentAt = time.Now().UTC().Format(time.RFC3339)
+			if err := a.store.SaveEventState(st); err != nil {
+				logger.Error("保存证书告警状态失败 key=%s 错误=%v", key, err)
+			}
+			continue
+		}
+		if st.Active {
+			subject := fmt.Sprintf("FRPS SSL证书恢复通知 - %s", c.Domain)
+			body := fmt.Sprintf("域名 %s 的证书检测已恢复正常。公网握手正常=%t，本地证书有效期=%s。", c.Domain, c.TLSOK, c.ExpiresAt)
+			if err := mail.Send(settings, authCode, subject, body); err != nil {
+				logger.Error("发送证书恢复通知邮件失败: %v", err)
+				_ = a.store.SaveEventState(st)
+				continue
+			}
+		}
+		st.Active = false
+		st.SentAt = ""
+		if err := a.store.SaveEventState(st); err != nil {
+			logger.Error("保存证书恢复状态失败 key=%s 错误=%v", key, err)
+		}
+	}
+}
+
+func certHasIssue(c model.CertStatus, threshold int) bool {
+	if !c.Present || !c.OK {
+		return true
+	}
+	if c.DaysLeft != nil && *c.DaysLeft <= threshold {
+		return true
+	}
+	if !c.TLSOK {
+		return true
+	}
+	if c.TLSDaysLeft != nil && *c.TLSDaysLeft <= threshold {
+		return true
+	}
+	if c.TLSHasLocalCert && !c.TLSMatchLocal {
+		return true
+	}
+	return false
+}
+
+func certAlertMessage(c model.CertStatus, threshold int) string {
+	if !c.Present {
+		return fmt.Sprintf("域名 %s 本地证书文件不存在（cert.pem not found）。", c.Domain)
+	}
+	if !c.TLSOK {
+		return fmt.Sprintf("域名 %s 公网 TLS 握手失败：%s。", c.Domain, c.TLSError)
+	}
+	if c.TLSHasLocalCert && !c.TLSMatchLocal {
+		return fmt.Sprintf("域名 %s 公网握手证书与本地证书不一致，请检查反向代理或证书部署。", c.Domain)
+	}
+	if c.TLSDaysLeft != nil && *c.TLSDaysLeft <= threshold {
+		return fmt.Sprintf("域名 %s 公网握手证书将在 %d 天后到期（到期时间：%s）。", c.Domain, *c.TLSDaysLeft, c.TLSExpiresAt)
+	}
+	if c.DaysLeft != nil {
+		return fmt.Sprintf("域名 %s 本地证书将在 %d 天后到期（到期时间：%s）。", c.Domain, *c.DaysLeft, c.ExpiresAt)
+	}
+	return fmt.Sprintf("域名 %s 证书状态异常。", c.Domain)
+}
+
+func (a *App) enrichProxyHealth(proxies []model.ProxyTraffic) {
+	now := time.Now().UTC()
+	since := now.Add(-24 * time.Hour)
+	for i := range proxies {
+		key := "proxy_offline:" + proxies[i].Type + ":" + proxies[i].Name
+		st, err := a.store.GetEventState(key)
+		if err != nil {
+			continue
+		}
+		wasOffline := st.FailStreak > 0
+		st.Key = key
+		st.TotalChecks++
+		if proxies[i].Online {
+			st.OnlineChecks++
+			st.FailStreak = 0
+			st.FirstFailAt = ""
+		} else {
+			st.FailStreak++
+			if st.FirstFailAt == "" {
+				st.FirstFailAt = now.Format(time.RFC3339)
+			}
+			st.LastOfflineAt = now.Format(time.RFC3339)
+		}
+		if wasOffline != !proxies[i].Online {
+			st.LastChangeAt = now.Format(time.RFC3339)
+			if proxies[i].Online {
+				st.LastRecoveryAt = now.Format(time.RFC3339)
+			}
+			_ = a.store.AddProxyStatusEvent(key, proxies[i].Online, now)
+		}
+		st.LastSeenAt = now.Format(time.RFC3339)
+		if err := a.store.SaveEventState(st); err != nil {
+			continue
+		}
+		rate := 0
+		if st.TotalChecks > 0 {
+			rate = int((st.OnlineChecks * 100) / st.TotalChecks)
+		}
+		flaps, _ := a.store.ProxyFlapCountSince(key, since)
+		health := model.ProxyHealth{
+			ConsecutiveOffline: st.FailStreak,
+			OnlineChecks:       st.OnlineChecks,
+			TotalChecks:        st.TotalChecks,
+			OnlineRate:         rate,
+			FlapCount24h:       flaps,
+			LastChangeAt:       st.LastChangeAt,
+			LastOfflineAt:      st.LastOfflineAt,
+			LastRecoveryAt:     st.LastRecoveryAt,
+		}
+		if !proxies[i].Online && st.FirstFailAt != "" {
+			if t, err := time.Parse(time.RFC3339, st.FirstFailAt); err == nil {
+				health.OfflineSeconds = int64(now.Sub(t).Seconds())
+			}
+		}
+		proxies[i].Health = health
 	}
 }
 
@@ -1004,8 +1166,8 @@ func (a *App) syncRecoveryEmailWarning() {
 func (a *App) syncProxyWarnings(proxies []model.ProxyTraffic) {
 	for _, p := range proxies {
 		key := "proxy_offline:" + p.Type + ":" + p.Name
-		if !p.Online {
-			msg := fmt.Sprintf("代理 %s（类型：%s）已离线，请检查客户端连接状态", p.Name, p.Type)
+		if !p.Online && p.Health.ConsecutiveOffline >= proxyOfflineAlertThreshold {
+			msg := fmt.Sprintf("代理 %s（类型：%s）连续 %d 次轮询离线，离线时长约 %d 秒", p.Name, p.Type, p.Health.ConsecutiveOffline, p.Health.OfflineSeconds)
 			_ = a.store.SetWarning(key, msg)
 		} else {
 			_ = a.store.ClearWarning(key)
@@ -1020,8 +1182,8 @@ func (a *App) syncCertWarnings(settings model.PublicSettings, certs []model.Cert
 	}
 	for _, c := range certs {
 		key := "cert_expiry:" + c.Domain
-		if c.Present && c.DaysLeft != nil && *c.DaysLeft <= threshold {
-			msg := fmt.Sprintf("域名 %s 的 SSL 证书将在 %d 天后到期（到期时间：%s）", c.Domain, *c.DaysLeft, c.ExpiresAt)
+		if certHasIssue(c, threshold) {
+			msg := certAlertMessage(c, threshold)
 			_ = a.store.SetWarning(key, msg)
 		} else {
 			_ = a.store.ClearWarning(key)

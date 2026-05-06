@@ -67,6 +67,7 @@
                 <tr>
                   <th class="col-name">域名</th>
                   <th class="col-status">状态</th>
+                  <th class="col-status">公网TLS</th>
                   <th class="col-num sortable" @click="toggleSort('days')">剩余天数 <span :class="sortClass('days')">↕</span></th>
                   <th>到期时间</th>
                   <th>关联代理</th>
@@ -74,7 +75,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!pagedRows.length"><td colspan="6" class="empty">暂无证书数据</td></tr>
+                <tr v-if="!pagedRows.length"><td colspan="7" class="empty">暂无证书数据</td></tr>
                 <tr
                   v-for="c in pagedRows"
                   :key="c.domain"
@@ -83,6 +84,7 @@
                 >
                   <td class="col-name"><code>{{ c.domain }}</code></td>
                   <td class="col-status"><span class="badge" :class="certBadge(c)">{{ certText(c) }}</span></td>
+                  <td class="col-status"><span class="badge" :class="tlsBadge(c)">{{ tlsText(c) }}</span></td>
                   <td class="col-num" :style="{ color: certColor(c.days_left) }">{{ daysText(c.days_left) }}</td>
                   <td>{{ fmtDate(c.expires_at) }}</td>
                   <td><code>{{ c.relatedProxy || '-' }}</code></td>
@@ -110,9 +112,14 @@
             <div class="detail-row"><span>检查状态</span><b :style="{ color: certColor(selected.days_left) }">{{ certText(selected) }}</b></div>
             <div class="detail-row"><span>剩余天数</span><b :style="{ color: certColor(selected.days_left) }">{{ daysText(selected.days_left) }}</b></div>
             <div class="detail-row"><span>到期时间</span><b>{{ fmtDate(selected.expires_at) }}</b></div>
+            <div class="detail-row"><span>公网TLS</span><b :style="{ color: selected.tls_ok ? 'var(--success)' : 'var(--danger)' }">{{ tlsText(selected) }}</b></div>
+            <div class="detail-row"><span>TLS时延</span><b>{{ selected.tls_latency_ms != null ? (selected.tls_latency_ms + ' ms') : '-' }}</b></div>
+            <div class="detail-row"><span>公网到期</span><b>{{ fmtDate(selected.tls_expires_at) }}</b></div>
+            <div class="detail-row"><span>公网剩余天数</span><b>{{ daysText(selected.tls_days_left) }}</b></div>
+            <div class="detail-row"><span>公网与本地一致</span><b>{{ selected.tls_has_local_cert ? (selected.tls_match_local ? '是' : '否') : '-' }}</b></div>
             <div class="detail-row"><span>关联代理</span><b>{{ selected.relatedProxy || '-' }}</b></div>
             <div class="detail-row"><span>证书存在</span><b>{{ selected.present ? '是' : '否' }}</b></div>
-            <div class="detail-row"><span>错误信息</span><b>{{ selected.error || '-' }}</b></div>
+            <div class="detail-row"><span>错误信息</span><b>{{ selected.error || selected.tls_error || '-' }}</b></div>
           </template>
         </aside>
       </div>
@@ -163,13 +170,25 @@ const minDays = computed(() => {
 const minDaysLabel = computed(() => minDays.value == null ? '-' : `${minDays.value} 天`)
 
 function certText(c) {
+  if (!c.tls_ok) return 'FAIL'
+  if (c.tls_has_local_cert && !c.tls_match_local) return 'FAIL'
   if (!c.present || !c.ok) return 'FAIL'
   if (c.days_left != null && c.days_left < 15) return 'WARN'
   return 'OK'
 }
 function certBadge(c) {
+  if (!c.tls_ok || (c.tls_has_local_cert && !c.tls_match_local)) return 'badge-bad'
   if (!c.present || !c.ok) return 'badge-bad'
   if (c.days_left != null && c.days_left < 15) return 'badge-warn'
+  return 'badge-ok'
+}
+function tlsText(c) {
+  if (!c.tls_ok) return 'FAIL'
+  if (c.tls_has_local_cert && !c.tls_match_local) return 'MISMATCH'
+  return 'OK'
+}
+function tlsBadge(c) {
+  if (!c.tls_ok || (c.tls_has_local_cert && !c.tls_match_local)) return 'badge-bad'
   return 'badge-ok'
 }
 function certColor(days) {

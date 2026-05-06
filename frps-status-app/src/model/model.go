@@ -7,40 +7,60 @@ type TCPCheck struct {
 }
 
 type CertStatus struct {
-	Domain    string `json:"domain"`
-	Present   bool   `json:"present"`
-	OK        bool   `json:"ok"`
-	ExpiresAt string `json:"expires_at,omitempty"`
-	DaysLeft  *int   `json:"days_left,omitempty"`
-	Error     string `json:"error,omitempty"`
+	Domain          string `json:"domain"`
+	Present         bool   `json:"present"`
+	OK              bool   `json:"ok"`
+	ExpiresAt       string `json:"expires_at,omitempty"`
+	DaysLeft        *int   `json:"days_left,omitempty"`
+	Error           string `json:"error,omitempty"`
+	TLSOK           bool   `json:"tls_ok"`
+	TLSLatencyMS    *int64 `json:"tls_latency_ms,omitempty"`
+	TLSExpiresAt    string `json:"tls_expires_at,omitempty"`
+	TLSDaysLeft     *int   `json:"tls_days_left,omitempty"`
+	TLSError        string `json:"tls_error,omitempty"`
+	TLSMatchLocal   bool   `json:"tls_match_local"`
+	TLSHasLocalCert bool   `json:"tls_has_local_cert"`
+}
+
+type ProxyHealth struct {
+	ConsecutiveOffline int    `json:"consecutive_offline"`
+	OnlineChecks       int64  `json:"online_checks"`
+	TotalChecks        int64  `json:"total_checks"`
+	OnlineRate         int    `json:"online_rate"`
+	FlapCount24h       int    `json:"flap_count_24h"`
+	LastChangeAt       string `json:"last_change_at,omitempty"`
+	LastOfflineAt      string `json:"last_offline_at,omitempty"`
+	LastRecoveryAt     string `json:"last_recovery_at,omitempty"`
+	OfflineSeconds     int64  `json:"offline_seconds,omitempty"`
 }
 
 type ProxyTraffic struct {
-	Name       string `json:"name"`
-	Type       string `json:"type"`
-	Domains    []string `json:"domains,omitempty"`
-	Online     bool   `json:"online"`
-	CurConns   int64  `json:"cur_conns"`
-	CurrentIn  uint64 `json:"current_in"`
-	CurrentOut uint64 `json:"current_out"`
-	MonthIn    uint64 `json:"month_in"`
-	MonthOut   uint64 `json:"month_out"`
+	Name       string      `json:"name"`
+	Type       string      `json:"type"`
+	Domains    []string    `json:"domains,omitempty"`
+	Online     bool        `json:"online"`
+	CurConns   int64       `json:"cur_conns"`
+	CurrentIn  uint64      `json:"current_in"`
+	CurrentOut uint64      `json:"current_out"`
+	MonthIn    uint64      `json:"month_in"`
+	MonthOut   uint64      `json:"month_out"`
+	Health     ProxyHealth `json:"health"`
 }
 
 type PublicSettings struct {
-	AlertInGB       float64 `json:"alert_in_gb"`
-	AlertOutGB      float64 `json:"alert_out_gb"`
-	AlertTotalGB    float64 `json:"alert_total_gb"`
-	SMTPHost        string  `json:"smtp_host"`
-	SMTPPort        int     `json:"smtp_port"`
-	SMTPUser        string  `json:"smtp_user"`
-	SMTPFrom        string  `json:"smtp_from"`
-	SMTPTo          string  `json:"smtp_to"`
-	SMTPEnabled        bool    `json:"smtp_enabled"`
-	SMTPAuthCode       string  `json:"smtp_auth_code"`
-	AlertProxyOffline  bool    `json:"alert_proxy_offline"`
-	AlertCertExpiry    bool    `json:"alert_cert_expiry"`
-	AlertCertDays      int     `json:"alert_cert_days"`
+	AlertInGB         float64 `json:"alert_in_gb"`
+	AlertOutGB        float64 `json:"alert_out_gb"`
+	AlertTotalGB      float64 `json:"alert_total_gb"`
+	SMTPHost          string  `json:"smtp_host"`
+	SMTPPort          int     `json:"smtp_port"`
+	SMTPUser          string  `json:"smtp_user"`
+	SMTPFrom          string  `json:"smtp_from"`
+	SMTPTo            string  `json:"smtp_to"`
+	SMTPEnabled       bool    `json:"smtp_enabled"`
+	SMTPAuthCode      string  `json:"smtp_auth_code"`
+	AlertProxyOffline bool    `json:"alert_proxy_offline"`
+	AlertCertExpiry   bool    `json:"alert_cert_expiry"`
+	AlertCertDays     int     `json:"alert_cert_days"`
 }
 
 type Snapshot struct {

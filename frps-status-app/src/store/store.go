@@ -44,6 +44,20 @@ type Store struct {
 	db *sql.DB
 }
 
+type EventState struct {
+	Key            string
+	Active         bool
+	FailStreak     int
+	TotalChecks    int64
+	OnlineChecks   int64
+	SentAt         string
+	LastChangeAt   string
+	LastOfflineAt  string
+	LastRecoveryAt string
+	FirstFailAt    string
+	LastSeenAt     string
+}
+
 func New(db *sql.DB) *Store {
 	return &Store{db: db}
 }
@@ -55,7 +69,8 @@ func (s *Store) InitDB() error {
 		`CREATE TABLE IF NOT EXISTS proxy_counters (name TEXT NOT NULL, type TEXT NOT NULL, last_in INTEGER NOT NULL, last_out INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(name,type))`,
 		`CREATE TABLE IF NOT EXISTS daily_traffic (day TEXT NOT NULL, proxy_name TEXT NOT NULL, proxy_type TEXT NOT NULL, in_bytes INTEGER NOT NULL DEFAULT 0, out_bytes INTEGER NOT NULL DEFAULT 0, peak_conns INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(day,proxy_name,proxy_type))`,
 		`CREATE TABLE IF NOT EXISTS alert_state (month TEXT NOT NULL, direction TEXT NOT NULL, sent_at TEXT NOT NULL, PRIMARY KEY(month,direction))`,
-		`CREATE TABLE IF NOT EXISTS event_alert_state (key TEXT PRIMARY KEY, sent_at TEXT NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS event_alert_state (key TEXT PRIMARY KEY, sent_at TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 0, fail_streak INTEGER NOT NULL DEFAULT 0, total_checks INTEGER NOT NULL DEFAULT 0, online_checks INTEGER NOT NULL DEFAULT 0, last_change_at TEXT NOT NULL DEFAULT '', last_offline_at TEXT NOT NULL DEFAULT '', last_recovery_at TEXT NOT NULL DEFAULT '', first_fail_at TEXT NOT NULL DEFAULT '', last_seen_at TEXT NOT NULL DEFAULT '')`,
+		`CREATE TABLE IF NOT EXISTS proxy_status_events (key TEXT NOT NULL, status INTEGER NOT NULL, at TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, password_salt TEXT NOT NULL, recovery_email TEXT NOT NULL DEFAULT '', is_initial_password INTEGER NOT NULL DEFAULT 1)`,
 		`CREATE TABLE IF NOT EXISTS warnings (key TEXT PRIMARY KEY, message TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
 	}
@@ -66,6 +81,16 @@ func (s *Store) InitDB() error {
 	}
 	_, _ = s.db.Exec(`ALTER TABLE daily_traffic ADD COLUMN peak_conns INTEGER NOT NULL DEFAULT 0`)
 	_, _ = s.db.Exec(`ALTER TABLE users ADD COLUMN is_initial_password INTEGER NOT NULL DEFAULT 1`)
+	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN active INTEGER NOT NULL DEFAULT 0`)
+	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN fail_streak INTEGER NOT NULL DEFAULT 0`)
+	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN total_checks INTEGER NOT NULL DEFAULT 0`)
+	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN online_checks INTEGER NOT NULL DEFAULT 0`)
+	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN last_change_at TEXT NOT NULL DEFAULT ''`)
+	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN last_offline_at TEXT NOT NULL DEFAULT ''`)
+	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN last_recovery_at TEXT NOT NULL DEFAULT ''`)
+	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN first_fail_at TEXT NOT NULL DEFAULT ''`)
+	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN last_seen_at TEXT NOT NULL DEFAULT ''`)
+	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_proxy_status_events_key_at ON proxy_status_events(key, at)`)
 	defaults := map[string]string{"alert_in_gb": "0", "alert_out_gb": "0", "alert_total_gb": "0", "smtp_port": "465", "smtp_enabled": "false", "alert_proxy_offline": "false", "alert_cert_expiry": "false", "alert_cert_days": "15", "smtp_verified": "false"}
 	for k, v := range defaults {
 		if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)`, k, v); err != nil {
@@ -167,19 +192,63 @@ func (s *Store) MarkAlertSent(month, direction string) error {
 }
 
 func (s *Store) EventAlertSent(key string) bool {
-	var count int
-	_ = s.db.QueryRow(`SELECT COUNT(*) FROM event_alert_state WHERE key=?`, key).Scan(&count)
-	return count > 0
+	var active int
+	err := s.db.QueryRow(`SELECT active FROM event_alert_state WHERE key=?`, key).Scan(&active)
+	return err == nil && active == 1
 }
 
 func (s *Store) SetEventAlert(key string) error {
-	_, err := s.db.Exec(`INSERT OR REPLACE INTO event_alert_state(key,sent_at) VALUES(?,?)`, key, time.Now().UTC().Format(time.RFC3339))
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.db.Exec(`INSERT INTO event_alert_state(key,sent_at,active,last_seen_at) VALUES(?,?,1,?)
+ON CONFLICT(key) DO UPDATE SET sent_at=excluded.sent_at,active=1,last_seen_at=excluded.last_seen_at`, key, now, now)
 	return logStoreErr("set event alert "+key, err)
 }
 
 func (s *Store) ClearEventAlert(key string) error {
-	_, err := s.db.Exec(`DELETE FROM event_alert_state WHERE key=?`, key)
+	_, err := s.db.Exec(`UPDATE event_alert_state SET active=0, fail_streak=0, first_fail_at='', last_recovery_at=? WHERE key=?`, time.Now().UTC().Format(time.RFC3339), key)
 	return logStoreErr("clear event alert "+key, err)
+}
+
+func (s *Store) GetEventState(key string) (EventState, error) {
+	var st EventState
+	var active int
+	err := s.db.QueryRow(`SELECT key,active,fail_streak,total_checks,online_checks,sent_at,last_change_at,last_offline_at,last_recovery_at,first_fail_at,last_seen_at FROM event_alert_state WHERE key=?`, key).
+		Scan(&st.Key, &active, &st.FailStreak, &st.TotalChecks, &st.OnlineChecks, &st.SentAt, &st.LastChangeAt, &st.LastOfflineAt, &st.LastRecoveryAt, &st.FirstFailAt, &st.LastSeenAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return EventState{Key: key}, nil
+	}
+	if err != nil {
+		return st, logStoreErr("get event state "+key, err)
+	}
+	st.Active = active == 1
+	return st, nil
+}
+
+func (s *Store) SaveEventState(st EventState) error {
+	active := 0
+	if st.Active {
+		active = 1
+	}
+	_, err := s.db.Exec(`INSERT INTO event_alert_state(key,sent_at,active,fail_streak,total_checks,online_checks,last_change_at,last_offline_at,last_recovery_at,first_fail_at,last_seen_at)
+VALUES(?,?,?,?,?,?,?,?,?,?,?)
+ON CONFLICT(key) DO UPDATE SET sent_at=excluded.sent_at,active=excluded.active,fail_streak=excluded.fail_streak,total_checks=excluded.total_checks,online_checks=excluded.online_checks,last_change_at=excluded.last_change_at,last_offline_at=excluded.last_offline_at,last_recovery_at=excluded.last_recovery_at,first_fail_at=excluded.first_fail_at,last_seen_at=excluded.last_seen_at`,
+		st.Key, st.SentAt, active, st.FailStreak, st.TotalChecks, st.OnlineChecks, st.LastChangeAt, st.LastOfflineAt, st.LastRecoveryAt, st.FirstFailAt, st.LastSeenAt)
+	return logStoreErr("save event state "+st.Key, err)
+}
+
+func (s *Store) AddProxyStatusEvent(key string, online bool, at time.Time) error {
+	status := 0
+	if online {
+		status = 1
+	}
+	_, err := s.db.Exec(`INSERT INTO proxy_status_events(key,status,at) VALUES(?,?,?)`, key, status, at.UTC().Format(time.RFC3339))
+	return logStoreErr("add proxy status event "+key, err)
+}
+
+func (s *Store) ProxyFlapCountSince(key string, since time.Time) (int, error) {
+	var count int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM proxy_status_events WHERE key=? AND at>=?`, key, since.UTC().Format(time.RFC3339)).Scan(&count)
+	return count, logStoreErr("proxy flap count "+key, err)
 }
 
 func (s *Store) Vacuum() error {

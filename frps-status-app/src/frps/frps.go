@@ -2,6 +2,8 @@ package frps
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -33,28 +35,81 @@ func CheckTCP(host string, port int) model.TCPCheck {
 func Certificates(certDir string, domains []string) []model.CertStatus {
 	out := make([]model.CertStatus, 0, len(domains))
 	for _, domain := range domains {
+		status := model.CertStatus{Domain: domain}
+		var localFingerprint [32]byte
+		hasLocalFingerprint := false
+
 		raw, err := os.ReadFile(filepath.Join(certDir, domain, "cert.pem"))
 		if err != nil {
 			logger.Warn("证书文件不存在 域名=%s 路径=%s 错误=%v", domain, filepath.Join(certDir, domain, "cert.pem"), err)
-			out = append(out, model.CertStatus{Domain: domain, Present: false, OK: false, Error: "cert.pem not found"})
-			continue
+			status.Present = false
+			status.OK = false
+			status.Error = "cert.pem not found"
+		} else {
+			block, _ := pem.Decode(raw)
+			if block == nil {
+				logger.Warn("证书 PEM 解码失败 域名=%s", domain)
+				status.Present = true
+				status.OK = false
+				status.Error = "parse certificate failed"
+			} else {
+				cert, parseErr := x509.ParseCertificate(block.Bytes)
+				if parseErr != nil {
+					logger.Warn("证书解析失败 域名=%s 错误=%v", domain, parseErr)
+					status.Present = true
+					status.OK = false
+					status.Error = "parse certificate failed"
+				} else {
+					days := int(time.Until(cert.NotAfter).Hours() / 24)
+					status.Present = true
+					status.OK = days >= 15
+					status.ExpiresAt = cert.NotAfter.UTC().Format(time.RFC3339)
+					status.DaysLeft = &days
+					localFingerprint = sha256.Sum256(cert.Raw)
+					hasLocalFingerprint = true
+					status.TLSHasLocalCert = true
+				}
+			}
 		}
-		block, _ := pem.Decode(raw)
-		if block == nil {
-			logger.Warn("证书 PEM 解码失败 域名=%s", domain)
-			out = append(out, model.CertStatus{Domain: domain, Present: true, OK: false, Error: "parse certificate failed"})
-			continue
+
+		remoteCert, latency, tlsErr := fetchTLSServerCert(domain, 443)
+		if tlsErr != nil {
+			status.TLSOK = false
+			status.TLSError = tlsErr.Error()
+		} else {
+			status.TLSOK = true
+			status.TLSLatencyMS = &latency
+			tlsDays := int(time.Until(remoteCert.NotAfter).Hours() / 24)
+			status.TLSExpiresAt = remoteCert.NotAfter.UTC().Format(time.RFC3339)
+			status.TLSDaysLeft = &tlsDays
+			if hasLocalFingerprint {
+				remoteFingerprint := sha256.Sum256(remoteCert.Raw)
+				status.TLSMatchLocal = remoteFingerprint == localFingerprint
+			}
 		}
-		cert, err := x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			logger.Warn("证书解析失败 域名=%s 错误=%v", domain, err)
-			out = append(out, model.CertStatus{Domain: domain, Present: true, OK: false, Error: "parse certificate failed"})
-			continue
-		}
-		days := int(time.Until(cert.NotAfter).Hours() / 24)
-		out = append(out, model.CertStatus{Domain: domain, Present: true, OK: days >= 15, ExpiresAt: cert.NotAfter.UTC().Format(time.RFC3339), DaysLeft: &days})
+		out = append(out, status)
 	}
 	return out
+}
+
+func fetchTLSServerCert(domain string, port int) (*x509.Certificate, int64, error) {
+	start := time.Now()
+	dialer := net.Dialer{Timeout: 3 * time.Second}
+	conf := &tls.Config{
+		ServerName:         domain,
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: true, // We need the presented cert even when chain is invalid.
+	}
+	conn, err := tls.DialWithDialer(&dialer, "tcp", net.JoinHostPort(domain, strconv.Itoa(port)), conf)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer conn.Close()
+	state := conn.ConnectionState()
+	if len(state.PeerCertificates) == 0 {
+		return nil, 0, fmt.Errorf("no peer certificate")
+	}
+	return state.PeerCertificates[0], time.Since(start).Milliseconds(), nil
 }
 
 type Client struct {

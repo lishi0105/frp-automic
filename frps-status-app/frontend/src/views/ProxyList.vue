@@ -160,12 +160,20 @@
               <div class="detail-row"><span>在线状态</span><b :class="selectedProxy.online ? 'ok-t' : 'bad-t'">{{ selectedProxy.online ? '在线' : '离线' }}</b></div>
               <div class="detail-row"><span>最近心跳</span><b>{{ selectedProxy.online ? '正常' : '中断' }}</b></div>
             </div>
+            <div class="detail-pair">
+              <div class="detail-row"><span>24h在线率</span><b>{{ (selectedProxy.health?.online_rate ?? 0) + '%' }}</b></div>
+              <div class="detail-row"><span>24h波动</span><b>{{ selectedProxy.health?.flap_count_24h ?? 0 }} 次</b></div>
+            </div>
             <div class="detail-row"><span>当前连接</span><b>{{ selectedProxy.cur_conns }}</b></div>
             <div class="detail-pair">
               <div class="detail-row"><span>上行</span><b>{{ humanBytes(selectedProxy.month_in) }}</b></div>
               <div class="detail-row"><span>下行</span><b>{{ humanBytes(selectedProxy.month_out) }}</b></div>
             </div>
             <div class="detail-row"><span>总流量</span><b>{{ humanBytes(selectedProxy.month_in + selectedProxy.month_out) }}</b></div>
+            <div class="detail-pair">
+              <div class="detail-row"><span>连续离线轮询</span><b>{{ selectedProxy.health?.consecutive_offline ?? 0 }}</b></div>
+              <div class="detail-row"><span>本次离线时长</span><b>{{ selectedProxy.online ? '-' : offlineSecondsText(selectedProxy.health?.offline_seconds) }}</b></div>
+            </div>
             <div class="detail-progress">
               <div class="in" :style="{ width: selectedTotal ? ((selectedProxy.month_in / selectedTotal) * 100).toFixed(1) + '%' : '0%' }"></div>
               <div class="out" :style="{ width: selectedTotal ? ((selectedProxy.month_out / selectedTotal) * 100).toFixed(1) + '%' : '0%' }"></div>
@@ -298,6 +306,13 @@ function certColor(days) {
 function certText(c) {
   if (c.days_left == null) return '未知'
   return `${c.days_left} 天`
+}
+function offlineSecondsText(sec) {
+  const n = Number(sec || 0)
+  if (!n) return '0 秒'
+  if (n < 60) return `${n} 秒`
+  if (n < 3600) return `${Math.floor(n / 60)} 分钟`
+  return `${Math.floor(n / 3600)} 小时 ${Math.floor((n % 3600) / 60)} 分钟`
 }
 function exportCsv() {
   const rows = sortedFiltered.value
