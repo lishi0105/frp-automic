@@ -16,11 +16,23 @@ function post(url, body) {
   })
 }
 
+function withQuery(url, params = {}) {
+  const qs = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null || v === '') continue
+    qs.set(k, String(v))
+  }
+  const s = qs.toString()
+  return s ? `${url}?${s}` : url
+}
+
 export const api = {
   login: (data) => post('api/login', data),
   logout: () => post('api/logout'),
   getSession: () => request('api/session'),
   getStatus: () => request('api/status'),
+  getProxies: (params) => request(withQuery('api/proxies', params)),
+  getCertificates: (params) => request(withQuery('api/certificates', params)),
   getDaily: () => request('api/daily'),
   getSettings: () => request('api/settings'),
   saveSettings: (data) => post('api/settings', data),

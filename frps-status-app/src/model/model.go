@@ -94,3 +94,20 @@ type DashboardSummary struct {
 	TopProxies  []DashboardTopProxy  `json:"top_proxies"`
 	Certificate DashboardCertSummary `json:"certificate"`
 }
+
+type PagedMeta struct {
+	Total      int `json:"total"`
+	Page       int `json:"page"`
+	PageSize   int `json:"page_size"`
+	TotalPages int `json:"total_pages"`
+}
+
+type ProxyListResponse struct {
+	Items []ProxyTraffic `json:"items"`
+	Meta  PagedMeta      `json:"meta"`
+}
+
+type CertificateListResponse struct {
+	Items []CertStatus `json:"items"`
+	Meta  PagedMeta    `json:"meta"`
+}

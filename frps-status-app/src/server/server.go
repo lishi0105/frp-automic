@@ -58,6 +58,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/api/user/recovery-email", a.withAuth(a.handleChangeRecoveryEmail))
 	mux.HandleFunc("/api/warnings", a.withAuth(a.handleWarnings))
 	mux.HandleFunc("/api/status", a.withAuth(a.handleStatus))
+	mux.HandleFunc("/api/proxies", a.withAuth(a.handleProxies))
+	mux.HandleFunc("/api/certificates", a.withAuth(a.handleCertificates))
 	mux.HandleFunc("/api/daily", a.withAuth(a.handleDaily))
 	mux.HandleFunc("/api/daily/export", a.withAuth(a.handleExportCSV))
 	mux.HandleFunc("/api/settings", a.withAuth(a.handleSettings))
@@ -871,6 +873,303 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	s := a.latest
 	a.mu.RUnlock()
 	writeJSON(w, s)
+}
+
+func (a *App) handleProxies(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := a.Refresh(r.Context()); err != nil {
+		logger.Warn("代理分页查询刷新失败: %v", err)
+	}
+	q := r.URL.Query()
+	page := clampInt(queryInt(q.Get("page"), 1), 1, 100000)
+	pageSize := clampInt(queryInt(q.Get("page_size"), 10), 1, 200)
+	sortKey := strings.TrimSpace(strings.ToLower(q.Get("sort")))
+	if sortKey == "" {
+		sortKey = "total"
+	}
+	order := strings.TrimSpace(strings.ToLower(q.Get("order")))
+	if order != "asc" {
+		order = "desc"
+	}
+	keyword := strings.TrimSpace(strings.ToLower(q.Get("keyword")))
+	typeFilter := strings.TrimSpace(strings.ToLower(q.Get("type")))
+	onlineRaw := strings.TrimSpace(strings.ToLower(q.Get("online")))
+
+	a.mu.RLock()
+	all := append([]model.ProxyTraffic(nil), a.latest.Proxies...)
+	a.mu.RUnlock()
+
+	filtered := make([]model.ProxyTraffic, 0, len(all))
+	for _, p := range all {
+		if typeFilter != "" && strings.ToLower(p.Type) != typeFilter {
+			continue
+		}
+		if onlineRaw == "online" && !p.Online {
+			continue
+		}
+		if onlineRaw == "offline" && p.Online {
+			continue
+		}
+		if keyword != "" {
+			hit := strings.Contains(strings.ToLower(p.Name), keyword)
+			if !hit {
+				for _, d := range p.Domains {
+					if strings.Contains(strings.ToLower(d), keyword) {
+						hit = true
+						break
+					}
+				}
+			}
+			if !hit {
+				continue
+			}
+		}
+		filtered = append(filtered, p)
+	}
+
+	sort.Slice(filtered, func(i, j int) bool {
+		pi, pj := filtered[i], filtered[j]
+		cmp := 0
+		switch sortKey {
+		case "name":
+			cmp = strings.Compare(pi.Name, pj.Name)
+		case "type":
+			cmp = strings.Compare(pi.Type, pj.Type)
+		case "status":
+			si, sj := 0, 0
+			if pi.Online {
+				si = 1
+			}
+			if pj.Online {
+				sj = 1
+			}
+			cmp = si - sj
+			if cmp == 0 {
+				cmp = strings.Compare(pi.Name, pj.Name)
+			}
+		case "conn":
+			switch {
+			case pi.CurConns < pj.CurConns:
+				cmp = -1
+			case pi.CurConns > pj.CurConns:
+				cmp = 1
+			default:
+				cmp = strings.Compare(pi.Name, pj.Name)
+			}
+		case "in":
+			switch {
+			case pi.MonthIn < pj.MonthIn:
+				cmp = -1
+			case pi.MonthIn > pj.MonthIn:
+				cmp = 1
+			default:
+				cmp = strings.Compare(pi.Name, pj.Name)
+			}
+		case "out":
+			switch {
+			case pi.MonthOut < pj.MonthOut:
+				cmp = -1
+			case pi.MonthOut > pj.MonthOut:
+				cmp = 1
+			default:
+				cmp = strings.Compare(pi.Name, pj.Name)
+			}
+		default:
+			ti, tj := pi.MonthIn+pi.MonthOut, pj.MonthIn+pj.MonthOut
+			switch {
+			case ti < tj:
+				cmp = -1
+			case ti > tj:
+				cmp = 1
+			default:
+				cmp = strings.Compare(pi.Name, pj.Name)
+			}
+		}
+		if order == "asc" {
+			return cmp < 0
+		}
+		return cmp > 0
+	})
+
+	items, meta := paginateProxies(filtered, page, pageSize)
+	writeJSON(w, model.ProxyListResponse{Items: items, Meta: meta})
+}
+
+func (a *App) handleCertificates(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := a.Refresh(r.Context()); err != nil {
+		logger.Warn("证书分页查询刷新失败: %v", err)
+	}
+	q := r.URL.Query()
+	page := clampInt(queryInt(q.Get("page"), 1), 1, 100000)
+	pageSize := clampInt(queryInt(q.Get("page_size"), 10), 1, 200)
+	sortKey := strings.TrimSpace(strings.ToLower(q.Get("sort")))
+	if sortKey == "" {
+		sortKey = "days"
+	}
+	order := strings.TrimSpace(strings.ToLower(q.Get("order")))
+	if order != "desc" {
+		order = "asc"
+	}
+	keyword := strings.TrimSpace(strings.ToLower(q.Get("keyword")))
+	statusFilter := strings.TrimSpace(strings.ToLower(q.Get("status")))
+	tlsFilter := strings.TrimSpace(strings.ToLower(q.Get("tls")))
+
+	a.mu.RLock()
+	certs := append([]model.CertStatus(nil), a.latest.Certificates...)
+	proxies := append([]model.ProxyTraffic(nil), a.latest.Proxies...)
+	a.mu.RUnlock()
+
+	certProxyMap := make(map[string][]string)
+	for _, p := range proxies {
+		for _, d := range p.Domains {
+			key := strings.ToLower(strings.TrimSpace(d))
+			if key == "" {
+				continue
+			}
+			certProxyMap[key] = append(certProxyMap[key], p.Name)
+		}
+	}
+
+	filtered := make([]model.CertStatus, 0, len(certs))
+	for _, c := range certs {
+		related := strings.Join(certProxyMap[strings.ToLower(strings.TrimSpace(c.Domain))], ", ")
+		if keyword != "" {
+			if !strings.Contains(strings.ToLower(c.Domain), keyword) && !strings.Contains(strings.ToLower(related), keyword) {
+				continue
+			}
+		}
+		if statusFilter != "" && certificateStatus(c) != statusFilter {
+			continue
+		}
+		if tlsFilter == "ok" && !c.TLSOK {
+			continue
+		}
+		if tlsFilter == "fail" && c.TLSOK {
+			continue
+		}
+		filtered = append(filtered, c)
+	}
+
+	sort.Slice(filtered, func(i, j int) bool {
+		ci, cj := filtered[i], filtered[j]
+		cmp := 0
+		switch sortKey {
+		case "domain":
+			cmp = strings.Compare(ci.Domain, cj.Domain)
+		case "expires_at":
+			cmp = strings.Compare(ci.ExpiresAt, cj.ExpiresAt)
+		default: // days
+			di, dj := 99999, 99999
+			if ci.DaysLeft != nil {
+				di = *ci.DaysLeft
+			}
+			if cj.DaysLeft != nil {
+				dj = *cj.DaysLeft
+			}
+			switch {
+			case di < dj:
+				cmp = -1
+			case di > dj:
+				cmp = 1
+			default:
+				cmp = strings.Compare(ci.Domain, cj.Domain)
+			}
+		}
+		if order == "asc" {
+			return cmp < 0
+		}
+		return cmp > 0
+	})
+
+	items, meta := paginateCertificates(filtered, page, pageSize)
+	writeJSON(w, model.CertificateListResponse{Items: items, Meta: meta})
+}
+
+func queryInt(v string, def int) int {
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil {
+		return def
+	}
+	return n
+}
+
+func clampInt(v, min, max int) int {
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
+}
+
+func paginateProxies(items []model.ProxyTraffic, page, pageSize int) ([]model.ProxyTraffic, model.PagedMeta) {
+	total := len(items)
+	totalPages := 1
+	if total > 0 {
+		totalPages = (total + pageSize - 1) / pageSize
+	}
+	if page > totalPages {
+		page = totalPages
+	}
+	start := (page - 1) * pageSize
+	if start < 0 {
+		start = 0
+	}
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
+	if start > end {
+		start = end
+	}
+	return items[start:end], model.PagedMeta{Total: total, Page: page, PageSize: pageSize, TotalPages: totalPages}
+}
+
+func paginateCertificates(items []model.CertStatus, page, pageSize int) ([]model.CertStatus, model.PagedMeta) {
+	total := len(items)
+	totalPages := 1
+	if total > 0 {
+		totalPages = (total + pageSize - 1) / pageSize
+	}
+	if page > totalPages {
+		page = totalPages
+	}
+	start := (page - 1) * pageSize
+	if start < 0 {
+		start = 0
+	}
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
+	if start > end {
+		start = end
+	}
+	return items[start:end], model.PagedMeta{Total: total, Page: page, PageSize: pageSize, TotalPages: totalPages}
+}
+
+func certificateStatus(c model.CertStatus) string {
+	if !c.TLSOK {
+		return "fail"
+	}
+	if c.TLSHasLocalCert && !c.TLSMatchLocal {
+		return "fail"
+	}
+	if !c.Present || !c.OK {
+		return "fail"
+	}
+	if c.DaysLeft != nil && *c.DaysLeft < 15 {
+		return "warn"
+	}
+	return "ok"
 }
 
 func (a *App) handleDaily(w http.ResponseWriter, r *http.Request) {

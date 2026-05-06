@@ -3,12 +3,12 @@
     <div class="page-header">
       <div>
         <div class="page-title">代理列表</div>
-        <div class="page-sub">共 {{ proxies.length }} 个代理，{{ onlineCount }} 个在线</div>
+        <div class="page-sub">共 {{ totalItems }} 个代理，{{ onlineCount }} 个在线</div>
       </div>
       <div class="flex-center">
         <button class="btn btn-outline btn-sm" @click="exportCsv">导出列表</button>
-        <button class="btn btn-outline btn-sm" :disabled="loading" @click="$emit('refresh')">
-          <span v-if="loading" class="spinner"></span>
+        <button class="btn btn-outline btn-sm" :disabled="loading || localLoading" @click="$emit('refresh')">
+          <span v-if="loading || localLoading" class="spinner"></span>
           <span v-else>↻</span> 刷新
         </button>
       </div>
@@ -35,7 +35,7 @@
           <div class="section-head">
             <div class="section-title">代理清单</div>
             <div class="proxy-table-tools">
-              <span class="text-muted text-sm">{{ sortedFiltered.length }} 条</span>
+              <span class="text-muted text-sm">{{ totalItems }} 条</span>
               <label class="text-muted text-sm">每页
                 <select class="form-select page-size" v-model.number="pageSize">
                   <option :value="10">10</option>
@@ -96,7 +96,7 @@
               >{{ n }}</button>
             </div>
             <span v-if="showRightEllipsis" class="text-muted text-sm">...</span>
-            <span class="text-muted text-sm">{{ page }} / {{ totalPages }}</span>
+            <span class="text-muted text-sm">第 {{ page }} / {{ totalPages }} 页</span>
             <button class="btn btn-outline btn-sm" :disabled="page >= totalPages" @click="page++">下一页</button>
             <label class="text-muted text-sm quick-jump">跳转
               <input class="form-input jump-input" type="number" min="1" :max="totalPages" v-model.number="jumpPage" @keyup.enter="applyJump" />
@@ -155,8 +155,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
+import { api } from '../api/index.js'
 import { humanBytes } from '../utils/format.js'
 
 const props = defineProps({ status: Object, loading: Boolean })
@@ -166,37 +167,27 @@ const selectedProxy = ref(null)
 const sortKey = ref('total')
 const sortDir = ref('desc')
 const page = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(10)
 const jumpPage = ref(1)
-
-const proxies = computed(() => props.status?.proxies ?? [])
+const rows = ref([])
+const totalItems = ref(0)
+const totalPages = ref(1)
+const localLoading = ref(false)
 const certs = computed(() => props.status?.certificates ?? [])
-const onlineCount = computed(() => proxies.value.filter(p => p.online).length)
-const totalProxies = computed(() => proxies.value.length)
-const curConnsTotal = computed(() => proxies.value.reduce((s, p) => s + Number(p.cur_conns || 0), 0))
-const monthTotal = computed(() => proxies.value.reduce((s, p) => s + Number(p.month_in || 0) + Number(p.month_out || 0), 0))
+
+const proxies = computed(() => rows.value)
+const onlineCount = computed(() => props.status?.proxies?.filter(p => p.online).length ?? 0)
+const totalProxies = computed(() => props.status?.proxies?.length ?? totalItems.value)
+const curConnsTotal = computed(() => props.status?.proxies?.reduce((s, p) => s + Number(p.cur_conns || 0), 0) ?? 0)
+const monthTotal = computed(() => props.status?.proxies?.reduce((s, p) => s + Number(p.month_in || 0) + Number(p.month_out || 0), 0) ?? 0)
 function proxyTotal(p) { return Number(p.month_in || 0) + Number(p.month_out || 0) }
 function proxyCerts(p) {
   const ds = (p.domains || []).filter(Boolean)
   if (!ds.length) return []
   return certs.value.filter(c => ds.includes(c.domain))
 }
-const sortedFiltered = computed(() => {
-  const list = [...proxies.value]
-  const sign = sortDir.value === 'asc' ? 1 : -1
-  const getter = (p) => {
-    if (sortKey.value === 'conn') return Number(p.cur_conns || 0)
-    if (sortKey.value === 'in') return Number(p.month_in || 0)
-    if (sortKey.value === 'out') return Number(p.month_out || 0)
-    return proxyTotal(p)
-  }
-  return list.sort((a, b) => (getter(a) - getter(b)) * sign)
-})
-const totalPages = computed(() => Math.max(1, Math.ceil(sortedFiltered.value.length / pageSize.value)))
-const pagedRows = computed(() => {
-  const start = (page.value - 1) * pageSize.value
-  return sortedFiltered.value.slice(start, start + pageSize.value)
-})
+const sortedFiltered = computed(() => rows.value)
+const pagedRows = computed(() => rows.value)
 const pageNumbers = computed(() => {
   const t = totalPages.value
   const p = page.value
@@ -255,6 +246,8 @@ function toggleSort(key) {
     sortKey.value = key
     sortDir.value = 'desc'
   }
+  page.value = 1
+  fetchPage()
 }
 function sortClass(key) {
   if (sortKey.value !== key) return 'sort-idle'
@@ -264,14 +257,35 @@ function applyJump() {
   const p = Number(jumpPage.value || 1)
   if (!Number.isFinite(p)) return
   page.value = Math.min(totalPages.value, Math.max(1, Math.floor(p)))
+  fetchPage()
 }
 
-watch([sortedFiltered, pageSize], () => {
+async function fetchPage() {
+  localLoading.value = true
+  try {
+    const res = await api.getProxies({
+      page: page.value,
+      page_size: pageSize.value,
+      sort: sortKey.value,
+      order: sortDir.value
+    })
+    rows.value = res.items || []
+    totalItems.value = res.meta?.total || 0
+    totalPages.value = Math.max(1, res.meta?.total_pages || 1)
+    page.value = Math.max(1, res.meta?.page || 1)
+  } finally {
+    localLoading.value = false
+  }
+}
+
+watch(pageSize, () => {
   page.value = 1
   jumpPage.value = 1
+  fetchPage()
 })
 watch(page, (p) => {
   jumpPage.value = p
+  fetchPage()
 })
 watch(sortedFiltered, (arr) => {
   if (!arr.length) {
@@ -282,6 +296,12 @@ watch(sortedFiltered, (arr) => {
     selectedProxy.value = arr[0]
   }
 }, { immediate: true })
+watch(() => props.status?.generated_at, () => {
+  fetchPage()
+})
+onMounted(() => {
+  fetchPage()
+})
 </script>
 
 <style scoped>
@@ -454,6 +474,7 @@ watch(sortedFiltered, (arr) => {
   margin-top: 10px;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
 }

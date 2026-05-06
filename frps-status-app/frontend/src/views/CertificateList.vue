@@ -6,8 +6,8 @@
         <div class="page-sub">共 {{ certs.length }} 张证书，{{ okCount }} 张正常</div>
       </div>
       <div class="flex-center">
-        <button class="btn btn-outline btn-sm" :disabled="loading" @click="$emit('refresh')">
-          <span v-if="loading" class="spinner"></span>
+        <button class="btn btn-outline btn-sm" :disabled="loading || localLoading" @click="$emit('refresh')">
+          <span v-if="loading || localLoading" class="spinner"></span>
           <span v-else>↻</span> 刷新
         </button>
       </div>
@@ -34,7 +34,7 @@
           <div class="section-head">
             <div class="section-title">证书清单</div>
             <div class="proxy-table-tools">
-              <span class="text-muted text-sm">显示 {{ pageStart }}-{{ pageEnd }} / 共 {{ sortedFiltered.length }}</span>
+              <span class="text-muted text-sm">显示 {{ pageStart }}-{{ pageEnd }} / 共 {{ totalItems }}</span>
               <label class="text-muted text-sm">每页
                 <select class="form-select page-size" v-model.number="pageSize">
                   <option :value="10">10</option>
@@ -83,8 +83,13 @@
             <div class="page-num-list">
               <button v-for="n in pageNumbers" :key="n" class="btn btn-outline btn-sm page-num" :class="{ active: n === page }" @click="page = n">{{ n }}</button>
             </div>
-            <span class="text-muted text-sm">{{ page }} / {{ totalPages }}</span>
+            <span v-if="showRightEllipsis" class="text-muted text-sm">...</span>
+            <span class="text-muted text-sm">第 {{ page }} / {{ totalPages }} 页</span>
             <button class="btn btn-outline btn-sm" :disabled="page >= totalPages" @click="page++">下一页</button>
+            <label class="text-muted text-sm quick-jump">跳转
+              <input class="form-input jump-input" type="number" min="1" :max="totalPages" v-model.number="jumpPage" @keyup.enter="applyJump" />
+            </label>
+            <button class="btn btn-outline btn-sm" @click="applyJump">确定</button>
           </div>
         </section>
 
@@ -112,7 +117,8 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { api } from '../api/index.js'
 import { fmtDate } from '../utils/format.js'
 
 const props = defineProps({ status: Object, loading: Boolean })
@@ -121,25 +127,17 @@ defineEmits(['refresh'])
 const selected = ref(null)
 const page = ref(1)
 const pageSize = ref(10)
+const jumpPage = ref(1)
 const sortKey = ref('days')
 const sortDir = ref('asc')
+const rows = ref([])
+const totalItems = ref(0)
+const totalPages = ref(1)
+const localLoading = ref(false)
 
-const domainProxyMap = computed(() => {
-  const m = {}
-  for (const p of (props.status?.proxies ?? [])) {
-    for (const d of (p.domains || [])) {
-      if (!d) continue
-      m[d] ??= []
-      m[d].push(p.name)
-    }
-  }
-  return m
-})
-
-const certs = computed(() => (props.status?.certificates ?? []).map(c => ({
-  ...c,
-  relatedProxy: (domainProxyMap.value[c.domain] || []).join(', ')
-})))
+const certs = computed(() => props.status?.certificates ?? [])
+const pagedRows = computed(() => rows.value)
+const sortedFiltered = computed(() => rows.value)
 
 const okCount = computed(() => certs.value.filter(c => c.ok && (c.days_left == null || c.days_left >= 15)).length)
 const warnCount = computed(() => certs.value.filter(c => c.ok && c.days_left != null && c.days_left < 15).length)
@@ -149,6 +147,18 @@ const minDays = computed(() => {
   return vals.length ? Math.min(...vals) : null
 })
 const minDaysLabel = computed(() => minDays.value == null ? '-' : `${minDays.value} 天`)
+
+const pageStart = computed(() => totalItems.value ? (page.value - 1) * pageSize.value + 1 : 0)
+const pageEnd = computed(() => Math.min(page.value * pageSize.value, totalItems.value))
+const pageNumbers = computed(() => {
+  const t = totalPages.value
+  const p = page.value
+  if (t <= 5) return Array.from({ length: t }, (_, i) => i + 1)
+  if (p <= 3) return [1, 2, 3, 4, 5]
+  if (p >= t - 2) return [t - 4, t - 3, t - 2, t - 1, t]
+  return [p - 2, p - 1, p, p + 1, p + 2]
+})
+const showRightEllipsis = computed(() => pageNumbers.value[pageNumbers.value.length - 1] < totalPages.value)
 
 function certText(c) {
   if (!c.tls_ok) return 'FAIL'
@@ -183,28 +193,23 @@ function daysText(days) {
   return `${days} 天`
 }
 
-const sortedFiltered = computed(() => {
-  const list = [...certs.value]
-  const sign = sortDir.value === 'asc' ? 1 : -1
-  return list.sort((a, b) => {
-    const da = a.days_left == null ? 99999 : Number(a.days_left)
-    const db = b.days_left == null ? 99999 : Number(b.days_left)
-    return (da - db) * sign
-  })
-})
-
-const totalPages = computed(() => Math.max(1, Math.ceil(sortedFiltered.value.length / pageSize.value)))
-const pagedRows = computed(() => sortedFiltered.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
-const pageStart = computed(() => sortedFiltered.value.length ? (page.value - 1) * pageSize.value + 1 : 0)
-const pageEnd = computed(() => Math.min(page.value * pageSize.value, sortedFiltered.value.length))
-const pageNumbers = computed(() => {
-  const t = totalPages.value
-  const p = page.value
-  if (t <= 5) return Array.from({ length: t }, (_, i) => i + 1)
-  if (p <= 3) return [1, 2, 3, 4, 5]
-  if (p >= t - 2) return [t - 4, t - 3, t - 2, t - 1, t]
-  return [p - 2, p - 1, p, p + 1, p + 2]
-})
+async function fetchPage() {
+  localLoading.value = true
+  try {
+    const res = await api.getCertificates({
+      page: page.value,
+      page_size: pageSize.value,
+      sort: sortKey.value,
+      order: sortDir.value
+    })
+    rows.value = res.items || []
+    totalItems.value = res.meta?.total || 0
+    totalPages.value = Math.max(1, res.meta?.total_pages || 1)
+    page.value = Math.max(1, res.meta?.page || 1)
+  } finally {
+    localLoading.value = false
+  }
+}
 
 function toggleSort(key) {
   if (sortKey.value === key) {
@@ -213,13 +218,29 @@ function toggleSort(key) {
     sortKey.value = key
     sortDir.value = 'asc'
   }
+  page.value = 1
+  fetchPage()
 }
 function sortClass(key) {
   if (sortKey.value !== key) return 'sort-idle'
   return sortDir.value === 'asc' ? 'sort-asc' : 'sort-desc'
 }
+function applyJump() {
+  const p = Number(jumpPage.value || 1)
+  if (!Number.isFinite(p)) return
+  page.value = Math.min(totalPages.value, Math.max(1, Math.floor(p)))
+  fetchPage()
+}
 
-watch([sortedFiltered, pageSize], () => { page.value = 1 })
+watch(pageSize, () => {
+  page.value = 1
+  jumpPage.value = 1
+  fetchPage()
+})
+watch(page, (p) => {
+  jumpPage.value = p
+  fetchPage()
+})
 watch(sortedFiltered, (arr) => {
   if (!arr.length) {
     selected.value = null
@@ -227,6 +248,12 @@ watch(sortedFiltered, (arr) => {
   }
   if (!selected.value || !arr.find(c => c.domain === selected.value.domain)) selected.value = arr[0]
 }, { immediate: true })
+watch(() => props.status?.generated_at, () => {
+  fetchPage()
+})
+onMounted(() => {
+  fetchPage()
+})
 </script>
 
 <style scoped>
@@ -295,6 +322,8 @@ watch(sortedFiltered, (arr) => {
 }
 .proxy-table-tools { display: flex; align-items: center; gap: 12px; }
 .page-size { margin-left: 6px; width: 74px; height: 28px; padding: 0 8px; }
+.quick-jump { display: inline-flex; align-items: center; gap: 6px; }
+.jump-input { width: 72px; height: 30px; padding: 0 8px; }
 .table-scroll { min-height: 0; overflow: auto; }
 .sticky-head th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
 .table-wrap table { table-layout: fixed; }
@@ -314,7 +343,7 @@ watch(sortedFiltered, (arr) => {
 .sort-asc::before { content: '↑'; }
 .sort-desc::before { content: '↓'; }
 .sort-asc, .sort-desc { font-size: 0; }
-.proxy-pager { margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.proxy-pager { margin-top: 10px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .page-num-list { display: flex; gap: 6px; }
 .page-num { min-width: 34px; padding: 0 8px; }
 .page-num.active { color: #bfdbfe; border-color: #1d4ed8; background: #172554; }
