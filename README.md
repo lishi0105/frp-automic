@@ -9,6 +9,10 @@ FRP 服务端一体化部署与监控工具集。包含两个组件：
 
 ## 快速开始
 
+### 前置条件
+- 域名必须已通过云解析服务（如阿里云 DNS、腾讯云 DNS、Cloudflare DNS）配置通配符 A 记录（`*.<root_domain>`），并解析到部署该服务的云服务器公网 IPv4 地址。
+- 云服务器需要开放80/443端口以及至少一个 TCP 端口供 frps 使用（脚本会自动输出需要开放的端口并提示）。
+
 ### 1. 配置
 
 生成并编辑配置文件：
@@ -78,9 +82,6 @@ python3 vps-install-frps.py -r
 
 # 只更新/启动代理相关配置，不自动申请证书；所有服务强制按 TCP 代理处理
 python3 vps-install-frps.py -p
-
-# 仅编译 frps-status-app 镜像（等价：--build）
-python3 vps-install-frps.py -b
 
 # 清理脚本生成的容器、镜像和目录
 python3 vps-install-frps.py --clean

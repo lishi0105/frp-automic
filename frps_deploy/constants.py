@@ -28,10 +28,9 @@ STATUS_APP_ENV_FILE = STATUS_APP_DIR / ".env"
 STATUS_APP_DATA_DIR = STATUS_APP_DIR / "data"
 
 DEFAULT_SERVICES: List[Dict[str, Any]] = [
-    {"alias": "emby",      "comment": "Emby 媒体服务", "mode": "http", "port": 7096, "local_port": 7096, "local_ip": "127.0.0.1", "expose_http_port": False},
+    {"alias": "emby",      "comment": "Emby 媒体服务", "mode": "http", "port": 7096, "local_ip": "127.0.0.1", "expose_http_port": False},
     {"alias": "gitlab",    "comment": "GitLab 服务",   "mode": "http", "port": 5080, "expose_http_port": False},
-    {"alias": "speedtest", "comment": "Speedtest 服务","mode": "http", "port": 3010, "expose_http_port": False},
-    {"alias": "gitlab_ssh","comment": "GitLab SSH",    "mode": "tcp",  "port": 5022, "local_port": 22, "local_ip": "127.0.0.1"},
+    {"alias": "gitlab_ssh","comment": "GitLab SSH",    "mode": "tcp",  "port": 5022, "local_ip": "127.0.0.1"},
 ]
 
 DEFAULT_CONFIG: Dict[str, Any] = {
