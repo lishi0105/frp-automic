@@ -105,7 +105,7 @@ def generate_frps_compose(ctx: DeployContext) -> None:
         domains_str = ",".join(managed_domains(ctx.root_domain))
         status_section = f"""
   frps-status:
-    image: frps-status:latest
+    image: lishi0105/frps-status:latest
     container_name: frps_status_{ctx.suffix}
     restart: unless-stopped
     depends_on:
