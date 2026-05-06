@@ -44,9 +44,19 @@
               type="button"
               class="password-toggle"
               :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+              :title="showPassword ? '隐藏密码' : '显示密码'"
               @click="showPassword = !showPassword"
             >
-              {{ showPassword ? '隐' : '显' }}
+              <svg v-if="!showPassword" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>
+              </svg>
+              <svg v-else viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="m10.477 5.08-.12.02a10.75 10.75 0 0 0-8.295 6.553 1 1 0 0 0 0 .694 10.75 10.75 0 0 0 14.708 5.79" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="m14.084 14.158.01-.01a3 3 0 0 0-4.242-4.243" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M2 2l20 20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M20.94 12.35a10.75 10.75 0 0 0-5.44-5.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
             </button>
           </span>
         </label>
@@ -158,18 +168,31 @@ async function submitForgot() {
   top: 50%;
   right: 8px;
   transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--border, #334155);
-  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
   background: transparent;
-  color: inherit;
-  font-size: 14px;
+  color: var(--text-2, #6b7280);
+  padding: 0;
   line-height: 1;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color .15s ease, background-color .15s ease;
+}
+.password-toggle svg {
+  width: 17px;
+  height: 17px;
 }
 .password-toggle:hover {
-  background: rgba(148, 163, 184, .12);
+  color: var(--text, #0f172a);
+  background: rgba(148, 163, 184, .16);
+}
+.password-toggle:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, .45);
+  outline-offset: 1px;
 }
 .login-forgot-link {
   text-align: center;
