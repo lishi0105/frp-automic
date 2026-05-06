@@ -73,6 +73,8 @@ func (s *Store) InitDB() error {
 		`CREATE TABLE IF NOT EXISTS proxy_status_events (key TEXT NOT NULL, status INTEGER NOT NULL, at TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, password_salt TEXT NOT NULL, recovery_email TEXT NOT NULL DEFAULT '', is_initial_password INTEGER NOT NULL DEFAULT 1)`,
 		`CREATE TABLE IF NOT EXISTS warnings (key TEXT PRIMARY KEY, message TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS iface_counters (iface TEXT NOT NULL, public_ip TEXT NOT NULL, last_rx_bytes INTEGER NOT NULL, last_tx_bytes INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(iface,public_ip))`,
+		`CREATE TABLE IF NOT EXISTS daily_iface_traffic (day TEXT NOT NULL, iface TEXT NOT NULL, public_ip TEXT NOT NULL, rx_kb INTEGER NOT NULL DEFAULT 0, tx_kb INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(day,iface,public_ip))`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.Exec(stmt); err != nil {
@@ -91,6 +93,7 @@ func (s *Store) InitDB() error {
 	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN first_fail_at TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN last_seen_at TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_proxy_status_events_key_at ON proxy_status_events(key, at)`)
+	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_daily_iface_traffic_day ON daily_iface_traffic(day)`)
 	defaults := map[string]string{"alert_in_gb": "0", "alert_out_gb": "0", "alert_total_gb": "0", "smtp_port": "465", "smtp_enabled": "false", "alert_proxy_offline": "false", "alert_cert_expiry": "false", "alert_cert_days": "15", "smtp_verified": "false"}
 	for k, v := range defaults {
 		if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)`, k, v); err != nil {
@@ -282,6 +285,92 @@ func (s *Store) DailyTraffic() ([]map[string]any, error) {
 		data = append(data, map[string]any{"day": day, "name": name, "type": typ, "in": clampZero(in), "out": clampZero(out), "peak_conns": clampZero(peak)})
 	}
 	return data, nil
+}
+
+func (s *Store) RecordInterfaceTraffic(iface, publicIP string, rxBytes, txBytes uint64, now time.Time) error {
+	day := now.Format("2006-01-02")
+	cutoff := now.AddDate(0, 0, -90).Format("2006-01-02")
+	tx, err := s.db.Begin()
+	if err != nil {
+		return logStoreErr("begin record iface traffic transaction", err)
+	}
+	defer tx.Rollback()
+
+	var lastRx, lastTx uint64
+	err = tx.QueryRow(`SELECT last_rx_bytes,last_tx_bytes FROM iface_counters WHERE iface=? AND public_ip=?`, iface, publicIP).Scan(&lastRx, &lastTx)
+	if errors.Is(err, sql.ErrNoRows) {
+		_, err = tx.Exec(`INSERT INTO iface_counters(iface,public_ip,last_rx_bytes,last_tx_bytes,updated_at) VALUES(?,?,?,?,?)`,
+			iface, publicIP, rxBytes, txBytes, now.UTC().Format(time.RFC3339))
+		if err != nil {
+			return logStoreErr("insert iface counter "+iface+"/"+publicIP, err)
+		}
+		return logStoreErr("commit record iface traffic init transaction", tx.Commit())
+	}
+	if err != nil {
+		return logStoreErr("query iface counter "+iface+"/"+publicIP, err)
+	}
+
+	deltaRx := deltaCounter(lastRx, rxBytes)
+	deltaTx := deltaCounter(lastTx, txBytes)
+	rxKB := deltaRx / 1024
+	txKB := deltaTx / 1024
+
+	if rxKB > 0 || txKB > 0 {
+		_, err = tx.Exec(`INSERT INTO daily_iface_traffic(day,iface,public_ip,rx_kb,tx_kb) VALUES(?,?,?,?,?)
+ON CONFLICT(day,iface,public_ip) DO UPDATE SET rx_kb=rx_kb+excluded.rx_kb,tx_kb=tx_kb+excluded.tx_kb`,
+			day, iface, publicIP, rxKB, txKB)
+		if err != nil {
+			return logStoreErr("upsert daily iface traffic "+iface+"/"+publicIP, err)
+		}
+	}
+	_, err = tx.Exec(`UPDATE iface_counters SET last_rx_bytes=?,last_tx_bytes=?,updated_at=? WHERE iface=? AND public_ip=?`,
+		rxBytes, txBytes, now.UTC().Format(time.RFC3339), iface, publicIP)
+	if err != nil {
+		return logStoreErr("update iface counter "+iface+"/"+publicIP, err)
+	}
+	if _, err := tx.Exec(`DELETE FROM daily_iface_traffic WHERE day < ?`, cutoff); err != nil {
+		return logStoreErr("delete expired daily iface traffic", err)
+	}
+	return logStoreErr("commit record iface traffic transaction", tx.Commit())
+}
+
+func (s *Store) DailyInterfaceTraffic(fromDay, toDay string) ([]map[string]any, error) {
+	query := `SELECT day,iface,public_ip,rx_kb,tx_kb FROM daily_iface_traffic`
+	args := []any{}
+	where := []string{}
+	if strings.TrimSpace(fromDay) != "" {
+		where = append(where, "day >= ?")
+		args = append(args, fromDay)
+	}
+	if strings.TrimSpace(toDay) != "" {
+		where = append(where, "day <= ?")
+		args = append(args, toDay)
+	}
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	query += " ORDER BY day,iface,public_ip"
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, logStoreErr("query daily iface traffic", err)
+	}
+	defer rows.Close()
+	out := make([]map[string]any, 0)
+	for rows.Next() {
+		var day, iface, publicIP string
+		var rxKB, txKB int64
+		if err := rows.Scan(&day, &iface, &publicIP, &rxKB, &txKB); err != nil {
+			return nil, logStoreErr("scan daily iface traffic row", err)
+		}
+		out = append(out, map[string]any{
+			"day":       day,
+			"iface":     iface,
+			"public_ip": publicIP,
+			"rx_kb":     clampZero(rxKB),
+			"tx_kb":     clampZero(txKB),
+		})
+	}
+	return out, nil
 }
 
 func deltaCounter(old, current uint64) uint64 {

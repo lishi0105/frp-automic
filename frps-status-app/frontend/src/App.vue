@@ -67,6 +67,7 @@
             </RouterLink>
           </div>
         </div>
+        <RouterLink class="nav-item" to="/traffic-statistics"><span class="nav-icon">🛰️</span> 流量统计</RouterLink>
         <RouterLink class="nav-item" to="/settings"><span class="nav-icon">⚙️</span> 系统配置</RouterLink>
       </nav>
       <div class="sidebar-footer">

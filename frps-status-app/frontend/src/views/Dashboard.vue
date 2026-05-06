@@ -39,6 +39,12 @@
               <div class="thin-progress"><div class="green" :style="{ width: outPct + '%' }"></div></div>
             </div>
           </div>
+          <div class="iface-month-summary">
+            <span>网卡汇总</span>
+            <b>{{ humanBytesKB(ifaceMonthInKB) }} ↑</b>
+            <b>{{ humanBytesKB(ifaceMonthOutKB) }} ↓</b>
+            <b>{{ humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }}</b>
+          </div>
         </section>
 
         <section class="summary-card online-card">
@@ -239,6 +245,8 @@ const logMeta = computed(() => {
   if (!logPath.value) return '当前日志文件'
   return `${logPath.value} · ${humanBytes(logSize.value)}`
 })
+const ifaceMonthInKB = ref(0)
+const ifaceMonthOutKB = ref(0)
 
 function parseLogRows(content) {
   if (!content) return []
@@ -431,13 +439,41 @@ function formatLocalDate(d) {
   return `${y}-${m}-${day}`
 }
 
+function humanBytesKB(kb) {
+  return humanBytes(Number(kb || 0) * 1024)
+}
+
+async function loadIfaceMonthSummary() {
+  const now = new Date()
+  const from = formatLocalDate(new Date(now.getFullYear(), now.getMonth(), 1))
+  const to = formatLocalDate(now)
+  try {
+    const rows = await api.getDailyInterface({ from, to })
+    let inKB = 0
+    let outKB = 0
+    for (const r of (rows || [])) {
+      inKB += Number(r.rx_kb || 0)
+      outKB += Number(r.tx_kb || 0)
+    }
+    ifaceMonthInKB.value = inKB
+    ifaceMonthOutKB.value = outKB
+  } catch {
+    ifaceMonthInKB.value = 0
+    ifaceMonthOutKB.value = 0
+  }
+}
+
 watch(() => props.daily, (d) => buildChart(d))
+watch(() => props.status?.generated_at, () => {
+  loadIfaceMonthSummary()
+})
 const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => chart?.resize()) : null
 
 onMounted(async () => {
   await nextTick()
   chart = echarts.init(chartEl.value)
   if (props.daily?.length) buildChart(props.daily)
+  loadIfaceMonthSummary()
   ro?.observe(chartEl.value)
 })
 
@@ -603,6 +639,21 @@ onUnmounted(() => {
   display: grid;
   gap: 12px;
   margin-top: 10px;
+}
+.iface-month-summary {
+  margin-top: 10px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #475569;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.iface-month-summary b {
+  color: #0f172a;
+  font-weight: 600;
 }
 .traffic-line {
   display: grid;

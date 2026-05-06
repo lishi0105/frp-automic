@@ -34,6 +34,7 @@ export const api = {
   getProxies: (params) => request(withQuery('api/proxies', params)),
   getCertificates: (params) => request(withQuery('api/certificates', params)),
   getDaily: () => request('api/daily'),
+  getDailyInterface: (params) => request(withQuery('api/daily/interface', params)),
   getSettings: () => request('api/settings'),
   saveSettings: (data) => post('api/settings', data),
   testEmail: () => post('api/settings/test-email'),

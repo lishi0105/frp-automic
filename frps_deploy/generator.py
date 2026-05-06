@@ -126,7 +126,7 @@ def generate_frps_compose(ctx: DeployContext) -> None:
       CERT_DIR: "/etc/letsencrypt/live"
       POLL_SECONDS: "60"
     volumes:
-      - ../frps-status-app/data:/data
+      - ./frps-status/data:/data
       - ./certbot/conf:/etc/letsencrypt:ro
 """
 

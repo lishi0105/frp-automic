@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -61,6 +62,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/api/proxies", a.withAuth(a.handleProxies))
 	mux.HandleFunc("/api/certificates", a.withAuth(a.handleCertificates))
 	mux.HandleFunc("/api/daily", a.withAuth(a.handleDaily))
+	mux.HandleFunc("/api/daily/interface", a.withAuth(a.handleDailyInterface))
 	mux.HandleFunc("/api/daily/export", a.withAuth(a.handleExportCSV))
 	mux.HandleFunc("/api/settings", a.withAuth(a.handleSettings))
 	mux.HandleFunc("/api/settings/test-email", a.withAuth(a.handleTestEmail))
@@ -107,6 +109,7 @@ func (a *App) Refresh(ctx context.Context) error {
 		a.checkProxyAlerts(settings, proxies)
 		a.syncProxyWarnings(proxies)
 	}
+	a.collectInterfaceTraffic()
 	a.checkCertAlerts(settings, certs)
 	a.syncCertWarnings(settings, certs)
 	a.syncTrafficWarnings(settings, monthIn, monthOut)
@@ -132,6 +135,31 @@ func (a *App) Refresh(ctx context.Context) error {
 	a.latest = s
 	a.mu.Unlock()
 	return fetchErr
+}
+
+func (a *App) collectInterfaceTraffic() {
+	publicIP, err := detectOutboundPublicIP()
+	if err != nil || publicIP == "" {
+		if err != nil {
+			logger.Warn("识别公网出口IP失败: %v", err)
+		}
+		return
+	}
+	iface, err := interfaceByIP(publicIP)
+	if err != nil || iface == "" {
+		if err != nil {
+			logger.Warn("根据公网IP匹配网卡失败 IP=%s 错误=%v", publicIP, err)
+		}
+		return
+	}
+	rxBytes, txBytes, err := readInterfaceCounters(iface)
+	if err != nil {
+		logger.Warn("读取网卡计数失败 网卡=%s 错误=%v", iface, err)
+		return
+	}
+	if err := a.store.RecordInterfaceTraffic(iface, publicIP, rxBytes, txBytes, time.Now()); err != nil {
+		logger.Error("记录网卡日流量失败 网卡=%s IP=%s 错误=%v", iface, publicIP, err)
+	}
 }
 
 const (
@@ -1185,6 +1213,92 @@ func (a *App) handleDaily(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, data)
+}
+
+func (a *App) handleDailyInterface(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	fromDay := strings.TrimSpace(r.URL.Query().Get("from"))
+	toDay := strings.TrimSpace(r.URL.Query().Get("to"))
+	data, err := a.store.DailyInterfaceTraffic(fromDay, toDay)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, data)
+}
+
+func detectOutboundPublicIP() (string, error) {
+	conn, err := net.DialTimeout("udp", "8.8.8.8:80", 2*time.Second)
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+	addr, ok := conn.LocalAddr().(*net.UDPAddr)
+	if !ok || addr == nil || addr.IP == nil {
+		return "", errors.New("invalid local udp address")
+	}
+	ip := addr.IP.To4()
+	if ip == nil {
+		return "", errors.New("non-ipv4 outbound ip")
+	}
+	return ip.String(), nil
+}
+
+func interfaceByIP(ipStr string) (string, error) {
+	ip := net.ParseIP(strings.TrimSpace(ipStr))
+	if ip == nil {
+		return "", errors.New("invalid ip")
+	}
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	for _, iface := range ifaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			var addrIP net.IP
+			switch a := addr.(type) {
+			case *net.IPNet:
+				addrIP = a.IP
+			case *net.IPAddr:
+				addrIP = a.IP
+			}
+			if addrIP == nil {
+				continue
+			}
+			if addrIP.Equal(ip) {
+				return iface.Name, nil
+			}
+		}
+	}
+	return "", errors.New("no interface bound with ip")
+}
+
+func readInterfaceCounters(iface string) (uint64, uint64, error) {
+	base := filepath.Join("/sys/class/net", iface, "statistics")
+	rxRaw, err := os.ReadFile(filepath.Join(base, "rx_bytes"))
+	if err != nil {
+		return 0, 0, err
+	}
+	txRaw, err := os.ReadFile(filepath.Join(base, "tx_bytes"))
+	if err != nil {
+		return 0, 0, err
+	}
+	rx, err := strconv.ParseUint(strings.TrimSpace(string(rxRaw)), 10, 64)
+	if err != nil {
+		return 0, 0, err
+	}
+	tx, err := strconv.ParseUint(strings.TrimSpace(string(txRaw)), 10, 64)
+	if err != nil {
+		return 0, 0, err
+	}
+	return rx, tx, nil
 }
 
 func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {

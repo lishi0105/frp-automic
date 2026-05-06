@@ -3,6 +3,7 @@ import Dashboard from '../views/Dashboard.vue'
 import ProxyList from '../views/ProxyList.vue'
 import CertificateList from '../views/CertificateList.vue'
 import Statistics from '../views/Statistics.vue'
+import TrafficStatistics from '../views/TrafficStatistics.vue'
 import Settings from '../views/Settings.vue'
 import Login from '../views/Login.vue'
 import { api } from '../api/index.js'
@@ -15,6 +16,7 @@ const router = createRouter({
     { path: '/certificates', component: CertificateList },
     { path: '/statistics', component: Statistics },
     { path: '/statistics/:proxyName', component: Statistics },
+    { path: '/traffic-statistics', component: TrafficStatistics },
     { path: '/settings', component: Settings },
     { path: '/account', redirect: '/?account=1' },
     { path: '/login', component: Login, meta: { public: true } }
