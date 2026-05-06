@@ -20,7 +20,10 @@
           <div class="text-muted text-sm">共 {{ certs.length }} 张证书，{{ warnCount }} 张临期，{{ failCount }} 张异常</div>
         </div>
         <div class="analytics-overview-metrics">
-          <div class="metric-inline"><b>{{ okCount }}</b><span>/ {{ certs.length }}</span><small>正常证书</small></div>
+          <div class="metric-inline">
+            <div class="metric-value"><b>{{ okCount }}</b><span>/ {{ certs.length }}</span></div>
+            <small>正常证书</small>
+          </div>
           <div><b>{{ warnCount }}</b><small>15天内到期</small></div>
           <div><b>{{ minDaysLabel }}</b><small>最快过期</small></div>
         </div>
@@ -261,11 +264,16 @@ watch(sortedFiltered, (arr) => {
 }
 .metric-inline {
   display: flex !important;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.metric-value {
+  display: inline-flex;
   align-items: baseline;
   gap: 4px;
 }
 .metric-inline small {
-  margin-left: 6px;
   white-space: nowrap;
 }
 .cert-main-custom {

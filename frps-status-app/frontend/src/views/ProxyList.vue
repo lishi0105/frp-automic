@@ -21,7 +21,10 @@
           <div class="text-muted text-sm">共 {{ totalProxies }} 个代理，{{ onlineCount }} 个在线</div>
         </div>
         <div class="analytics-overview-metrics">
-          <div class="metric-inline"><b>{{ onlineCount }}</b><span>/ {{ totalProxies }}</span><small>在线代理</small></div>
+          <div class="metric-inline">
+            <div class="metric-value"><b>{{ onlineCount }}</b><span>/ {{ totalProxies }}</span></div>
+            <small>在线代理</small>
+          </div>
           <div><b>{{ curConnsTotal }}</b><small>当前连接数</small></div>
           <div><b>{{ humanBytes(monthTotal) }}</b><small>本月总流量</small></div>
         </div>
@@ -316,11 +319,16 @@ watch(sortedFiltered, (arr) => {
 }
 .metric-inline {
   display: flex !important;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.metric-value {
+  display: inline-flex;
   align-items: baseline;
   gap: 4px;
 }
 .metric-inline small {
-  margin-left: 6px;
   white-space: nowrap;
 }
 .proxy-table-wrap, .proxy-detail {
