@@ -84,7 +84,7 @@
               </tbody>
             </table>
           </div>
-          <div v-if="totalPages > 1" class="analytics-pager proxy-pager">
+          <div class="analytics-pager proxy-pager">
             <button class="btn btn-outline btn-sm" :disabled="page <= 1" @click="page--">上一页</button>
             <div class="page-num-list">
               <button
