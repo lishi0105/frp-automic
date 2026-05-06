@@ -92,28 +92,32 @@ def get_public_ip() -> str:
     raise RuntimeError("无法自动获取 VPS 公网 IP，请在 frps-config.json 中填写 vps_public_ip")
 
 
+def get_default_route_iface() -> str:
+    """Resolve default outbound interface via `ip route get 1.1.1.1`."""
+    ret = subprocess.run(
+        ["ip", "route", "get", "1.1.1.1"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if ret.returncode != 0:
+        raise RuntimeError(f"无法通过路由识别默认网卡：{ret.stderr.strip()}")
+    parts = ret.stdout.strip().split()
+    if "dev" in parts:
+        idx = parts.index("dev")
+        if idx + 1 < len(parts):
+            iface = parts[idx + 1].strip()
+            if iface and iface != "lo":
+                return iface
+    raise RuntimeError("默认路由未返回有效网卡（dev）")
+
+
 def get_iface_by_ip(ip: str) -> str:
     """
     Resolve host interface name by IPv4 address.
     Prefer `ip route get <ip>` output, fallback to `ip -o -4 addr show`.
     """
-    try:
-        ret = subprocess.run(
-            ["ip", "route", "get", ip],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        if ret.returncode == 0:
-            parts = ret.stdout.strip().split()
-            if "dev" in parts:
-                idx = parts.index("dev")
-                if idx + 1 < len(parts):
-                    iface = parts[idx + 1].strip()
-                    if iface:
-                        return iface
-    except Exception:
-        pass
+    # Keep this function as fallback only; prefer get_default_route_iface().
 
     ret = subprocess.run(
         ["ip", "-o", "-4", "addr", "show"],

@@ -17,7 +17,7 @@ from frps_deploy.constants import BASE_DIR
 from frps_deploy.docker_env import (
     check_docker_compose, check_docker_permission, check_frps_server_port,
     check_required_ports,
-    get_latest_frp_version, get_public_ip, get_iface_by_ip,
+    get_latest_frp_version, get_public_ip, get_iface_by_ip, get_default_route_iface,
 )
 from frps_deploy.generator import (
     ensure_dirs, generate_frpc_compose, generate_frpc_toml,
@@ -122,7 +122,10 @@ def build_context(root_domain: str, email: str) -> DeployContext:
     else:
         status_port = random_free_port_excluding(generated_ports)
     vps_public_ip = validate_ipv4(config.VPS_PUBLIC_IP) if config.VPS_PUBLIC_IP else validate_ipv4(get_public_ip())
-    host_iface = get_iface_by_ip(vps_public_ip)
+    try:
+        host_iface = get_default_route_iface()
+    except Exception:
+        host_iface = get_iface_by_ip(vps_public_ip)
     print(f"检测到公网IP对应网卡：{host_iface}")
 
     return DeployContext(
