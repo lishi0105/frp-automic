@@ -12,12 +12,15 @@ FRPS + Nginx + Certbot 一体化部署脚本
 6. 支持服务列表 JSON 配置：
    - mode = "http"：走 Nginx HTTPS 反代，生成 alias.root_domain 证书；
    - mode = "tcp" ：不反代，直接公网开放 remote port，例如 GitLab SSH；
-7. 支持 local_port：
+7. 支持 tunnel：
+   - tunnel 缺省为 true，表示通过 frp 穿透；
+   - tunnel = false 表示服务已在 VPS 本机，HTTP 模式下由 Nginx 直接反代到 local_ip:local_port；
+8. 支持 local_port：
    - port       表示 VPS/frps 侧端口，也就是 frpc 的 remotePort；
    - local_port 表示内网真实服务端口，缺失时默认等于 port；
-8. 分别生成 frps/docker-compose.yml、frps/frps.toml、nginx 配置，以及 frpc/docker-compose.yml、frpc/frpc.toml；
-9. 使用 certbot webroot 模式申请证书，并启动自动续期容器；
-10. 容器名格式：服务名 + '_' + 16 位随机英文大小写后缀。
+9. 分别生成 frps/docker-compose.yml、frps/frps.toml、nginx 配置，以及 frpc/docker-compose.yml、frpc/frpc.toml；
+10. 使用 certbot webroot 模式申请证书，并启动自动续期容器；
+11. 容器名格式：服务名 + '_' + 16 位随机英文大小写后缀。
 
 使用前提：
 - 当前机器已经安装 Docker Engine 和 docker compose 插件；

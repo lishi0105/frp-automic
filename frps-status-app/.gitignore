@@ -4,6 +4,7 @@
 
 # 数据目录
 data/
+frps-status-app/frontend/design
 
 # Go 编译产物
 frps-status

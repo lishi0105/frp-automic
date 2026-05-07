@@ -16,6 +16,7 @@ NGINX_CONF_DIR    = BASE_DIR / "nginx" / "conf.d"
 CERTBOT_CONF_DIR  = BASE_DIR / "certbot" / "conf"
 CERTBOT_WWW_DIR   = BASE_DIR / "certbot" / "www"
 GENERATED_INFO_FILE = BASE_DIR / ".env.generated.txt"
+DEPLOY_STATE_FILE = BASE_DIR / ".deploy-state.json"
 COMPOSE_FILE      = BASE_DIR / "docker-compose.yml"
 FRPS_TOML_FILE    = BASE_DIR / "frps.toml"
 
@@ -28,9 +29,9 @@ STATUS_APP_ENV_FILE = STATUS_APP_DIR / ".env"
 STATUS_APP_DATA_DIR = STATUS_APP_DIR / "data"
 
 DEFAULT_SERVICES: List[Dict[str, Any]] = [
-    {"alias": "emby",      "comment": "Emby 媒体服务", "mode": "http", "port": 7096, "local_ip": "127.0.0.1", "expose_http_port": False},
-    {"alias": "gitlab",    "comment": "GitLab 服务",   "mode": "http", "port": 5080, "expose_http_port": False},
-    {"alias": "gitlab_ssh","comment": "GitLab SSH",    "mode": "tcp",  "port": 5022, "local_ip": "127.0.0.1"},
+    {"alias": "emby",      "comment": "Emby 媒体服务", "mode": "http", "tunnel": True, "port": 7096, "local_ip": "127.0.0.1", "expose_http_port": False},
+    {"alias": "gitlab",    "comment": "GitLab 服务",   "mode": "http", "tunnel": True, "port": 5080, "expose_http_port": False},
+    {"alias": "gitlab_ssh","comment": "GitLab SSH",    "mode": "tcp",  "tunnel": True, "port": 5022, "local_ip": "127.0.0.1"},
 ]
 
 DEFAULT_CONFIG: Dict[str, Any] = {

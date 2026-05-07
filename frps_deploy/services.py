@@ -10,6 +10,20 @@ def mode_of(item: Dict[str, Any]) -> str:
     return str(item.get("mode", "http")).strip().lower()
 
 
+def bool_value(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
+
+
+def needs_tunnel(item: Dict[str, Any]) -> bool:
+    return bool_value(item.get("tunnel", item.get("need_tunnel", True)), default=True)
+
+
 def remote_port(item: Dict[str, Any]) -> int:
     return int(item["port"])
 
@@ -23,12 +37,18 @@ def local_ip(item: Dict[str, Any]) -> str:
 
 
 def expose_http_port(item: Dict[str, Any]) -> bool:
-    value = item.get("expose_http_port", False)
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
-    return bool(value)
+    return bool_value(item.get("expose_http_port", False), default=False)
+
+
+def upstream_host(item: Dict[str, Any]) -> str:
+    host = local_ip(item).strip() or "127.0.0.1"
+    if host in {"127.0.0.1", "localhost"}:
+        return "host.docker.internal"
+    return host
+
+
+def tunneled_services() -> List[Dict[str, Any]]:
+    return [s for s in config.SERVICES if needs_tunnel(s)]
 
 
 def http_services() -> List[Dict[str, Any]]:
@@ -40,24 +60,25 @@ def tcp_services() -> List[Dict[str, Any]]:
 
 
 def all_remote_ports() -> List[int]:
-    return sorted({remote_port(s) for s in config.SERVICES})
+    return sorted({remote_port(s) for s in tunneled_services()})
 
 
 def http_remote_ports() -> List[int]:
-    return sorted({remote_port(s) for s in http_services()})
+    return sorted({remote_port(s) for s in http_services() if needs_tunnel(s)})
 
 
 def exposed_http_remote_ports() -> List[int]:
-    return sorted({remote_port(s) for s in http_services() if expose_http_port(s)})
+    return sorted({remote_port(s) for s in http_services() if needs_tunnel(s) and expose_http_port(s)})
 
 
 def tcp_remote_ports() -> List[int]:
-    return sorted({remote_port(s) for s in tcp_services()})
+    return sorted({remote_port(s) for s in tcp_services() if needs_tunnel(s)})
 
 
 def force_all_services_tcp() -> None:
     for item in config.SERVICES:
-        item["mode"] = "tcp"
+        if needs_tunnel(item):
+            item["mode"] = "tcp"
 
 
 def http_domains(root_domain: str) -> List[str]:
@@ -83,10 +104,10 @@ def validate_services() -> None:
     aliases: set = set()
     ports: set = set()
 
-    for item in config.SERVICES:
+    for index, item in enumerate(config.SERVICES, start=1):
         alias = str(item.get("alias", "")).strip()
         if not alias:
-            raise ValueError("SERVICES 中存在空 alias")
+            raise ValueError(f"services[{index}] 缺少 alias 或 alias 为空")
         if alias in aliases:
             raise ValueError(f"SERVICES 中 alias 重复：{alias}")
         if alias in {"frps", "status"}:
@@ -97,15 +118,28 @@ def validate_services() -> None:
         if mode not in {"http", "tcp"}:
             raise ValueError(f"服务 {alias} 的 mode 非法：{mode}，只支持 http/tcp")
 
-        rp = remote_port(item)
-        lp = local_port(item)
-        if not (1 <= rp <= 65535):
+        if "port" not in item:
+            raise ValueError(f"服务 {alias} 缺少 port")
+
+        try:
+            rp = remote_port(item)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"服务 {alias} 的 port 必须是整数：{item.get('port')!r}") from exc
+        try:
+            lp = local_port(item)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"服务 {alias} 的 local_port 必须是整数：{item.get('local_port')!r}") from exc
+        if not (1000 <= rp <= 65535):
             raise ValueError(f"服务 {alias} 的 port 非法：{rp}")
-        if not (1 <= lp <= 65535):
+        if not (1000 <= lp <= 65535):
             raise ValueError(f"服务 {alias} 的 local_port 非法：{lp}")
         if rp in ports:
             raise ValueError(f"SERVICES 中 port 重复：{rp}")
         ports.add(rp)
+
+        tunnel = item.get("tunnel", item.get("need_tunnel", True))
+        if not isinstance(tunnel, (bool, str, int)):
+            raise ValueError(f"服务 {alias} 的 tunnel 必须是布尔值")
 
         if mode == "http":
             for ch in alias:

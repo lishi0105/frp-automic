@@ -66,6 +66,28 @@ def load_config_file() -> Dict[str, Any]:
     return data
 
 
+def _require_object(value: Any, key: str) -> Dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"配置项 {key} 必须是 object")
+    return value
+
+
+def _validate_runtime_config_shape(data: Dict[str, Any]) -> None:
+    for key in ("root_domain", "domain", "cert_email", "certificate_email", "email", "vps_public_ip", "public_ip"):
+        if key in data and data[key] is not None and not isinstance(data[key], str):
+            raise ValueError(f"配置项 {key} 必须是字符串")
+
+    _require_object(data.get("frps"), "frps")
+    _require_object(data.get("status"), "status")
+
+    services = data.get("services", DEFAULT_SERVICES)
+    if not isinstance(services, list):
+        raise ValueError("配置项 services 必须是数组")
+    for index, item in enumerate(services, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"services[{index}] 必须是 object")
+
+
 def _bool_config(value: Any, default: bool = False) -> bool:
     if isinstance(value, bool):
         return value
@@ -80,19 +102,16 @@ def load_runtime_config() -> None:
     global CONFIG, SERVICES, ROOT_DOMAIN, CERT_EMAIL, VPS_PUBLIC_IP, FRPS_SERVER_PORT, FRPS_TOKEN, FRPS_DASHBOARD_HTTP, STATUS_APP_ENABLED, STATUS_APP_PORT, STATUS_APP_HTTP, STATUS_APP_USER, STATUS_APP_PASSWORD
 
     CONFIG = load_config_file()
+    _validate_runtime_config_shape(CONFIG)
 
     services = CONFIG.get("services", DEFAULT_SERVICES)
-    if not isinstance(services, list):
-        raise ValueError("配置项 services 必须是数组")
 
     SERVICES    = services
     ROOT_DOMAIN = str(CONFIG.get("root_domain") or CONFIG.get("domain") or "").strip().lower()
     CERT_EMAIL  = str(CONFIG.get("cert_email") or CONFIG.get("certificate_email") or CONFIG.get("email") or "").strip()
     VPS_PUBLIC_IP = str(CONFIG.get("vps_public_ip") or CONFIG.get("public_ip") or "").strip()
 
-    frps_config = CONFIG.get("frps")
-    if not isinstance(frps_config, dict):
-        raise ValueError("配置项 frps 必须是 object")
+    frps_config = _require_object(CONFIG.get("frps"), "frps")
     FRPS_TOKEN = str(frps_config.get("token") or "").strip()
 
     raw_server_port = frps_config.get("server_port", 0)
@@ -103,9 +122,7 @@ def load_runtime_config() -> None:
 
     FRPS_DASHBOARD_HTTP = _bool_config(frps_config.get("dashboard_http", False), default=False)
 
-    status_config = CONFIG.get("status")
-    if not isinstance(status_config, dict):
-        raise ValueError("配置项 status 必须是 object")
+    status_config = _require_object(CONFIG.get("status"), "status")
 
     STATUS_APP_ENABLED = _bool_config(status_config.get("enabled", True), default=True)
     raw_status_port = status_config.get("port", 0)

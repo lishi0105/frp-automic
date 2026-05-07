@@ -10,7 +10,7 @@ from frps_deploy.constants import (
 from frps_deploy.models import DeployContext
 from frps_deploy.services import (
     dashboard_domain, http_services, local_ip, local_port, remote_port,
-    status_domain, tcp_services,
+    needs_tunnel, status_domain, tcp_services, tunneled_services,
 )
 from frps_deploy.utils import toml_str
 
@@ -25,7 +25,7 @@ def print_frpc_config(ctx: DeployContext) -> None:
     print("")
     print("[transport.tls]")
     print("enable = true")
-    for item in config.SERVICES:
+    for item in tunneled_services():
         print("")
         print(f"# {item.get('comment', item['alias'])}")
         print("[[proxies]]")
@@ -58,9 +58,10 @@ def print_result(ctx: DeployContext) -> None:
         print(f"  user     = {ctx.status_user}")
         print(f"  password = {ctx.status_password}")
 
-    if tcp_services():
+    tunneled_tcp_services = [item for item in tcp_services() if needs_tunnel(item)]
+    if tunneled_tcp_services:
         print("\nTCP 直通端口：")
-        for item in tcp_services():
+        for item in tunneled_tcp_services:
             print(f"  {item.get('comment', item['alias'])}: {ctx.vps_public_ip}:{remote_port(item)} -> {local_ip(item)}:{local_port(item)}")
 
     print("\nfrps 客户端连接信息：")
@@ -87,7 +88,7 @@ def print_result(ctx: DeployContext) -> None:
         print("  docker compose logs -f frps-status")
     print_frpc_config(ctx)
     print("\n注意：")
-    print("1. http 模式服务只在 Docker 内部 expose 给 nginx，外网不能直接用 IP:端口访问。")
+    print("1. http 模式服务默认只通过 HTTPS 域名访问；tunnel=false 时 nginx 会直接反代到 VPS 本机服务。")
     print("2. tcp 模式服务会直接把端口开放到公网，例如 GitLab SSH 的 5022。")
     print("3. frpc 和内网服务不在同一台机器时，请把 localIP 改成真实内网 IP。")
     print("4. 证书续期由 certbot 容器每 12 小时检查一次。")
@@ -134,10 +135,11 @@ def print_proxy_only_result(ctx: DeployContext) -> None:
     print(f"frps 配置：{FRPS_TOML_FILE}")
     print(f"frpc 配置：{FRPC_TOML_FILE}")
     print("\n本次未执行证书申请，也未改写现有 Nginx HTTPS 站点配置。")
-    print("所有服务已强制按 TCP 代理处理，忽略配置文件中的 mode 和 expose_http_port。")
-    if tcp_services():
+    print("需要穿透的服务已强制按 TCP 代理处理，忽略配置文件中的 mode 和 expose_http_port。")
+    tunneled_tcp_services = [item for item in tcp_services() if needs_tunnel(item)]
+    if tunneled_tcp_services:
         print("\n代理直通端口：")
-        for item in tcp_services():
+        for item in tunneled_tcp_services:
             print(f"  {item.get('comment', item['alias'])}: {ctx.vps_public_ip}:{remote_port(item)} -> {local_ip(item)}:{local_port(item)}")
     print("\nfrps 客户端连接信息：")
     print(f"  serverPort = {ctx.bind_port}")

@@ -11,7 +11,8 @@ from frps_deploy.models import DeployContext
 from frps_deploy.services import (
     all_remote_ports, dashboard_domain, exposed_http_remote_ports,
     http_remote_ports, http_services, local_ip, local_port, managed_domains,
-    remote_port, status_domain, tcp_remote_ports, tcp_services,
+    needs_tunnel, remote_port, status_domain, tcp_remote_ports, tcp_services,
+    tunneled_services, upstream_host,
 )
 from frps_deploy.utils import safe_alias, toml_str
 
@@ -71,7 +72,7 @@ def generate_frpc_toml(ctx: DeployContext) -> None:
         "[transport.tls]",
         "enable = true",
     ]
-    for item in config.SERVICES:
+    for item in tunneled_services():
         lines += [
             "",
             f"# {item.get('comment', item['alias'])}",
@@ -308,7 +309,11 @@ server {{
     for item in http_services():
         alias  = str(item["alias"])
         domain = f"{alias}.{ctx.root_domain}"
-        port   = remote_port(item)
+        proxy_target = (
+            f"http://frps:{remote_port(item)}"
+            if needs_tunnel(item)
+            else f"http://{upstream_host(item)}:{local_port(item)}"
+        )
         comment = str(item.get("comment", alias))
         conf = f"""# {comment}
 server {{
@@ -337,7 +342,7 @@ server {{
     client_max_body_size 0;
 
     location / {{
-        proxy_pass http://frps:{port};
+        proxy_pass {proxy_target};
 
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -356,9 +361,13 @@ server {{
         (NGINX_CONF_DIR / f"{safe_alias(alias)}.conf").write_text(conf, encoding="utf-8")
 
 
-def remove_https_confs() -> None:
+def remove_https_confs(previous_http_safe_aliases: list[str] | None = None) -> None:
     for name in ("frps-dashboard.conf", "frps-status.conf"):
         p = NGINX_CONF_DIR / name
+        if p.exists():
+            p.unlink()
+    for alias in previous_http_safe_aliases or []:
+        p = NGINX_CONF_DIR / f"{alias}.conf"
         if p.exists():
             p.unlink()
     for item in http_services():

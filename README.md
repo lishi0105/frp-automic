@@ -44,6 +44,7 @@ python3 vps-install-frps.py
 
 需要将所有 HTTP 服务域名，以及 `frps.<root_domain>`、`status.<root_domain>` 的 A 记录解析到 VPS 公网 IP。禁用 `status.enabled` 时不需要配置 `status.<root_domain>`。
 启动 frps 前脚本会检查 `frps.server_port/tcp` 是否被本机占用，并检查常见本机防火墙是否放行；云服务器还需要在云厂商安全组中放行该 TCP 端口。
+脚本会检查 JSON 配置文件结构、`services` 条目类型、必填端口、端口范围（`1000` 到 `65535`），以及 `services` 中的 `alias` 和 `port` 是否重复。
 
 服务列表示例：
 
@@ -64,14 +65,26 @@ python3 vps-install-frps.py
       "alias": "emby",
       "comment": "Emby 媒体服务",
       "mode": "http",      // http = Nginx HTTPS 反代；tcp = 直接暴露端口
+      "tunnel": true,      // 是否通过 frp 穿透，缺省 true；false 表示服务已在 VPS 本机
       "port": 8096,        // frps 侧端口（frpc remotePort）
       "local_port": 8096,  // 内网真实端口（缺省等于 port）
       "local_ip": "127.0.0.1", // 内网真实 IP（缺省为127.0.0.1)
       "expose_http_port": false // http 模式下是否额外开放 VPS_IP:port，默认 false
+    },
+    {
+      "alias": "alist",
+      "comment": "VPS 本机 Alist",
+      "mode": "http",
+      "tunnel": false,
+      "port": 5244,
+      "local_port": 5244,
+      "local_ip": "127.0.0.1"
     }
   ]
 }
 ```
+
+`tunnel: false` 适用于服务已经运行在 VPS 本机的场景。HTTP 服务仍会生成 `https://<alias>.<root_domain>` 的 Nginx 反代和证书配置，但不会生成 frpc 代理；Nginx 会直接转发到 VPS 本机的 `local_ip:local_port`。
 
 ### 2. 部署 frps
 
@@ -95,12 +108,22 @@ python3 vps-install-frps.py -s
 python3 vps-install-frps.py -c /path/to/frps-config.json -r
 ```
 
+运行 `-r/--run` 时，脚本会读取上次部署记录（`frps/.deploy-state.json`，旧版本则回退读取 `frps/.env.generated.txt`），并与当前 JSON 配置中的 `services` 对比：
+
+- 已部署且配置未变化的服务会保留，不重新生成随机端口、token 或容器后缀；
+- 配置新增的服务会加入 frps/frpc/Nginx/证书管理；
+- 配置已删除的服务会从 frps/frpc/Nginx 入口配置中移除；
+- alias 相同但端口、模式、穿透方式等发生变化的服务会按新配置更新。
+
+已存在的证书不会重复申请，后续续期仍由 certbot 容器处理。已删除服务的 Nginx 入口会被移除，但证书目录不会自动删除。
+
 脚本会在当前目录生成：
 
 ```
 frps/
   docker-compose.yml
   frps.toml
+  .deploy-state.json
   nginx/conf.d/
   certbot/
 frpc/

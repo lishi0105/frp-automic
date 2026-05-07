@@ -7,7 +7,7 @@ import urllib.request
 from typing import Optional
 
 from frps_deploy.console import print
-from frps_deploy.constants import BASE_DIR, CERTBOT_WWW_DIR
+from frps_deploy.constants import BASE_DIR, CERTBOT_CONF_DIR, CERTBOT_WWW_DIR
 from frps_deploy.models import DeployContext
 from frps_deploy.services import managed_domains
 from frps_deploy.utils import capture, run
@@ -82,6 +82,11 @@ def issue_certs(ctx: DeployContext) -> None:
         return
 
     for domain in domains:
+        cert_file = CERTBOT_CONF_DIR / "live" / domain / "fullchain.pem"
+        key_file = CERTBOT_CONF_DIR / "live" / domain / "privkey.pem"
+        if cert_file.exists() and key_file.exists():
+            print(f"\n证书已存在，跳过申请：{domain}")
+            continue
         print(f"\n开始申请证书：{domain}")
         verify_http_challenge(domain)
         certbot_cmd = [
@@ -101,7 +106,7 @@ def issue_certs(ctx: DeployContext) -> None:
 
 
 def docker_compose_up_initial() -> None:
-    run(["docker", "compose", "up", "-d", "frps", "nginx"], cwd=BASE_DIR)
+    run(["docker", "compose", "up", "-d", "--remove-orphans", "frps", "nginx"], cwd=BASE_DIR)
     time.sleep(2)
     ret = capture(["docker", "compose", "ps", "nginx"], cwd=BASE_DIR, check=False)
     if ret.returncode != 0:
@@ -118,6 +123,5 @@ def docker_compose_restart_nginx() -> None:
 
 
 def docker_compose_up_all() -> None:
-    run(["docker", "compose", "up", "-d"], cwd=BASE_DIR)
-
+    run(["docker", "compose", "up", "-d", "--remove-orphans"], cwd=BASE_DIR)
 
