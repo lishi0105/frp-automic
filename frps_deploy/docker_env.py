@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import json
+import socket
 import subprocess
 import sys
 import urllib.request
+from typing import Iterable
 
 from frps_deploy.console import print, eprint
 from frps_deploy.constants import DEFAULT_FRP_VERSION
@@ -90,6 +92,35 @@ def get_public_ip() -> str:
         except Exception:
             continue
     raise RuntimeError("无法自动获取 VPS 公网 IP，请在 frps-config.json 中填写 vps_public_ip")
+
+
+def resolve_domain_ipv4s(domain: str) -> list[str]:
+    try:
+        infos = socket.getaddrinfo(domain, None, family=socket.AF_INET, type=socket.SOCK_STREAM)
+    except socket.gaierror as exc:
+        raise RuntimeError(f"域名无法解析：{domain}，原因：{exc}") from exc
+
+    ips = sorted({addr for *_, sockaddr in infos for addr in [sockaddr[0]] if isinstance(addr, str)})
+    if not ips:
+        raise RuntimeError(f"域名未解析到 IPv4 A 记录：{domain}")
+    return ips
+
+
+def verify_domains_resolve_to_ip(domains: Iterable[str], expected_ip: str) -> None:
+    checked: set[str] = set()
+    for domain in domains:
+        domain = domain.strip().rstrip(".").lower()
+        if not domain or domain in checked:
+            continue
+        checked.add(domain)
+
+        ips = resolve_domain_ipv4s(domain)
+        if expected_ip not in ips:
+            raise RuntimeError(
+                f"域名解析 IP 不匹配：{domain} 当前解析到 {', '.join(ips)}，"
+                f"但检测到的 VPS 公网 IP 是 {expected_ip}。请修改域名 A 记录后重试。"
+            )
+        print(f"域名解析检查通过：{domain} -> {expected_ip}")
 
 
 def get_default_route_iface() -> str:

@@ -18,6 +18,7 @@ from frps_deploy.docker_env import (
     check_docker_compose, check_docker_permission, check_frps_server_port,
     check_required_ports,
     get_latest_frp_version, get_public_ip, get_iface_by_ip, get_default_route_iface,
+    verify_domains_resolve_to_ip,
 )
 from frps_deploy.generator import (
     ensure_dirs, generate_frpc_compose, generate_frpc_toml,
@@ -29,7 +30,7 @@ from frps_deploy.models import DeployContext
 from frps_deploy.output import print_generate_only_result, print_proxy_only_result, print_result
 from frps_deploy.services import (
     all_remote_ports, exposed_http_remote_ports, force_all_services_tcp,
-    tcp_remote_ports, validate_services,
+    managed_domains, tcp_remote_ports, validate_services,
 )
 from frps_deploy.utils import (
     random_free_port_excluding, random_letters, random_password, run,
@@ -122,6 +123,7 @@ def build_context(root_domain: str, email: str) -> DeployContext:
     else:
         status_port = random_free_port_excluding(generated_ports)
     vps_public_ip = validate_ipv4(config.VPS_PUBLIC_IP) if config.VPS_PUBLIC_IP else validate_ipv4(get_public_ip())
+    verify_domains_resolve_to_ip(managed_domains(root_domain), vps_public_ip)
     try:
         host_iface = get_default_route_iface()
     except Exception:
