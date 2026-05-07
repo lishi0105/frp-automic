@@ -71,7 +71,7 @@
           <button type="button" class="link-btn" @click="showForgot = true">忘记密码？</button>
         </p>
 
-        <p class="login-version">安全管理后台 v0.1</p>
+        <p class="login-version">frp监控平台 v0.1</p>
       </form>
 
       <form v-else class="login-panel" @submit.prevent="submitForgot">
