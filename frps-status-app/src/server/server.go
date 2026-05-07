@@ -1102,10 +1102,14 @@ func (a *App) handleCertificates(w http.ResponseWriter, r *http.Request) {
 			certProxyMap[key] = append(certProxyMap[key], p.Name)
 		}
 	}
+	for domain, names := range certProxyMap {
+		certProxyMap[domain] = uniqueSortedStrings(names)
+	}
 
 	filtered := make([]model.CertStatus, 0, len(certs))
 	for _, c := range certs {
 		related := strings.Join(certProxyMap[strings.ToLower(strings.TrimSpace(c.Domain))], ", ")
+		c.RelatedProxy = related
 		if keyword != "" {
 			if !strings.Contains(strings.ToLower(c.Domain), keyword) && !strings.Contains(strings.ToLower(related), keyword) {
 				continue
@@ -1156,6 +1160,24 @@ func (a *App) handleCertificates(w http.ResponseWriter, r *http.Request) {
 
 	items, meta := paginateCertificates(filtered, page, pageSize)
 	writeJSON(w, model.CertificateListResponse{Items: items, Meta: meta})
+}
+
+func uniqueSortedStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func queryInt(v string, def int) int {

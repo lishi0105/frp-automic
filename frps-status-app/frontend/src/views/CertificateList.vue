@@ -49,6 +49,7 @@
             <table>
               <thead class="sticky-head">
                 <tr>
+                  <th class="col-index">序号</th>
                   <th class="col-name">域名</th>
                   <th class="col-status">状态</th>
                   <th class="col-status">公网TLS</th>
@@ -59,13 +60,14 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!pagedRows.length"><td colspan="7" class="empty">暂无证书数据</td></tr>
+                <tr v-if="!pagedRows.length"><td colspan="8" class="empty">暂无证书数据</td></tr>
                 <tr
-                  v-for="c in pagedRows"
+                  v-for="(c, index) in pagedRows"
                   :key="c.domain"
                   :class="{ selected: selected && selected.domain === c.domain }"
                   @click="selected = c"
                 >
+                  <td class="col-index">{{ rowIndex(index) }}</td>
                   <td class="col-name"><code>{{ c.domain }}</code></td>
                   <td class="col-status"><span class="badge" :class="certBadge(c)">{{ certText(c) }}</span></td>
                   <td class="col-status"><span class="badge" :class="tlsBadge(c)">{{ tlsText(c) }}</span></td>
@@ -225,6 +227,9 @@ function sortClass(key) {
   if (sortKey.value !== key) return 'sort-idle'
   return sortDir.value === 'asc' ? 'sort-asc' : 'sort-desc'
 }
+function rowIndex(index) {
+  return (page.value - 1) * pageSize.value + index + 1
+}
 function applyJump() {
   const p = Number(jumpPage.value || 1)
   if (!Number.isFinite(p)) return
@@ -334,7 +339,16 @@ onMounted(() => {
 .detail-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
 .detail-row span { color: var(--text-2); font-size: 12px; }
 .sortable { cursor: pointer; user-select: none; white-space: nowrap; }
-.col-name { min-width: 220px; }
+.col-index { width: 54px; text-align: center; color: var(--text-2); }
+.col-name { width: 180px; }
+.col-name code {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
 .col-status { width: 92px; }
 .col-num { width: 116px; text-align: right; }
 .col-action { width: 74px; text-align: right; }

@@ -17,6 +17,7 @@ from frps_deploy.utils import toml_str
 
 def print_frpc_config(ctx: DeployContext) -> None:
     print("\n================ frpc.toml 示例 ================")
+    print("# 下列键名为 frp 客户端要求的英文配置项，请原样复制到 frpc.toml")
     print(f"serverAddr = {toml_str(ctx.vps_public_ip)}")
     print(f"serverPort = {ctx.bind_port}")
     print("")
@@ -55,8 +56,8 @@ def print_result(ctx: DeployContext) -> None:
         else:
             print(f"  http://127.0.0.1:{ctx.status_port}  （仅本机）")
         print(f"  https://{status_domain(ctx.root_domain)}")
-        print(f"  user     = {ctx.status_user}")
-        print(f"  password = {ctx.status_password}")
+        print(f"  用户名 = {ctx.status_user}")
+        print(f"  密码   = {ctx.status_password}")
 
     tunneled_tcp_services = [item for item in tcp_services() if needs_tunnel(item)]
     if tunneled_tcp_services:
@@ -67,15 +68,15 @@ def print_result(ctx: DeployContext) -> None:
     print("\nfrps 客户端连接信息：")
     print(f"  serverPort = {ctx.bind_port}")
     print(f"  auth.token = {ctx.token}")
-    print("\nfrps dashboard：")
+    print("\nfrps 控制台（Dashboard）：")
     if config.FRPS_DASHBOARD_HTTP:
         print(f"  http://{ctx.vps_public_ip}:{ctx.dashboard_port}  （已开放公网，注意防火墙）")
     else:
         print(f"  仅 VPS 本机访问：http://127.0.0.1:{ctx.dashboard_port}")
     print(f"  https://{dashboard_domain(ctx.root_domain)}")
-    print(f"  user     = {ctx.dashboard_user}")
-    print(f"  password = {ctx.dashboard_password}")
-    print("\n常用命令：")
+    print(f"  用户名 = {ctx.dashboard_user}")
+    print(f"  密码   = {ctx.dashboard_password}")
+    print("\n常用命令（终端中需原样输入，含英文子命令）：")
     print(f"  cd {BASE_DIR}")
     print("  docker compose ps")
     print("  docker compose logs -f frps")
@@ -88,9 +89,9 @@ def print_result(ctx: DeployContext) -> None:
         print("  docker compose logs -f frps-status")
     print_frpc_config(ctx)
     print("\n注意：")
-    print("1. http 模式服务默认只通过 HTTPS 域名访问；tunnel=false 时 nginx 会直接反代到 VPS 本机服务。")
+    print("1. http 模式服务默认只通过 HTTPS 域名访问；隧道关闭时 nginx 会直接反代到 VPS 本机服务。")
     print("2. tcp 模式服务会直接把端口开放到公网，例如 GitLab SSH 的 5022。")
-    print("3. frpc 和内网服务不在同一台机器时，请把 localIP 改成真实内网 IP。")
+    print("3. frpc 与内网服务不在同一台机器时，请在 frpc.toml 中将本地地址项（键名为 localIP）改为真实内网 IP。")
     print("4. 证书续期由 certbot 容器每 12 小时检查一次。")
     print("==========================================")
 
@@ -100,7 +101,7 @@ def print_generate_only_result(ctx: DeployContext) -> None:
     print(f"生成目录：{BASE_DIR}")
     print(f"配置记录：{GENERATED_INFO_FILE}")
     print(f"frps 配置：{FRPS_TOML_FILE}")
-    print(f"Docker Compose：{COMPOSE_FILE}")
+    print(f"Docker Compose 文件：{COMPOSE_FILE}")
     print(f"Nginx 配置目录：{NGINX_CONF_DIR}")
     if config.STATUS_APP_ENABLED:
         if config.STATUS_APP_HTTP:
@@ -110,7 +111,7 @@ def print_generate_only_result(ctx: DeployContext) -> None:
     print(f"frpc 配置：{FRPC_TOML_FILE}")
     print(f"frpc Docker Compose：{FRPC_COMPOSE_FILE}")
     print("\n本次未执行启动、证书申请。")
-    print("frps dashboard 部署后访问：")
+    print("frps 控制台部署后可访问：")
     print(f"  https://{dashboard_domain(ctx.root_domain)}")
     if config.FRPS_DASHBOARD_HTTP:
         print(f"  http://{ctx.vps_public_ip}:{ctx.dashboard_port}")
@@ -135,7 +136,7 @@ def print_proxy_only_result(ctx: DeployContext) -> None:
     print(f"frps 配置：{FRPS_TOML_FILE}")
     print(f"frpc 配置：{FRPC_TOML_FILE}")
     print("\n本次未执行证书申请，也未改写现有 Nginx HTTPS 站点配置。")
-    print("需要穿透的服务已强制按 TCP 代理处理，忽略配置文件中的 mode 和 expose_http_port。")
+    print("需要穿透的服务已强制按 TCP 代理处理，忽略配置文件中的模式（mode）与是否暴露 HTTP 端口（expose_http_port）。")
     tunneled_tcp_services = [item for item in tcp_services() if needs_tunnel(item)]
     if tunneled_tcp_services:
         print("\n代理直通端口：")

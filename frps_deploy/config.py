@@ -45,7 +45,7 @@ def write_default_config() -> None:
     except OSError:
         pass
     print(f"未找到配置文件，已生成默认配置：{CONFIG_FILE}")
-    print("请按需填写 root_domain、cert_email 和 services。")
+    print("请按需填写主域名（root_domain）、证书邮箱（cert_email）与服务列表（services）。")
 
 
 def load_config_file() -> Dict[str, Any]:
@@ -59,7 +59,7 @@ def load_config_file() -> Dict[str, Any]:
         raise ValueError(f"配置文件不是合法 JSON：{CONFIG_FILE}，{exc}") from exc
 
     if not isinstance(raw, dict):
-        raise ValueError(f"配置文件顶层必须是 JSON object：{CONFIG_FILE}")
+        raise ValueError(f"配置文件顶层必须是 JSON 对象：{CONFIG_FILE}")
 
     data = clone_default_config()
     data.update(raw)
@@ -68,7 +68,7 @@ def load_config_file() -> Dict[str, Any]:
 
 def _require_object(value: Any, key: str) -> Dict[str, Any]:
     if not isinstance(value, dict):
-        raise ValueError(f"配置项 {key} 必须是 object")
+        raise ValueError(f"配置项 {key} 必须是 JSON 对象")
     return value
 
 
@@ -82,10 +82,10 @@ def _validate_runtime_config_shape(data: Dict[str, Any]) -> None:
 
     services = data.get("services", DEFAULT_SERVICES)
     if not isinstance(services, list):
-        raise ValueError("配置项 services 必须是数组")
+        raise ValueError("配置项 services 必须是 JSON 数组")
     for index, item in enumerate(services, start=1):
         if not isinstance(item, dict):
-            raise ValueError(f"services[{index}] 必须是 object")
+            raise ValueError(f"services[{index}] 必须是 JSON 对象")
 
 
 def _bool_config(value: Any, default: bool = False) -> bool:

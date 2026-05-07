@@ -19,7 +19,7 @@ def _compose_down(cwd: Path) -> None:
     if not compose_file.exists():
         return
     cmd = ["docker", "compose", "down"]
-    print(f"\n$ {' '.join(cmd)}  (cwd={cwd})")
+    print(f"\n$ {' '.join(cmd)}  （工作目录：{cwd}）")
     subprocess.run(cmd, cwd=str(cwd), check=False)
 
 
@@ -84,4 +84,4 @@ def stop_all() -> None:
     print("=== 停止部署服务 ===")
     _compose_down(BASE_DIR)
     _compose_down(FRPC_BASE_DIR)
-    print("\n已停止所有已生成的 Docker Compose 服务。")
+    print("\n已停止所有已生成的 Docker 编排（Compose）服务。")

@@ -50,6 +50,7 @@
             <table>
               <thead class="sticky-head">
                 <tr>
+                  <th class="col-index">序号</th>
                   <th class="col-name">名称</th>
                   <th class="col-type">类型</th>
                   <th class="col-status">状态</th>
@@ -61,13 +62,14 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!pagedRows.length"><td colspan="8" class="empty">暂无代理数据</td></tr>
+                <tr v-if="!pagedRows.length"><td colspan="9" class="empty">暂无代理数据</td></tr>
                 <tr
-                  v-for="p in pagedRows"
+                  v-for="(p, index) in pagedRows"
                   :key="p.name + p.type"
                   :class="{ selected: selectedProxy && selectedProxy.name === p.name && selectedProxy.type === p.type }"
                   @click="selectedProxy = p"
                 >
+                  <td class="col-index">{{ rowIndex(index) }}</td>
                   <td class="col-name"><code>{{ p.name }}</code></td>
                   <td class="col-type"><span class="badge badge-ok">{{ p.type }}</span></td>
                   <td class="col-status"><span class="flex-center"><span class="dot" :class="p.online ? 'ok' : 'bad'"></span>{{ p.online ? '在线' : '离线' }}</span></td>
@@ -252,6 +254,9 @@ function toggleSort(key) {
 function sortClass(key) {
   if (sortKey.value !== key) return 'sort-idle'
   return sortDir.value === 'asc' ? 'sort-asc' : 'sort-desc'
+}
+function rowIndex(index) {
+  return (page.value - 1) * pageSize.value + index + 1
 }
 function applyJump() {
   const p = Number(jumpPage.value || 1)
@@ -502,7 +507,16 @@ onMounted(() => {
   padding: 0 8px;
 }
 .sortable { cursor: pointer; user-select: none; white-space: nowrap; }
-.col-name { min-width: 180px; }
+.col-index { width: 54px; text-align: center; color: var(--text-2); }
+.col-name { width: 150px; }
+.col-name code {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
 .col-type { width: 76px; }
 .col-status { width: 92px; }
 .col-num { width: 110px; text-align: right; }

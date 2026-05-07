@@ -8,6 +8,7 @@ type TCPCheck struct {
 
 type CertStatus struct {
 	Domain          string `json:"domain"`
+	RelatedProxy    string `json:"relatedProxy,omitempty"`
 	Present         bool   `json:"present"`
 	OK              bool   `json:"ok"`
 	ExpiresAt       string `json:"expires_at,omitempty"`

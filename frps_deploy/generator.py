@@ -36,7 +36,7 @@ def ensure_dirs() -> None:
 
 
 def generate_default_nginx_conf() -> None:
-    conf = """# Reject unmatched Host names so they do not fall through to the first vhost.
+    conf = """# 拒绝未匹配的主机名（Host），避免请求落到第一个默认虚拟主机。
 server {
     listen 80 default_server;
     server_name _;
@@ -230,7 +230,7 @@ def generate_http_challenge_conf(ctx: DeployContext) -> None:
     }}
 
     location / {{
-        return 200 "certbot challenge server is running\\n";
+        return 200 "证书 HTTP 验证服务运行中\\n";
         add_header Content-Type text/plain;
     }}
 }}
@@ -245,7 +245,7 @@ def generate_https_nginx_confs(ctx: DeployContext) -> None:
         challenge_conf.unlink()
 
     frps_domain = dashboard_domain(ctx.root_domain)
-    frps_conf = f"""# frps dashboard
+    frps_conf = f"""# frps 控制台（Dashboard）
 server {{
     listen 80;
     server_name {frps_domain};
@@ -284,7 +284,7 @@ server {{
 
     if config.STATUS_APP_ENABLED:
         status_host = status_domain(ctx.root_domain)
-        status_conf = f"""# frps status app
+        status_conf = f"""# frps 状态页
 server {{
     listen 80;
     server_name {status_host};
@@ -411,7 +411,7 @@ def write_generated_info(ctx: DeployContext) -> None:
         f"FRPS_DIR={BASE_DIR}",
         f"FRPC_DIR={_FRPC}",
         "",
-        "# HTTP services",
+        "# HTTP 服务",
     ]
     if config.STATUS_APP_ENABLED:
         lines[9:9] = [
@@ -422,13 +422,13 @@ def write_generated_info(ctx: DeployContext) -> None:
     for item in http_services():
         lines.append(
             f"HTTP_{item['alias'].upper()}=https://{item['alias']}.{ctx.root_domain} "
-            f"remotePort={remote_port(item)} local={local_ip(item)}:{local_port(item)}"
+            f"远端端口={remote_port(item)} 本地={local_ip(item)}:{local_port(item)}"
         )
-    lines += ["", "# TCP services"]
+    lines += ["", "# TCP 服务"]
     for item in tcp_services():
         lines.append(
             f"TCP_{str(item['alias']).upper()}={ctx.vps_public_ip}:{remote_port(item)} "
-            f"local={local_ip(item)}:{local_port(item)}"
+            f"本地={local_ip(item)}:{local_port(item)}"
         )
     GENERATED_INFO_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

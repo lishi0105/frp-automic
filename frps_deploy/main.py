@@ -125,13 +125,13 @@ def build_context(root_domain: str, email: str, previous: dict | None = None) ->
     generated_ports: set = set(all_remote_ports())
     if config.FRPS_SERVER_PORT >= 1000:
         if config.FRPS_SERVER_PORT in generated_ports:
-            raise ValueError(f"frps.server_port 与 services port 冲突：{config.FRPS_SERVER_PORT}")
+            raise ValueError(f"frps.server_port 与各服务端口（services 中的 port）冲突：{config.FRPS_SERVER_PORT}")
         bind_port = config.FRPS_SERVER_PORT
         generated_ports.add(bind_port)
     elif can_reuse and _previous_int(previous, "bind_port") >= 1000:
         bind_port = _previous_int(previous, "bind_port")
         if bind_port in generated_ports:
-            raise ValueError(f"上次部署的 frps.server_port 与 services port 冲突：{bind_port}")
+            raise ValueError(f"上次部署的 frps.server_port 与各服务端口（services 中的 port）冲突：{bind_port}")
         generated_ports.add(bind_port)
     else:
         bind_port = random_free_port_excluding(generated_ports)
@@ -202,7 +202,7 @@ def generate_files(
     print("写入部署信息记录...")
     write_generated_info(ctx)
     if include_challenge:
-        print("\n生成临时 HTTP challenge 配置...")
+        print("\n生成临时证书 HTTP 验证（ACME）配置...")
         remove_https_confs(previous_http_safe_aliases(previous_state or {}))
         generate_http_challenge_conf(ctx)
 
@@ -221,8 +221,8 @@ def print_service_plan(previous_state: dict) -> None:
 
 def prompt_firewall_confirmation(ctx: DeployContext) -> None:
     ports = [
-        ("80/tcp",  "Nginx HTTP"),
-        ("443/tcp", "Nginx HTTPS"),
+        ("80/tcp",  "Nginx HTTP（80）"),
+        ("443/tcp", "Nginx HTTPS（443）"),
         (f"{ctx.bind_port}/tcp", "frps 客户端连接"),
     ]
     for p in tcp_remote_ports():
@@ -230,7 +230,7 @@ def prompt_firewall_confirmation(ctx: DeployContext) -> None:
     for p in exposed_http_remote_ports():
         ports.append((f"{p}/tcp", "HTTP 服务直通"))
     if config.FRPS_DASHBOARD_HTTP:
-        ports.append((f"{ctx.dashboard_port}/tcp", "frps dashboard 公网访问"))
+        ports.append((f"{ctx.dashboard_port}/tcp", "frps 控制台公网访问"))
     if config.STATUS_APP_ENABLED and config.STATUS_APP_HTTP:
         ports.append((f"{ctx.status_port}/tcp", "状态页公网访问"))
 
@@ -313,7 +313,7 @@ def main() -> None:
     prompt_firewall_confirmation(ctx)
 
     if args.run and not reusable_previous_state:
-        print("\n全新部署前先停止可能残留的旧 Compose 服务，防止重复部署。", color=COLOR_YELLOW)
+        print("\n全新部署前先停止可能残留的旧容器编排（Compose）服务，防止重复部署。", color=COLOR_YELLOW)
         stop_all()
         
     print("\n启动 frps + nginx，用于证书 HTTP 验证...")
@@ -328,7 +328,7 @@ def main() -> None:
     print("\n重启 Nginx 应用 HTTPS 配置...")
     docker_compose_restart_nginx()
 
-    print("\n启动所有容器（含 certbot 续期、frps-status）...")
+    print("\n启动所有容器（含 certbot 证书续期与状态页 frps-status）...")
     docker_compose_up_all()
 
     write_deploy_state(ctx)

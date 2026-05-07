@@ -50,8 +50,7 @@ def random_letters(n: int = 16) -> str:
 
 
 def random_password(n: int = 16) -> str:
-    # Exclude $ to prevent Docker Compose from interpreting the value as a variable
-    # reference when the password is written to .env files.
+    # 排除字符 $，避免密码写入 .env 时被 Docker Compose 当作变量引用解析。
     special = "!@#%^&*()-_=+"
     chars = string.ascii_letters + string.digits + special
     while True:

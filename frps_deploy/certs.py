@@ -38,23 +38,23 @@ def verify_http_challenge(domain: str) -> None:
             ps = capture(["docker", "compose", "ps"], cwd=BASE_DIR, check=False)
             logs = capture(["docker", "compose", "logs", "--tail", "80", "nginx"], cwd=BASE_DIR, check=False)
             detail = [
-                f"本机 Nginx HTTP-01 自检失败：无法访问 {local_url}，Host={domain}，原因：{exc}",
+                f"本机 Nginx HTTP-01 自检失败：无法访问 {local_url}，请求 Host 头为 {domain}，原因：{exc}",
                 "这通常表示 nginx 容器未启动、80 端口未映射成功，或 nginx 配置加载失败。",
             ]
             if ps.stdout.strip():
-                detail.append("\n[docker compose ps]\n" + ps.stdout.strip())
+                detail.append("\n【docker compose ps 标准输出】\n" + ps.stdout.strip())
             if ps.stderr.strip():
-                detail.append("\n[docker compose ps stderr]\n" + ps.stderr.strip())
+                detail.append("\n【docker compose ps 标准错误】\n" + ps.stderr.strip())
             if logs.stdout.strip():
-                detail.append("\n[nginx logs]\n" + logs.stdout.strip())
+                detail.append("\n【nginx 容器日志 标准输出】\n" + logs.stdout.strip())
             if logs.stderr.strip():
-                detail.append("\n[nginx logs stderr]\n" + logs.stderr.strip())
+                detail.append("\n【nginx 容器日志 标准错误】\n" + logs.stderr.strip())
             raise RuntimeError("\n".join(detail)) from exc
 
         if local_body != token:
             raise RuntimeError(
                 f"本机 Nginx HTTP-01 自检失败：{local_url} 返回内容不匹配，"
-                f"Host={domain}，实际返回：{local_body[:120]!r}"
+                f"请求 Host 头为 {domain}，实际返回：{local_body[:120]!r}"
             )
 
         body = _read_url(public_url, timeout=15)
@@ -144,8 +144,8 @@ def docker_compose_up_initial() -> None:
         logs = capture(["docker", "compose", "logs", "--tail", "80", "nginx"], cwd=BASE_DIR, check=False)
         raise RuntimeError(
             "nginx 容器启动后状态检查失败。\n"
-            f"[docker compose ps nginx]\n{ret.stdout}{ret.stderr}\n"
-            f"[nginx logs]\n{logs.stdout}{logs.stderr}"
+            f"【docker compose ps nginx】\n{ret.stdout}{ret.stderr}\n"
+            f"【nginx 容器日志】\n{logs.stdout}{logs.stderr}"
         )
 
 

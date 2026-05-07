@@ -126,7 +126,7 @@ def verify_domains_resolve_to_ip(domains: Iterable[str], expected_ip: str) -> No
 
 
 def get_default_route_iface() -> str:
-    """Resolve default outbound interface via `ip route get 1.1.1.1`."""
+    """通过 `ip route get 1.1.1.1` 解析默认出站网卡。"""
     ret = subprocess.run(
         ["ip", "route", "get", "1.1.1.1"],
         stdout=subprocess.PIPE,
@@ -142,15 +142,15 @@ def get_default_route_iface() -> str:
             iface = parts[idx + 1].strip()
             if iface and iface != "lo":
                 return iface
-    raise RuntimeError("默认路由未返回有效网卡（dev）")
+    raise RuntimeError("默认路由结果中未解析出有效网卡名（缺少 dev 字段或仅为 lo）")
 
 
 def get_iface_by_ip(ip: str) -> str:
     """
-    Resolve host interface name by IPv4 address.
-    Prefer `ip route get <ip>` output, fallback to `ip -o -4 addr show`.
+    根据 IPv4 地址解析主机网卡名。
+    优先使用 `ip route get <ip>` 的输出，否则回退到 `ip -o -4 addr show`。
     """
-    # Keep this function as fallback only; prefer get_default_route_iface().
+    # 仅作回退；优先使用 get_default_route_iface()。
 
     ret = subprocess.run(
         ["ip", "-o", "-4", "addr", "show"],
@@ -161,7 +161,7 @@ def get_iface_by_ip(ip: str) -> str:
     if ret.returncode != 0:
         raise RuntimeError(f"无法识别公网IP对应网卡（ip -o -4 addr show 执行失败）：{ret.stderr.strip()}")
     for line in ret.stdout.splitlines():
-        # Example: 2: eth0    inet 1.2.3.4/24 brd ...
+        # 示例：2: eth0    inet 1.2.3.4/24 brd ...
         cols = line.split()
         if len(cols) >= 4 and cols[2] == "inet":
             iface = cols[1]
