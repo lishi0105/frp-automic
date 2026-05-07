@@ -82,11 +82,35 @@ def _cert_file_exists(path) -> bool:
         return True
 
 
+def fix_certbot_conf_permissions() -> None:
+    try:
+        exists = CERTBOT_CONF_DIR.exists()
+    except PermissionError:
+        exists = True
+    if not exists:
+        return
+
+    print(f"\n修正 certbot 证书目录权限：{CERTBOT_CONF_DIR}")
+    ret = run(
+        [
+            "docker", "run", "--rm",
+            "-v", f"{CERTBOT_CONF_DIR}:/target",
+            "alpine",
+            "chmod", "-R", "777", "/target",
+        ],
+        check=False,
+    )
+    if ret.returncode != 0:
+        print("警告：证书目录权限修正失败，后续证书检查可能仍会遇到权限问题。")
+
+
 def issue_certs(ctx: DeployContext) -> None:
     domains = managed_domains(ctx.root_domain)
     if not domains:
         print("没有需要申请证书的域名，跳过证书申请。")
         return
+
+    fix_certbot_conf_permissions()
 
     for domain in domains:
         cert_file = CERTBOT_CONF_DIR / "live" / domain / "fullchain.pem"
