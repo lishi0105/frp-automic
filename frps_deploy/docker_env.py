@@ -98,10 +98,12 @@ def resolve_domain_ipv4s(domain: str) -> list[str]:
     try:
         infos = socket.getaddrinfo(domain, None, family=socket.AF_INET, type=socket.SOCK_STREAM)
     except socket.gaierror as exc:
+        eprint(f"解析域名 {domain} 失败，可能是 DNS 问题或域名不存在。")
         raise RuntimeError(f"域名无法解析：{domain}，原因：{exc}") from exc
 
     ips = sorted({addr for *_, sockaddr in infos for addr in [sockaddr[0]] if isinstance(addr, str)})
     if not ips:
+        eprint(f"域名 {domain} 没有解析到 IPv4 地址。")
         raise RuntimeError(f"域名未解析到 IPv4 A 记录：{domain}")
     return ips
 
