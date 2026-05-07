@@ -5,31 +5,32 @@
         <div class="page-title">代理列表</div>
         <div class="page-sub">共 {{ totalItems }} 个代理，{{ onlineCount }} 个在线</div>
       </div>
-      <div class="flex-center">
-        <button class="btn btn-outline btn-sm" @click="exportCsv">导出列表</button>
-        <button class="btn btn-outline btn-sm" :disabled="loading || localLoading" @click="$emit('refresh')">
-          <span v-if="loading || localLoading" class="spinner"></span>
-          <span v-else>↻</span> 刷新
-        </button>
+      <div class="header-side">
+        <div class="header-summary">
+          <div>
+            <b>{{ onlineCount }}</b><span>/ {{ totalProxies }}</span>
+            <small>在线代理</small>
+          </div>
+          <div>
+            <b>{{ curConnsTotal }}</b>
+            <small>当前连接数</small>
+          </div>
+          <div>
+            <b>{{ humanBytes(monthTotal) }}</b>
+            <small>本月总流量</small>
+          </div>
+        </div>
+        <div class="flex-center">
+          <button class="btn btn-outline btn-sm" @click="exportCsv">导出列表</button>
+          <button class="btn btn-outline btn-sm" :disabled="loading || localLoading" @click="$emit('refresh')">
+            <span v-if="loading || localLoading" class="spinner"></span>
+            <span v-else>↻</span> 刷新
+          </button>
+        </div>
       </div>
     </div>
 
     <div class="page-body analytics-page proxy-page">
-      <section class="analytics-overview">
-        <div>
-          <div class="section-title">代理运行概览</div>
-          <div class="text-muted text-sm">共 {{ totalProxies }} 个代理，{{ onlineCount }} 个在线</div>
-        </div>
-        <div class="analytics-overview-metrics">
-          <div class="metric-inline">
-            <div class="metric-value"><b>{{ onlineCount }}</b><span>/ {{ totalProxies }}</span></div>
-            <small>在线代理</small>
-          </div>
-          <div><b>{{ curConnsTotal }}</b><small>当前连接数</small></div>
-          <div><b>{{ humanBytes(monthTotal) }}</b><small>本月总流量</small></div>
-        </div>
-      </section>
-
       <div class="proxy-main analytics-main-2col proxy-main-custom">
         <section class="proxy-table-wrap">
           <div class="section-head">
@@ -322,38 +323,33 @@ onMounted(() => {
   flex-direction: column;
   min-height: 0;
 }
-.analytics-overview {
-  padding: 10px 14px;
-  gap: 12px;
+.header-side {
+  display: flex;
   align-items: center;
+  gap: 18px;
 }
-.analytics-overview-metrics {
-  gap: 14px;
+.header-summary {
+  display: flex;
+  align-items: center;
+  gap: 18px;
 }
-.analytics-overview-metrics > div {
-  gap: 0;
-}
-.analytics-overview-metrics b {
-  font-size: 18px;
-}
-.analytics-overview-metrics span {
-  font-size: 12px;
-}
-.analytics-overview-metrics small {
-  font-size: 11px;
-}
-.metric-inline {
-  display: flex !important;
-  flex-direction: column;
-  align-items: flex-start;
+.header-summary > div {
+  display: grid;
   gap: 2px;
+  min-width: 74px;
 }
-.metric-value {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
+.header-summary b {
+  font-size: 18px;
+  line-height: 1;
 }
-.metric-inline small {
+.header-summary span {
+  color: var(--text-2);
+  font-size: 12px;
+  margin-left: 3px;
+}
+.header-summary small {
+  color: var(--text-3);
+  font-size: 11px;
   white-space: nowrap;
 }
 .proxy-table-wrap, .proxy-detail {
@@ -543,6 +539,15 @@ onMounted(() => {
 .sort-desc::before { content: '↓'; }
 .sort-asc, .sort-desc { font-size: 0; }
 @media (max-width: 1200px) {
+  .header-side {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .header-summary {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
   .proxy-page { flex: none; min-height: auto; }
   .proxy-main-custom { grid-template-columns: 1fr; }
   .table-scroll { max-height: 480px; }

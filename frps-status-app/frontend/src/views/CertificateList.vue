@@ -5,30 +5,31 @@
         <div class="page-title">证书列表</div>
         <div class="page-sub">共 {{ certs.length }} 张证书，{{ okCount }} 张正常</div>
       </div>
-      <div class="flex-center">
-        <button class="btn btn-outline btn-sm" :disabled="loading || localLoading" @click="$emit('refresh')">
-          <span v-if="loading || localLoading" class="spinner"></span>
-          <span v-else>↻</span> 刷新
-        </button>
+      <div class="header-side">
+        <div class="header-summary">
+          <div>
+            <b>{{ okCount }}</b><span>/ {{ certs.length }}</span>
+            <small>正常证书</small>
+          </div>
+          <div>
+            <b>{{ warnCount }}</b>
+            <small>15天内到期</small>
+          </div>
+          <div>
+            <b>{{ minDaysLabel }}</b>
+            <small>最快过期</small>
+          </div>
+        </div>
+        <div class="flex-center">
+          <button class="btn btn-outline btn-sm" :disabled="loading || localLoading" @click="$emit('refresh')">
+            <span v-if="loading || localLoading" class="spinner"></span>
+            <span v-else>↻</span> 刷新
+          </button>
+        </div>
       </div>
     </div>
 
     <div class="page-body analytics-page cert-page">
-      <section class="analytics-overview">
-        <div>
-          <div class="section-title">证书健康概览</div>
-          <div class="text-muted text-sm">共 {{ certs.length }} 张证书，{{ warnCount }} 张临期，{{ failCount }} 张异常</div>
-        </div>
-        <div class="analytics-overview-metrics">
-          <div class="metric-inline">
-            <div class="metric-value"><b>{{ okCount }}</b><span>/ {{ certs.length }}</span></div>
-            <small>正常证书</small>
-          </div>
-          <div><b>{{ warnCount }}</b><small>15天内到期</small></div>
-          <div><b>{{ minDaysLabel }}</b><small>最快过期</small></div>
-        </div>
-      </section>
-
       <div class="proxy-main analytics-main-2col cert-main-custom">
         <section class="proxy-table-wrap">
           <div class="section-head">
@@ -274,38 +275,33 @@ onMounted(() => {
   flex-direction: column;
   min-height: 0;
 }
-.analytics-overview {
-  padding: 10px 14px;
-  gap: 12px;
+.header-side {
+  display: flex;
   align-items: center;
+  gap: 18px;
 }
-.analytics-overview-metrics {
-  gap: 14px;
+.header-summary {
+  display: flex;
+  align-items: center;
+  gap: 18px;
 }
-.analytics-overview-metrics > div {
-  gap: 0;
-}
-.analytics-overview-metrics b {
-  font-size: 18px;
-}
-.analytics-overview-metrics span {
-  font-size: 12px;
-}
-.analytics-overview-metrics small {
-  font-size: 11px;
-}
-.metric-inline {
-  display: flex !important;
-  flex-direction: column;
-  align-items: flex-start;
+.header-summary > div {
+  display: grid;
   gap: 2px;
+  min-width: 74px;
 }
-.metric-value {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
+.header-summary b {
+  font-size: 18px;
+  line-height: 1;
 }
-.metric-inline small {
+.header-summary span {
+  color: var(--text-2);
+  font-size: 12px;
+  margin-left: 3px;
+}
+.header-summary small {
+  color: var(--text-3);
+  font-size: 11px;
   white-space: nowrap;
 }
 .cert-main-custom {
@@ -362,6 +358,15 @@ onMounted(() => {
 .page-num { min-width: 34px; padding: 0 8px; }
 .page-num.active { color: #bfdbfe; border-color: #1d4ed8; background: #172554; }
 @media (max-width: 1200px) {
+  .header-side {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .header-summary {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
   .cert-page { flex: none; min-height: auto; }
   .cert-main-custom { grid-template-columns: 1fr; }
   .table-scroll { max-height: 480px; }
