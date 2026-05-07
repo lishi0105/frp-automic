@@ -2,7 +2,7 @@ services:
   frps-status:
     build:
       context: .
-    image: frps-status:v0.1
+    image: lishi0105/frps-status:v0.1
     container_name: frps_status
     restart: unless-stopped
     ports:
