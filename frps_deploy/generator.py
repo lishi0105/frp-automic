@@ -35,6 +35,23 @@ def ensure_dirs() -> None:
     FRPC_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def generate_default_nginx_conf() -> None:
+    conf = """# Reject unmatched Host names so they do not fall through to the first vhost.
+server {
+    listen 80 default_server;
+    server_name _;
+    return 444;
+}
+
+server {
+    listen 443 ssl default_server;
+    server_name _;
+    ssl_reject_handshake on;
+}
+"""
+    (NGINX_CONF_DIR / "00-default.conf").write_text(conf, encoding="utf-8")
+
+
 def generate_frps_toml(ctx: DeployContext) -> None:
     lines = [
         'bindAddr = "0.0.0.0"',
@@ -199,6 +216,7 @@ def generate_frpc_compose(ctx: DeployContext) -> None:
 
 
 def generate_http_challenge_conf(ctx: DeployContext) -> None:
+    generate_default_nginx_conf()
     domains = managed_domains(ctx.root_domain)
     if not domains:
         return
@@ -221,6 +239,7 @@ def generate_http_challenge_conf(ctx: DeployContext) -> None:
 
 
 def generate_https_nginx_confs(ctx: DeployContext) -> None:
+    generate_default_nginx_conf()
     challenge_conf = NGINX_CONF_DIR / "00-http-challenge.conf"
     if challenge_conf.exists():
         challenge_conf.unlink()
