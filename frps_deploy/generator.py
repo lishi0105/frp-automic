@@ -124,7 +124,7 @@ def generate_frps_compose(ctx: DeployContext) -> None:
         domains_str = ",".join(managed_domains(ctx.root_domain))
         status_section = f"""
   frps-status:
-    image: lishi0105/frps-status:latest
+    image: lishi0105/frps-status:{ctx.status_app_version}
     container_name: frps_status_{ctx.suffix}
     restart: unless-stopped
     depends_on:
@@ -401,6 +401,7 @@ def write_generated_info(ctx: DeployContext) -> None:
         f"ROOT_DOMAIN={ctx.root_domain}",
         f"EMAIL={ctx.email}",
         f"FRP_VERSION={ctx.frp_version}",
+        f"STATUS_APP_VERSION={ctx.status_app_version}",
         f"VPS_PUBLIC_IP={ctx.vps_public_ip}",
         f"FRPS_BIND_PORT={ctx.bind_port}",
         f"FRPS_DASHBOARD_PORT={ctx.dashboard_port}",

@@ -75,6 +75,33 @@ def get_latest_frp_version() -> str:
     return DEFAULT_FRP_VERSION
 
 
+def get_latest_dockerhub_tag(repository: str, fallback: str = "latest") -> str:
+    url = f"https://hub.docker.com/v2/repositories/{repository}/tags?page_size=100&ordering=last_updated"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "frp-stack-deploy-script"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        tags = data.get("results")
+        if not isinstance(tags, list):
+            raise RuntimeError("Docker Hub tags 响应格式不正确")
+        candidates = []
+        for item in tags:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            if not isinstance(name, str) or not name.strip() or name == "latest":
+                continue
+            candidates.append((str(item.get("last_updated") or ""), name.strip()))
+        candidates.sort(reverse=True)
+        if candidates:
+            tag = candidates[0][1]
+            print(f"检测到 {repository} 最新镜像版本：{tag}")
+            return tag
+    except Exception as exc:
+        print(f"获取 {repository} 最新镜像版本失败，使用 {fallback}，原因：{exc}")
+    return fallback
+
+
 def get_public_ip() -> str:
     urls = [
         "https://api.ipify.org",

@@ -20,8 +20,8 @@ from frps_deploy.constants import BASE_DIR
 from frps_deploy.docker_env import (
     check_docker_compose, check_docker_permission, check_frps_server_port,
     check_required_ports,
-    get_latest_frp_version, get_public_ip, get_iface_by_ip, get_default_route_iface,
-    verify_domains_resolve_to_ip,
+    get_latest_dockerhub_tag, get_latest_frp_version, get_public_ip,
+    get_iface_by_ip, get_default_route_iface, verify_domains_resolve_to_ip,
 )
 from frps_deploy.generator import (
     ensure_dirs, generate_frpc_compose, generate_frpc_toml,
@@ -173,6 +173,10 @@ def build_context(root_domain: str, email: str, previous: dict | None = None) ->
         vps_public_ip=vps_public_ip,
         host_iface=host_iface,
         frp_version=_previous_str(previous, "frp_version") if can_reuse and _previous_str(previous, "frp_version") else get_latest_frp_version(),
+        status_app_version=get_latest_dockerhub_tag(
+            "lishi0105/frps-status",
+            fallback=_previous_str(previous, "status_app_version") if can_reuse and _previous_str(previous, "status_app_version") else "latest",
+        ) if config.STATUS_APP_ENABLED else "",
         bind_port=bind_port,
         dashboard_port=dashboard_port,
         status_port=status_port,

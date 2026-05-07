@@ -11,6 +11,7 @@ class DeployContext:
     vps_public_ip: str
     host_iface: str
     frp_version: str
+    status_app_version: str
     bind_port: int
     dashboard_port: int
     status_port: int
