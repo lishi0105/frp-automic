@@ -291,9 +291,10 @@ def main() -> None:
     except Exception as exc:
         eprint(f"配置错误：{exc}")
         sys.exit(1)
-    generate_files(ctx, include_challenge=not args.proxy, previous_state=previous_state)
 
     reusable_previous_state = _previous_str(previous_state, "root_domain") == root_domain
+
+    generate_files(ctx, include_challenge=not args.proxy, previous_state=previous_state)
 
     if args.proxy:
         apply_proxy_only(ctx, has_previous_state=reusable_previous_state)
@@ -311,6 +312,10 @@ def main() -> None:
         check_required_ports(ctx.bind_port)
     prompt_firewall_confirmation(ctx)
 
+    if args.run and not reusable_previous_state:
+        print("\n全新部署前先停止可能残留的旧 Compose 服务，防止重复部署。", color=COLOR_YELLOW)
+        stop_all()
+        
     print("\n启动 frps + nginx，用于证书 HTTP 验证...")
     docker_compose_up_initial()
 
