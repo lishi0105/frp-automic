@@ -8,6 +8,11 @@
 - **`frps-status-app/`** — 基于 Vue 3 + Go 的 Web 监控面板，实时展示代理状态、流量趋势、证书有效期，并支持 SMTP 告警
 
 ---
+## 许可证
+
+本项目采用 Apache License 2.0 许可证。
+
+详情请查看 [LICENSE](./LICENSE) 文件。
 
 ## 一、快速开始
 
