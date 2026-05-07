@@ -27,6 +27,9 @@ Thumbs.db
 frps-status-app/.env
 frps-status-app/.env.local
 
+# 设计稿
+frps-status-app/frontend/design
+
 # 数据目录
 frps-status-app/data/
 
