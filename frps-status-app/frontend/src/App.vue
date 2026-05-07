@@ -115,6 +115,7 @@ const accountOpen = ref(false)
 const currentUser = ref({ username: '' })
 
 const isLogin = computed(() => route.path === '/login')
+const isSettings = computed(() => route.path === '/settings')
 const frpsOnline = computed(() => status.value?.frps?.bind?.ok ?? false)
 const userInitial = computed(() => (currentUser.value.username || 'U').slice(0, 1).toUpperCase())
 const proxyNavItems = computed(() => {
@@ -215,7 +216,9 @@ onMounted(() => {
     load()
     loadUser()
   }
-  timer = setInterval(() => { if (!isLogin.value) load() }, 30000)
+  timer = setInterval(() => {
+    if (!isLogin.value && !isSettings.value) load()
+  }, 30000)
   document.addEventListener('click', onDocClick)
 })
 onUnmounted(() => {

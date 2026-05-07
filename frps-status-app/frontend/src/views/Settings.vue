@@ -164,6 +164,7 @@ const eventMsg = ref(null)
 const vacuumMsg = ref(null)
 const purgeMsg = ref(null)
 const savedSettings = ref(null)
+const formInitialized = ref(false)
 
 const smtpReady = computed(() =>
   Boolean(form.smtp_host && form.smtp_from && form.smtp_to && form.smtp_auth_code)
@@ -195,8 +196,10 @@ function fillForm(s) {
 
 watch(() => props.status?.settings, (settings) => {
   if (smtpModalOpen.value) return
+  if (formInitialized.value) return
   savedSettings.value = settings || savedSettings.value
   fillForm(settings)
+  if (settings) formInitialized.value = true
 }, { immediate: true })
 
 function flash(msgRef, ok, text, ms = 4000) {
@@ -235,7 +238,10 @@ function closeSMTPModal() {
 async function saveThreshold() {
   savingThreshold.value = true
   try {
-    await api.saveSettings(makePayload())
+    const saved = await api.saveSettings(makePayload())
+    savedSettings.value = saved
+    fillForm(saved)
+    formInitialized.value = true
     flash(saveMsg, true, '阈值已保存')
   } catch (e) {
     flash(saveMsg, false, '保存失败：' + e.message)
@@ -250,6 +256,7 @@ async function saveSMTP() {
     const saved = await api.saveSettings(makeSMTPPayload())
     savedSettings.value = saved
     fillForm(saved)
+    formInitialized.value = true
     flash(smtpMsg, true, 'SMTP 配置已保存')
   } catch (e) {
     flash(smtpMsg, false, '保存失败：' + e.message)
@@ -282,11 +289,14 @@ function toggleField(key) {
 async function saveEvents() {
   savingEvents.value = true
   try {
-    await api.saveSettings({
+    const saved = await api.saveSettings({
       alert_proxy_offline: form.alert_proxy_offline,
       alert_cert_expiry: form.alert_cert_expiry,
       alert_cert_days: form.alert_cert_days
     })
+    savedSettings.value = saved
+    fillForm(saved)
+    formInitialized.value = true
     flash(eventMsg, true, '事件告警配置已保存')
   } catch (e) {
     flash(eventMsg, false, '保存失败：' + e.message)
