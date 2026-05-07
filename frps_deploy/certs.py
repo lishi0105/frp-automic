@@ -75,6 +75,13 @@ def verify_http_challenge(domain: str) -> None:
         raise RuntimeError(f"HTTP-01 公网自检失败：{public_url} 返回内容不匹配，实际返回：{body[:120]!r}")
 
 
+def _cert_file_exists(path) -> bool:
+    try:
+        return path.exists()
+    except PermissionError:
+        return True
+
+
 def issue_certs(ctx: DeployContext) -> None:
     domains = managed_domains(ctx.root_domain)
     if not domains:
@@ -84,7 +91,7 @@ def issue_certs(ctx: DeployContext) -> None:
     for domain in domains:
         cert_file = CERTBOT_CONF_DIR / "live" / domain / "fullchain.pem"
         key_file = CERTBOT_CONF_DIR / "live" / domain / "privkey.pem"
-        if cert_file.exists() and key_file.exists():
+        if _cert_file_exists(cert_file) and _cert_file_exists(key_file):
             print(f"\n证书已存在，跳过申请：{domain}")
             continue
         print(f"\n开始申请证书：{domain}")
@@ -124,4 +131,3 @@ def docker_compose_restart_nginx() -> None:
 
 def docker_compose_up_all() -> None:
     run(["docker", "compose", "up", "-d", "--remove-orphans"], cwd=BASE_DIR)
-
