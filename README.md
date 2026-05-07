@@ -1,9 +1,11 @@
-# frp-automic
+# 内网穿透运维工具
 
-FRP 服务端一体化部署与监控工具集。包含两个组件：
+面向基于 frp 的内网穿透场景，提供从服务端部署、域名入口配置、HTTPS 证书申领到运行状态监控、流量统计和异常告警的一体化运维能力。它用于快速搭建可公网访问的内网服务入口，并持续观察代理、证书和主机网络状态，减少手动配置、巡检和告警处理成本。
 
-- **`vps-install-frps.py`** — 一键部署脚本，自动生成 frps / Nginx / Certbot / frpc 配置并启动容器
-- **`frps-status-app/`** — 基于 Vue 3 + Go 的 Web 监控面板，实时展示代理状态、流量趋势和证书有效期
+工具集包含两个组件：
+
+- **`vps-install-frps.py`** — 一键部署脚本，自动生成 frps / Nginx / Certbot / frpc 配置，申请域名证书并启动容器
+- **`frps-status-app/`** — 基于 Vue 3 + Go 的 Web 监控面板，实时展示代理状态、流量趋势、证书有效期，并支持 SMTP 告警
 
 ---
 
@@ -150,6 +152,8 @@ https://frps.<root_domain>
 ---
 
 ## frps-status-app — 监控面板
+默认用户名密码：admin/admin123
+登录入口：status.<root_domain>
 
 ### 功能
 
