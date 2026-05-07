@@ -62,6 +62,7 @@ def generate_frpc_toml(ctx: DeployContext) -> None:
     lines = [
         f"serverAddr = {toml_str(ctx.vps_public_ip)}",
         f"serverPort = {ctx.bind_port}",
+        f"loginFailExit = false",
         "",
         "[auth]",
         'method = "token"',
