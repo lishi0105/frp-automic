@@ -9,13 +9,14 @@
 
 ---
 
-## 快速开始
+## 一、快速开始
 
-### 前置条件
-- 域名必须已通过云解析服务（如阿里云 DNS、腾讯云 DNS、Cloudflare DNS）配置通配符 A 记录（`*.<root_domain>`），并解析到部署该服务的云服务器公网 IPv4 地址。
+### 1.1. 前置条件
+
+- 域名必须已自行配置通配符 A 记录（`*.<root_domain>`），并解析到部署该服务的云服务器公网 IPv4 地址。
 - 云服务器需要开放80/443端口以及至少一个 TCP 端口供 frps 使用（脚本会自动输出需要开放的端口并提示）。
 
-### 1. 配置
+### 1.2. 配置
 
 生成并编辑配置文件：
 
@@ -27,20 +28,18 @@ python3 vps-install-frps.py
 
 `frps-config.json` 主要字段：
 
-| 字段 | 说明 |
-|------|------|
-| `root_domain` | 根域名，如 `example.com` |
-| `vps_public_ip` | VPS 公网 IP；留空时自动获取，并写入生成的 `frpc/frpc.toml` |
-| `cert_email` | Certbot 注册邮箱 |
-| `frps.server_port` | frps serverPort；小于 `1000` 或留空时随机生成 |
-| `frps.token` | frps 认证 token；留空时随机生成 |
+| 字段                  | 说明                                                         |
+| --------------------- | ------------------------------------------------------------ |
+| `root_domain`         | 根域名，如 `example.com`                                     |
+| `vps_public_ip`       | VPS 公网 IP；留空时自动获取，并写入生成的 `frpc/frpc.toml`   |
+| `cert_email`          | Certbot 注册邮箱                                             |
+| `frps.server_port`    | frps serverPort；小于 `1000` 或留空时随机生成                |
+| `frps.token`          | frps 认证 token；留空时随机生成                              |
 | `frps.dashboard_http` | 是否允许 frps dashboard 通过 `VPS_IP:dashboardPort` 公网直通，默认关闭 |
-| `status.enabled` | 是否启用状态面板与 `status.<root_domain>` 反代，默认启用 |
-| `status.port` | 状态面板本机 HTTP 端口；小于 `1000` 或留空时随机生成 |
-| `status.http` | 是否允许状态面板通过 `VPS_IP:status.port` 公网直通，默认关闭 |
-| `dns_provider` | DNS 解析方式：`manual` 或 `cloudflare` |
-| `cf_api_token` | Cloudflare API Token（仅 cloudflare 模式需要） |
-| `services` | 服务列表，见下方说明 |
+| `status.enabled`      | 是否启用状态面板与 `status.<root_domain>` 反代，默认启用     |
+| `status.port`         | 状态面板本机 HTTP 端口；小于 `1000` 或留空时随机生成         |
+| `status.http`         | 是否允许状态面板通过 `VPS_IP:status.port` 公网直通，默认关闭 |
+| `services`            | 服务列表，见下方说明                                         |
 
 需要将所有 HTTP 服务域名，以及 `frps.<root_domain>`、`status.<root_domain>` 的 A 记录解析到 VPS 公网 IP。禁用 `status.enabled` 时不需要配置 `status.<root_domain>`。
 启动 frps 前脚本会检查 `frps.server_port/tcp` 是否被本机占用，并检查常见本机防火墙是否放行；云服务器还需要在云厂商安全组中放行该 TCP 端口。
@@ -86,7 +85,7 @@ python3 vps-install-frps.py
 
 `tunnel: false` 适用于服务已经运行在 VPS 本机的场景。HTTP 服务仍会生成 `https://<alias>.<root_domain>` 的 Nginx 反代和证书配置，但不会生成 frpc 代理；Nginx 会直接转发到 VPS 本机的 `local_ip:local_port`。
 
-### 2. 部署 frps
+### 1.3. 部署 frps
 
 ```bash
 # 仅生成配置文件，不启动
@@ -133,7 +132,7 @@ frpc/
 
 将 `frpc/` 目录复制到需要做内网穿透的机器，运行 `docker compose up -d` 即可连接。
 
-### 3. 访问方式
+### 1.4. 访问方式
 
 HTTP 模式默认只通过 Nginx 域名入口访问：
 
@@ -174,52 +173,53 @@ https://frps.<root_domain>
 
 ---
 
-## frps-status-app — 监控面板
+## 二、frps-status-app — 监控面板
+
 默认用户名密码：admin/admin123
 登录入口：status.<root_domain>
 
-### 功能
+### 2.1. 功能
 
-| 页面 | 内容 |
-|------|------|
+| 页面     | 内容                                                         |
+| -------- | ------------------------------------------------------------ |
 | 数据看板 | frps 在线状态、本月流量与网卡流量汇总、证书预警、代理统计、本月趋势图 |
 | 代理列表 | 代理在线状态、连接数、月度流量、证书关联，后端分页/排序/筛选 |
-| 证书列表 | 证书有效期、剩余天数、公网 TLS 握手状态、关联代理与异常信息 |
-| 历史统计 | 每日流量明细、本月 Top 5、趋势折线图、导出 CSV |
+| 证书列表 | 证书有效期、剩余天数、公网 TLS 握手状态、关联代理与异常信息  |
+| 历史统计 | 每日流量明细、本月 Top 5、趋势折线图、导出 CSV               |
 | 流量统计 | 公网 IP/网卡维度日流量汇总，支持按日期查询上行、下行与总量趋势 |
-| 系统配置 | SMTP 告警（含测试发送）、流量阈值、数据库压缩与清理 |
+| 系统配置 | SMTP 告警（含测试发送）、流量阈值、数据库压缩与清理          |
 
-### 环境变量
+### 2.2. 环境变量
 
-复制示例文件：
+复制示例文件（可按默认配置）：
 
 ```bash
 cd frps-status-app
 cp .env.example .env
 ```
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `LISTEN` | `0.0.0.0:8080` | 容器内监听地址 |
-| `STATUS_APP_BIND` | `127.0.0.1` | 映射到宿主机的绑定地址；设为 `0.0.0.0` 才允许公网直通 |
-| `STATUS_APP_PORT` | `28080` | 映射到宿主机的 HTTP 端口 |
-| `DB_PATH` | `/data/frps-status.sqlite` | SQLite 数据库路径 |
-| `FRPS_HOST` | `frps` | frps 所在主机 |
-| `FRPS_BIND_PORT` | `7000` | frps 服务端口 |
-| `FRPS_DASHBOARD_PORT` | `7500` | frps Dashboard 端口 |
-| `FRPS_DASHBOARD_USER` | — | Dashboard 用户名 |
-| `FRPS_DASHBOARD_PASSWORD` | — | Dashboard 密码 |
-| `STATUS_DOMAINS` | — | 逗号分隔的域名，用于证书检测 |
-| `STATUS_USER` | — | 面板登录用户名（留空不鉴权） |
-| `STATUS_PASSWORD` | — | 面板登录密码 |
-| `CERT_DIR` | `/etc/letsencrypt/live` | 证书目录 |
-| `POLL_SECONDS` | `60` | 数据轮询间隔（秒） |
-| `HOST_PUBLIC_IP` | — | 宿主机公网 IPv4（用于网卡流量统计；部署脚本会自动写入） |
-| `HOST_IFACE` | — | 公网 IP 对应网卡名（如 `eth0`，部署脚本会自动写入） |
-| `HOST_NET_STATS_DIR` | `/host-net-stats` | 容器内网卡统计目录 |
-| `HOST_NET_STATS_MOUNT` | `/sys/class/net/eth0/statistics` | 宿主机映射路径（手动部署时需按实际网卡调整） |
+| 变量                      | 默认值                           | 说明                                                    |
+| ------------------------- | -------------------------------- | ------------------------------------------------------- |
+| `LISTEN`                  | `0.0.0.0:8080`                   | 容器内监听地址                                          |
+| `STATUS_APP_BIND`         | `127.0.0.1`                      | 映射到宿主机的绑定地址；设为 `0.0.0.0` 才允许公网直通   |
+| `STATUS_APP_PORT`         | `28080`                          | 映射到宿主机的 HTTP 端口                                |
+| `DB_PATH`                 | `/data/frps-status.sqlite`       | SQLite 数据库路径                                       |
+| `FRPS_HOST`               | `frps`                           | frps 所在主机                                           |
+| `FRPS_BIND_PORT`          | `7000`                           | frps 服务端口                                           |
+| `FRPS_DASHBOARD_PORT`     | `7500`                           | frps Dashboard 端口                                     |
+| `FRPS_DASHBOARD_USER`     | —                                | Dashboard 用户名                                        |
+| `FRPS_DASHBOARD_PASSWORD` | —                                | Dashboard 密码                                          |
+| `STATUS_DOMAINS`          | —                                | 逗号分隔的域名，用于证书检测                            |
+| `STATUS_USER`             | —                                | 面板登录用户名（留空不鉴权）                            |
+| `STATUS_PASSWORD`         | —                                | 面板登录密码                                            |
+| `CERT_DIR`                | `/etc/letsencrypt/live`          | 证书目录                                                |
+| `POLL_SECONDS`            | `60`                             | 数据轮询间隔（秒）                                      |
+| `HOST_PUBLIC_IP`          | —                                | 宿主机公网 IPv4（用于网卡流量统计；部署脚本会自动写入） |
+| `HOST_IFACE`              | —                                | 公网 IP 对应网卡名（如 `eth0`，部署脚本会自动写入）     |
+| `HOST_NET_STATS_DIR`      | `/host-net-stats`                | 容器内网卡统计目录                                      |
+| `HOST_NET_STATS_MOUNT`    | `/sys/class/net/eth0/statistics` | 宿主机映射路径（手动部署时需按实际网卡调整）            |
 
-### Docker 部署（推荐）
+### 2.3. Docker 部署（推荐）
 
 通常由 `vps-install-frps.py --run` 自动写入 `.env` 并启动。状态服务默认加入 `frps_default` Docker 网络，供 Nginx 通过容器内网反代；单独部署前需确保 frps 侧 compose 已启动并创建该网络。
 为采集宿主机网卡日流量，部署脚本会自动识别公网 IP 对应网卡并将其统计目录只读挂载到容器（`/host-net-stats`）。
@@ -232,7 +232,7 @@ cp .env.example .env   # 编辑 .env
 docker compose up -d --build
 ```
 
-### 本地开发
+### 2.4. 本地开发
 
 **后端：**
 
@@ -256,29 +256,29 @@ cd frps-status-app/frontend
 npm run build  # 输出至 ../web/
 ```
 
-### API 接口
+### 2.5. API 接口
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/login` | 面板登录 |
-| POST | `/api/logout` | 退出登录 |
-| GET | `/api/session` | 会话状态 |
-| GET | `/api/status` | 完整快照（frps、代理、证书、流量） |
-| GET | `/api/proxies` | 代理分页列表（`page/page_size/sort/order/keyword/type/online`） |
-| GET | `/api/certificates` | 证书分页列表（`page/page_size/sort/order/keyword/status/tls`） |
-| GET | `/api/daily` | 每日流量明细 |
-| GET | `/api/daily/interface` | 网卡/公网IP维度日流量（`from/to`） |
-| GET | `/api/daily/export` | 导出 CSV |
-| GET/POST | `/api/settings` | 读取 / 保存配置 |
-| POST | `/api/settings/test-email` | 发送测试邮件 |
-| POST | `/api/db/vacuum` | SQLite VACUUM |
-| POST | `/api/db/purge` | 清理旧数据 `{"days": 60}` |
+| 方法     | 路径                       | 说明                                                         |
+| -------- | -------------------------- | ------------------------------------------------------------ |
+| POST     | `/api/login`               | 面板登录                                                     |
+| POST     | `/api/logout`              | 退出登录                                                     |
+| GET      | `/api/session`             | 会话状态                                                     |
+| GET      | `/api/status`              | 完整快照（frps、代理、证书、流量）                           |
+| GET      | `/api/proxies`             | 代理分页列表（`page/page_size/sort/order/keyword/type/online`） |
+| GET      | `/api/certificates`        | 证书分页列表（`page/page_size/sort/order/keyword/status/tls`） |
+| GET      | `/api/daily`               | 每日流量明细                                                 |
+| GET      | `/api/daily/interface`     | 网卡/公网IP维度日流量（`from/to`）                           |
+| GET      | `/api/daily/export`        | 导出 CSV                                                     |
+| GET/POST | `/api/settings`            | 读取 / 保存配置                                              |
+| POST     | `/api/settings/test-email` | 发送测试邮件                                                 |
+| POST     | `/api/db/vacuum`           | SQLite VACUUM                                                |
+| POST     | `/api/db/purge`            | 清理旧数据 `{"days": 60}`                                    |
 
 除 `/api/login`、`/api/session`、`/api/user/forgot-password` 外，其余接口需要登录态（会话 Cookie）。
 
 ---
 
-## 目录结构
+## 三、目录结构
 
 ```
 frp-automic/
@@ -306,7 +306,7 @@ frp-automic/
 └── frpc/                     # 由部署脚本生成，复制到内网机器使用
 ```
 
-## 依赖
+## 四、依赖
 
 - Docker Engine + docker compose 插件
 - Go 1.22+（本地开发）
