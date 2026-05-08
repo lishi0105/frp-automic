@@ -21,7 +21,7 @@ def bool_value(value: Any, default: bool = False) -> bool:
 
 
 def needs_tunnel(item: Dict[str, Any]) -> bool:
-    return bool_value(item.get("tunnel", item.get("need_tunnel", True)), default=True)
+    return bool_value(item.get("tunnel", True), default=True)
 
 
 def remote_port(item: Dict[str, Any]) -> int:
@@ -137,7 +137,7 @@ def validate_services() -> None:
             raise ValueError(f"各服务的远端端口（port）重复：{rp}")
         ports.add(rp)
 
-        tunnel = item.get("tunnel", item.get("need_tunnel", True))
+        tunnel = item.get("tunnel", True)
         if not isinstance(tunnel, (bool, str, int)):
             raise ValueError(f"服务 {alias} 的隧道开关（tunnel）必须是布尔值")
 
