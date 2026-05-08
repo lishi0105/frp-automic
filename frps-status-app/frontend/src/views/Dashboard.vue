@@ -541,8 +541,8 @@ onUnmounted(() => {
   gap: 10px;
 }
 .page-actions .btn {
-  height: 30px;
-  padding: 0 10px;
+  height: 36px;
+  padding: 0 12px;
   gap: 6px;
   border-color: #d7e1ed;
   background: #fff;
@@ -550,6 +550,7 @@ onUnmounted(() => {
   font-size: 12px;
   font-weight: 500;
   box-shadow: none;
+  border-radius: 8px;
 }
 .btn-doc-icon {
   width: 14px;

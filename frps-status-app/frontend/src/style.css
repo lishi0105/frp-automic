@@ -492,6 +492,23 @@ a { color: var(--primary); text-decoration: none; }
 }
 .page-title { font-size: var(--fs-page-title); font-weight: var(--fw-title); line-height: var(--lh-title); letter-spacing: 0; }
 .page-sub { color: var(--text-2); font-size: var(--fs-body); margin-top: 4px; }
+.page-header > .flex-center,
+.page-header .page-actions,
+.page-header .header-side {
+  align-self: flex-start;
+  min-height: 36px;
+  align-items: center;
+}
+.page-header > .flex-center,
+.page-header .page-actions,
+.page-header .header-side > .flex-center {
+  gap: 10px;
+}
+.page-header .btn.btn-sm {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+}
 
 .page-body { padding: 16px 24px 24px; flex: 1; }
 

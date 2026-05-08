@@ -246,7 +246,7 @@ onUnmounted(() => {
 /* ── warning anchor ── */
 .top-tools {
   position: absolute;
-  top: 14px;
+  top: 16px;
   right: 24px;
   z-index: 90;
   display: flex;
@@ -459,10 +459,10 @@ onUnmounted(() => {
 
 .top-user {
   border: 0;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   color: #334155;
-  height: 38px;
+  height: 36px;
   padding: 0 6px;
   display: inline-flex;
   align-items: center;

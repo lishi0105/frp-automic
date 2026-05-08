@@ -53,12 +53,14 @@
           <div class="feature-logo">∿</div>
           <div>
             <h3>流量与告警策略</h3>
-            <p>统一配置流量阈值、总量限额与事件告警策略</p>
-            <div class="feature-tags">
-              <span>流量阈值</span>
-              <span>总量限额</span>
-              <span>事件告警</span>
-              <span>通知策略</span>
+            <div class="feature-meta">
+              <p>统一配置流量阈值、总量限额与事件告警策略</p>
+              <div class="feature-tags">
+                <span>流量阈值</span>
+                <span>总量限额</span>
+                <span>事件告警</span>
+                <span>通知策略</span>
+              </div>
             </div>
           </div>
         </div>
@@ -342,7 +344,7 @@ async function saveRetentionDays() {
 <style scoped>
 .sysset-page { display: flex; flex-direction: column; gap: 0; }
 .sysset-header { min-height: auto; }
-.sysset-main { display: grid; gap: 12px; padding: 0 24px 24px; }
+.sysset-main { display: grid; gap: 10px; padding: 0 24px 24px; }
 .card-surface {
   background: #fff;
   border: 1px solid #d9e4f3;
@@ -350,7 +352,7 @@ async function saveRetentionDays() {
   box-shadow: 0 8px 28px rgba(15, 23, 42, .05);
 }
 .summary-card {
-  min-height: 118px;
+  min-height: 94px;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -359,20 +361,20 @@ async function saveRetentionDays() {
 .summary-item {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 18px;
+  gap: 12px;
+  padding: 10px 16px;
   min-width: 0;
 }
 .summary-item + .summary-item {
   border-left: 1px solid #e2e8f0;
 }
 .summary-icon {
-  width: 54px;
-  height: 54px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: var(--fw-strong);
 }
 .summary-icon.in { color: #2563eb; background: #dbeafe; }
@@ -380,7 +382,7 @@ async function saveRetentionDays() {
 .summary-icon.total { color: #f59e0b; background: #fef3c7; }
 .summary-icon.smtp { color: #7c3aed; background: #ede9fe; }
 .summary-item h3 {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   font-size: var(--fs-card-title);
   line-height: 1.2;
   font-weight: var(--fw-title);
@@ -388,29 +390,29 @@ async function saveRetentionDays() {
 }
 .summary-metrics {
   display: flex;
-  gap: 18px;
+  gap: 14px;
   min-width: 0;
 }
 .summary-metrics span {
   display: grid;
-  gap: 4px;
-  min-width: 54px;
+  gap: 2px;
+  min-width: 50px;
 }
-.summary-item b { display: block; font-size: var(--fs-page-title-sm); color: #0f172a; line-height: 1.15; white-space: nowrap; }
+.summary-item b { display: block; font-size: var(--fs-section-title); color: #0f172a; line-height: 1.15; white-space: nowrap; }
 .summary-item small { color: #64748b; font-size: var(--fs-caption); }
 
 .feature-card {
-  min-height: 116px;
-  padding: 14px 18px;
+  min-height: 88px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
 }
-.feature-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.feature-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .feature-logo {
-  width: 54px;
-  height: 54px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -420,7 +422,8 @@ async function saveRetentionDays() {
 }
 .feature-left h3 { margin: 0 0 4px; font-size: var(--fs-section-title); line-height: 1.25; font-weight: var(--fw-section); color: #0f172a; }
 .feature-left p { margin: 0; color: #64748b; font-size: var(--fs-caption); }
-.feature-tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.feature-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.feature-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .feature-tags span { border: 1px solid #cfe0fb; color: #2563eb; background: #eff6ff; border-radius: 6px; font-size: var(--fs-caption); padding: 2px 7px; }
 .btn-lg { min-width: 96px; height: 34px; font-size: var(--fs-caption); }
 
@@ -430,7 +433,7 @@ async function saveRetentionDays() {
 .mail-status.off { color: #ef4444; }
 
 .db-card {
-  min-height: 132px;
+  min-height: 104px;
   padding: 0;
   display: grid;
   grid-template-columns: 1.2fr .8fr 1fr;
@@ -440,21 +443,21 @@ async function saveRetentionDays() {
 .db-main {
   display: flex;
   align-items: center;
-  padding: 14px 18px;
+  padding: 10px 16px;
   border-right: 1px solid #e2e8f0;
 }
 .db-maintain {
   display: contents;
 }
 .db-item {
-  padding: 14px 18px;
+  padding: 10px 16px;
   border-right: 1px solid #e2e8f0;
 }
 .db-item:last-child {
   border-right: 0;
 }
 .db-item h4 { margin: 0; font-size: var(--fs-card-title); font-weight: var(--fw-section); color: #0f172a; }
-.db-item p { margin: 6px 0 10px; color: #64748b; font-size: var(--fs-caption); }
+.db-item p { margin: 4px 0 8px; color: #64748b; font-size: var(--fs-caption); }
 .purge-row { display: flex; align-items: center; gap: 6px; color: #334155; font-size: var(--fs-caption); }
 .purge-row input { width: 54px; height: 30px; border: 1px solid #d5e2f6; border-radius: 6px; text-align: center; font-size: var(--fs-caption); }
 .db-messages { grid-column: 1 / -1; display: grid; gap: 8px; }
