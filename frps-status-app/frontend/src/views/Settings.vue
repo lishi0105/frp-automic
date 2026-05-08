@@ -90,19 +90,20 @@
             <button class="btn btn-outline btn-sm" :disabled="vacuuming" @click="doVacuum">{{ vacuuming ? '执行中…' : '立即执行' }}</button>
           </div>
           <div class="db-item">
-            <h4>历史数据清理</h4>
-            <p>删除超过保留天数的历史记录</p>
+            <h4>历史数据保留天数</h4>
+            <p>设置历史数据保留天数，超期数据由后端自动清理</p>
             <div class="purge-row">
               <span>保留近</span>
               <input v-model.number="purgeDays" type="number" min="1" max="365" />
               <span>天</span>
-              <button class="btn btn-dark btn-sm" :disabled="purging" @click="doPurge">{{ purging ? '清理中…' : '清理' }}</button>
+              <span>历史记录</span>
+              <button class="btn btn-dark btn-sm" :disabled="purging" @click="saveRetentionDays">{{ purging ? '保存中…' : '保存' }}</button>
             </div>
           </div>
         </div>
         <div class="db-messages">
           <div v-if="vacuumMsg" class="alert" :class="vacuumMsg.ok ? 'alert-success' : 'alert-error'">{{ vacuumMsg.text }}</div>
-          <div v-if="purgeMsg" class="alert" :class="purgeMsg.ok ? 'alert-success' : 'alert-error'">{{ purgeMsg.text }}</div>
+          <div v-if="retentionMsg" class="alert" :class="retentionMsg.ok ? 'alert-success' : 'alert-error'">{{ retentionMsg.text }}</div>
         </div>
       </section>
     </div>
@@ -169,7 +170,7 @@ const purgeDays = ref(60)
 const smtpMsg = ref(null)
 const policyMsg = ref(null)
 const vacuumMsg = ref(null)
-const purgeMsg = ref(null)
+const retentionMsg = ref(null)
 const savedSettings = ref(null)
 const formInitialized = ref(false)
 
@@ -195,6 +196,7 @@ function fillForm(s) {
   form.alert_cert_expiry = s.alert_cert_expiry ? 'true' : 'false'
   form.alert_cert_days = s.alert_cert_days || 15
   form.smtp_auth_code = s.smtp_auth_code || ''
+  purgeDays.value = Number(s.history_retention_days) > 0 ? Number(s.history_retention_days) : 60
 }
 
 watch(() => props.status?.settings, (settings) => {
@@ -306,15 +308,23 @@ async function doVacuum() {
   }
 }
 
-async function doPurge() {
-  if (!confirm(`确定删除 ${purgeDays.value} 天前的流量记录？此操作不可恢复。`)) return
+async function saveRetentionDays() {
+  if (!Number.isFinite(purgeDays.value) || purgeDays.value < 1) {
+    purgeDays.value = 60
+  }
+  purgeDays.value = Math.min(365, Math.max(1, Math.floor(purgeDays.value)))
   purging.value = true
-  purgeMsg.value = null
+  retentionMsg.value = null
   try {
-    const r = await api.purge(purgeDays.value)
-    flash(purgeMsg, true, `已删除 ${r.deleted} 条记录`)
+    const saved = await api.saveSettings({
+      history_retention_days: purgeDays.value
+    })
+    savedSettings.value = saved
+    fillForm(saved)
+    formInitialized.value = true
+    flash(retentionMsg, true, `历史数据保留天数已更新为 ${purgeDays.value} 天`)
   } catch (e) {
-    flash(purgeMsg, false, '清理失败：' + e.message)
+    flash(retentionMsg, false, '保存失败：' + e.message)
   } finally {
     purging.value = false
   }

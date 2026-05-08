@@ -32,12 +32,13 @@ import (
 )
 
 type App struct {
-	cfg    config.Config
-	store  *store.Store
-	frps   *frps.Client
-	secret []byte
-	mu     sync.RWMutex
-	latest model.Snapshot
+	cfg              config.Config
+	store            *store.Store
+	frps             *frps.Client
+	secret           []byte
+	mu               sync.RWMutex
+	latest           model.Snapshot
+	lastAutoPurgeDay string
 }
 
 func New(cfg config.Config, st *store.Store, fc *frps.Client) *App {
@@ -82,7 +83,41 @@ func (a *App) PollLoop() {
 		if err := a.Refresh(context.Background()); err != nil {
 			logger.Warn("定时刷新失败: %v", err)
 		}
+		a.autoPurgeHistoryIfNeeded()
 	}
+}
+
+func (a *App) autoPurgeHistoryIfNeeded() {
+	now := time.Now()
+	hour := now.Hour()
+	if hour < 2 || hour >= 4 {
+		return
+	}
+	day := now.Format("2006-01-02")
+	a.mu.RLock()
+	alreadyDone := a.lastAutoPurgeDay == day
+	a.mu.RUnlock()
+	if alreadyDone {
+		return
+	}
+	settings, err := a.store.PublicSettings()
+	if err != nil {
+		logger.Warn("自动清理读取设置失败: %v", err)
+		return
+	}
+	days := settings.HistoryRetentionDays
+	if days < 1 {
+		days = 60
+	}
+	deleted, err := a.store.Purge(days)
+	if err != nil {
+		logger.Error("自动清理历史数据失败 保留天数=%d 错误=%v", days, err)
+		return
+	}
+	a.mu.Lock()
+	a.lastAutoPurgeDay = day
+	a.mu.Unlock()
+	logger.Info("自动清理历史数据完成 日期=%s 保留天数=%d 已删除=%d", day, days, deleted)
 }
 
 func (a *App) Refresh(ctx context.Context) error {
@@ -1397,7 +1432,7 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		smtpKeys := map[string]bool{"smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true}
-		allowed := map[string]bool{"threshold_in_gb": true, "threshold_out_gb": true, "threshold_total_gb": true, "limit_in_gb": true, "limit_out_gb": true, "limit_total_gb": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true, "alert_proxy_offline": true, "alert_cert_expiry": true, "alert_cert_days": true}
+		allowed := map[string]bool{"threshold_in_gb": true, "threshold_out_gb": true, "threshold_total_gb": true, "limit_in_gb": true, "limit_out_gb": true, "limit_total_gb": true, "history_retention_days": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true, "alert_proxy_offline": true, "alert_cert_expiry": true, "alert_cert_days": true}
 		smtpChanged := false
 		for key, value := range in {
 			if !allowed[key] {
@@ -1473,6 +1508,11 @@ func (a *App) handlePurge(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	if body.Days < 1 {
 		body.Days = 60
+	}
+	if err := a.store.SaveSetting("history_retention_days", strconv.Itoa(body.Days)); err != nil {
+		logger.Error("保存历史保留天数失败 保留天数=%d 错误=%v", body.Days, err)
+		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+		return
 	}
 	deleted, err := a.store.Purge(body.Days)
 	if err != nil {

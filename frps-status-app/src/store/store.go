@@ -95,18 +95,19 @@ func (s *Store) InitDB() error {
 	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_proxy_status_events_key_at ON proxy_status_events(key, at)`)
 	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_daily_iface_traffic_day ON daily_iface_traffic(day)`)
 	defaults := map[string]string{
-		"threshold_in_gb":     "0",
-		"threshold_out_gb":    "0",
-		"threshold_total_gb":  "0",
-		"limit_in_gb":         "0",
-		"limit_out_gb":        "0",
-		"limit_total_gb":      "0",
-		"smtp_port":           "465",
-		"smtp_enabled":        "false",
-		"alert_proxy_offline": "false",
-		"alert_cert_expiry":   "false",
-		"alert_cert_days":     "15",
-		"smtp_verified":       "false",
+		"threshold_in_gb":        "0",
+		"threshold_out_gb":       "0",
+		"threshold_total_gb":     "0",
+		"limit_in_gb":            "0",
+		"limit_out_gb":           "0",
+		"limit_total_gb":         "0",
+		"smtp_port":              "465",
+		"smtp_enabled":           "false",
+		"alert_proxy_offline":    "false",
+		"alert_cert_expiry":      "false",
+		"alert_cert_days":        "15",
+		"smtp_verified":          "false",
+		"history_retention_days": "60",
 	}
 	for k, v := range defaults {
 		if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)`, k, v); err != nil {
@@ -129,22 +130,23 @@ func (s *Store) SaveSetting(key, value string) error {
 
 func (s *Store) PublicSettings() (model.PublicSettings, error) {
 	return model.PublicSettings{
-		ThresholdInGB:     parseFloat(s.Setting("threshold_in_gb")),
-		ThresholdOutGB:    parseFloat(s.Setting("threshold_out_gb")),
-		ThresholdTotalGB:  parseFloat(s.Setting("threshold_total_gb")),
-		LimitInGB:         parseFloat(s.Setting("limit_in_gb")),
-		LimitOutGB:        parseFloat(s.Setting("limit_out_gb")),
-		LimitTotalGB:      parseFloat(s.Setting("limit_total_gb")),
-		SMTPHost:          s.Setting("smtp_host"),
-		SMTPPort:          int(parseFloatDefault(s.Setting("smtp_port"), 465)),
-		SMTPUser:          s.Setting("smtp_user"),
-		SMTPFrom:          s.Setting("smtp_from"),
-		SMTPTo:            s.Setting("smtp_to"),
-		SMTPEnabled:       strings.EqualFold(s.Setting("smtp_enabled"), "true"),
-		SMTPAuthCode:      s.Setting("smtp_auth_code"),
-		AlertProxyOffline: strings.EqualFold(s.Setting("alert_proxy_offline"), "true"),
-		AlertCertExpiry:   strings.EqualFold(s.Setting("alert_cert_expiry"), "true"),
-		AlertCertDays:     int(parseFloatDefault(s.Setting("alert_cert_days"), 15)),
+		ThresholdInGB:        parseFloat(s.Setting("threshold_in_gb")),
+		ThresholdOutGB:       parseFloat(s.Setting("threshold_out_gb")),
+		ThresholdTotalGB:     parseFloat(s.Setting("threshold_total_gb")),
+		LimitInGB:            parseFloat(s.Setting("limit_in_gb")),
+		LimitOutGB:           parseFloat(s.Setting("limit_out_gb")),
+		LimitTotalGB:         parseFloat(s.Setting("limit_total_gb")),
+		HistoryRetentionDays: int(parseFloatDefault(s.Setting("history_retention_days"), 60)),
+		SMTPHost:             s.Setting("smtp_host"),
+		SMTPPort:             int(parseFloatDefault(s.Setting("smtp_port"), 465)),
+		SMTPUser:             s.Setting("smtp_user"),
+		SMTPFrom:             s.Setting("smtp_from"),
+		SMTPTo:               s.Setting("smtp_to"),
+		SMTPEnabled:          strings.EqualFold(s.Setting("smtp_enabled"), "true"),
+		SMTPAuthCode:         s.Setting("smtp_auth_code"),
+		AlertProxyOffline:    strings.EqualFold(s.Setting("alert_proxy_offline"), "true"),
+		AlertCertExpiry:      strings.EqualFold(s.Setting("alert_cert_expiry"), "true"),
+		AlertCertDays:        int(parseFloatDefault(s.Setting("alert_cert_days"), 15)),
 	}, nil
 }
 
@@ -277,12 +279,26 @@ func (s *Store) Vacuum() error {
 
 func (s *Store) Purge(days int) (int64, error) {
 	cutoff := time.Now().AddDate(0, 0, -days).Format("2006-01-02")
-	res, err := s.db.Exec(`DELETE FROM daily_traffic WHERE day < ?`, cutoff)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, logStoreErr("begin purge transaction", err)
+	}
+	defer tx.Rollback()
+
+	res1, err := tx.Exec(`DELETE FROM daily_traffic WHERE day < ?`, cutoff)
 	if err != nil {
 		return 0, logStoreErr("purge daily traffic", err)
 	}
-	n, _ := res.RowsAffected()
-	return n, nil
+	res2, err := tx.Exec(`DELETE FROM daily_iface_traffic WHERE day < ?`, cutoff)
+	if err != nil {
+		return 0, logStoreErr("purge daily iface traffic", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, logStoreErr("commit purge transaction", err)
+	}
+	n1, _ := res1.RowsAffected()
+	n2, _ := res2.RowsAffected()
+	return n1 + n2, nil
 }
 
 func (s *Store) DailyTraffic() ([]map[string]any, error) {
