@@ -91,7 +91,6 @@ def fix_certbot_dir_permissions(dirpath: Path) -> None:
     if not exists:
         return
 
-    print(f"\n修正目录权限：{dirpath}")
     ret = run(
         [
             "docker", "run", "--rm",
@@ -112,8 +111,6 @@ def issue_certs(ctx: DeployContext) -> None:
         return
 
     fix_certbot_dir_permissions(CERTBOT_CONF_DIR)
-    live_dir = CERTBOT_CONF_DIR / "live"
-    fix_certbot_dir_permissions(live_dir)
 
     for domain in domains:
         cert_file = CERTBOT_CONF_DIR / "live" / domain / "fullchain.pem"
@@ -133,6 +130,7 @@ def issue_certs(ctx: DeployContext) -> None:
         ]
         ret = run(certbot_cmd, cwd=BASE_DIR, check=False)
         if ret.returncode == 0:
+            fix_certbot_dir_permissions(CERTBOT_CONF_DIR)
             continue
         print("certbot 首次申请失败，等待 15 秒后重试一次...")
         time.sleep(15)
