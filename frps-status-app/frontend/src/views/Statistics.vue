@@ -6,7 +6,7 @@
       </div>
       <div class="flex-center">
         <a class="btn btn-outline btn-sm" :href="exportUrl">⬇ 导出 CSV</a>
-        <button class="btn btn-outline btn-sm" :disabled="loading" @click="$emit('refresh')">
+        <button class="btn btn-outline btn-sm" :disabled="loading || ifaceLoading" @click="refreshPage">
           <span v-if="loading" class="spinner"></span>
           <span v-else>↻</span> 刷新
         </button>
@@ -17,7 +17,7 @@
       <section class="analytics-overview">
         <div>
           <div class="section-title">所选时间范围</div>
-          <div class="text-muted text-sm">{{ startDate || minDay || '-' }} 至 {{ endDate || maxDay || '-' }} · {{ selectedProxyName || '全部代理汇总' }}</div>
+          <div class="text-muted text-sm">{{ startDate || minDay || '-' }} 至 {{ endDate || maxDay || '-' }} · {{ selectedProxyName || '网卡流量汇总' }}</div>
         </div>
         <div class="analytics-overview-metrics">
           <div><b>{{ humanBytes(totalTraffic) }}</b><small>总流量</small></div>
@@ -47,14 +47,14 @@
 
         <section class="card stats-table-card">
           <div class="section-head">
-            <div class="section-title">{{ selectedProxyName ? '当前代理每日明细' : '每日明细（全局聚合）' }}</div>
+            <div class="section-title">{{ selectedProxyName ? '当前代理每日明细' : '每日明细（网卡聚合）' }}</div>
             <span class="text-muted text-sm">{{ filteredRows.length }} 条</span>
           </div>
           <div class="table-wrap stats-table-scroll">
             <table class="stats-detail-table">
               <thead>
                 <tr v-if="selectedProxyName"><th class="col-date">日期</th><th class="col-type">类型</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num">合计</th></tr>
-                <tr v-else><th class="col-date">日期</th><th class="col-count">代理数</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num">合计</th></tr>
+                <tr v-else><th class="col-date">日期</th><th class="col-count">网卡记录</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num">合计</th></tr>
               </thead>
               <tbody>
                 <tr v-if="!pagedRows.length"><td colspan="5" class="empty">暂无数据</td></tr>
@@ -97,7 +97,7 @@ import { humanBytes } from '../utils/format.js'
 import { api } from '../api/index.js'
 
 const props = defineProps({ status: Object, daily: Array, loading: Boolean })
-defineEmits(['refresh'])
+const emit = defineEmits(['refresh'])
 const route = useRoute()
 
 const exportUrl = api.exportCSVUrl
@@ -107,10 +107,19 @@ const startDate = ref('')
 const endDate = ref('')
 const page = ref(1)
 const PAGE_SIZE = 15
+const ifaceRows = ref([])
+const ifaceLoading = ref(false)
 
 const rows = computed(() => props.daily ?? [])
 const selectedProxyName = computed(() => decodeURIComponent(route.params.proxyName || ''))
-const proxyRows = computed(() => selectedProxyName.value ? rows.value.filter(r => r.name === selectedProxyName.value) : rows.value)
+const globalRows = computed(() => ifaceRows.value.map(r => ({
+  day: r.day,
+  in: Number(r.rx_kb || 0) * 1024,
+  out: Number(r.tx_kb || 0) * 1024,
+  iface: r.iface || '',
+  public_ip: r.public_ip || ''
+})))
+const proxyRows = computed(() => selectedProxyName.value ? rows.value.filter(r => r.name === selectedProxyName.value) : globalRows.value)
 const proxyInfo = computed(() => (props.status?.proxies ?? []).find(p => p.name === selectedProxyName.value) || null)
 const proxyType = computed(() => proxyInfo.value?.type || proxyRows.value[0]?.type || '')
 const minDay = computed(() => proxyRows.value.length ? [...proxyRows.value].sort((a, b) => a.day.localeCompare(b.day))[0].day : '')
@@ -131,14 +140,13 @@ const filteredRows = computed(() => {
     }
     return Object.values(byDayType).sort((a, b) => b.day.localeCompare(a.day))
   }
-  for (const r of rows.value) {
+  for (const r of globalRows.value) {
     if (startDate.value && r.day < startDate.value) continue
     if (endDate.value && r.day > endDate.value) continue
-    byDay[r.day] ??= { day: r.day, in: 0, out: 0, proxy_count: 0, peak_conns: 0, seen: new Set() }
+    byDay[r.day] ??= { day: r.day, in: 0, out: 0, proxy_count: 0, seen: new Set() }
     byDay[r.day].in += Number(r.in || 0)
     byDay[r.day].out += Number(r.out || 0)
-    byDay[r.day].peak_conns += Number(r.peak_conns || 0)
-    const key = `${r.name}:${r.type}`
+    const key = `${r.iface || '-'}:${r.public_ip || '-'}`
     if (!byDay[r.day].seen.has(key)) {
       byDay[r.day].seen.add(key)
       byDay[r.day].proxy_count++
@@ -183,6 +191,25 @@ function quickThisMonth() {
 function resetFilter() {
   startDate.value = ''
   endDate.value = ''
+}
+
+async function loadIfaceRows() {
+  ifaceLoading.value = true
+  try {
+    const data = await api.getDailyInterface()
+    ifaceRows.value = Array.isArray(data) ? data : []
+  } catch {
+    ifaceRows.value = []
+  } finally {
+    ifaceLoading.value = false
+  }
+}
+
+async function refreshPage() {
+  await Promise.all([
+    loadIfaceRows(),
+    Promise.resolve(emit('refresh'))
+  ])
 }
 
 function formatLocalDate(d) {
@@ -233,10 +260,14 @@ function buildChart() {
 }
 
 watch(filteredRows, buildChart)
+watch(() => props.status?.generated_at, () => {
+  if (!selectedProxyName.value) loadIfaceRows()
+})
 const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => chart?.resize()) : null
 onMounted(async () => {
   await nextTick()
   quickThisMonth()
+  await loadIfaceRows()
   chart = echarts.init(chartEl.value)
   buildChart()
   ro?.observe(chartEl.value)
