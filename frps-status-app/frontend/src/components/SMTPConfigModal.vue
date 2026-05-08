@@ -7,6 +7,8 @@
       </div>
 
       <div class="smtp-modal-body">
+        <div v-if="smtpMsg" class="alert mt-3 save-feedback" :class="smtpMsg.ok ? 'alert-success save-feedback-ok' : 'alert-error'">{{ smtpMsg.text }}</div>
+
         <label class="smtp-line">
           <span class="smtp-label"><i>*</i> 名称</span>
           <div class="smtp-input-wrap">
@@ -64,7 +66,6 @@
           <li>25端口为SMTP协议，587端口为STARTTLS协议</li>
         </ul>
 
-        <div v-if="smtpMsg" class="alert mt-3 save-feedback" :class="smtpMsg.ok ? 'alert-success save-feedback-ok' : 'alert-error'">{{ smtpMsg.text }}</div>
       </div>
 
       <div class="smtp-modal-foot">
