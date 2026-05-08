@@ -142,12 +142,15 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/index.js'
 import SMTPConfigModal from '../components/SMTPConfigModal.vue'
 import TrafficPolicyModal from '../components/TrafficPolicyModal.vue'
 
 const props = defineProps({ status: Object })
 defineEmits(['refresh'])
+const route = useRoute()
+const router = useRouter()
 
 const form = reactive({
   smtp_host: '',
@@ -216,12 +219,24 @@ function fillForm(s) {
 }
 
 watch(() => props.status?.settings, (settings) => {
-  if (smtpModalOpen.value || policyModalOpen.value) return
-  if (formInitialized.value) return
   savedSettings.value = settings || savedSettings.value
+  if (formInitialized.value && (smtpModalOpen.value || policyModalOpen.value)) return
+  if (formInitialized.value) return
   fillForm(settings)
   if (settings) formInitialized.value = true
 }, { immediate: true })
+
+watch(() => route.query.modal, (modal) => {
+  policyModalOpen.value = modal === 'policy'
+  smtpModalOpen.value = modal === 'smtp'
+}, { immediate: true })
+
+function setModalQuery(modal) {
+  const query = { ...route.query }
+  if (modal) query.modal = modal
+  else delete query.modal
+  router.replace({ path: route.path, query })
+}
 
 function flash(msgRef, ok, text, ms = 4000) {
   msgRef.value = { ok, text }
@@ -230,22 +245,28 @@ function flash(msgRef, ok, text, ms = 4000) {
 
 function openSMTPModal() {
   smtpMsg.value = null
+  fillForm(savedSettings.value || props.status?.settings)
   smtpModalOpen.value = true
+  setModalQuery('smtp')
 }
 
 function closeSMTPModal() {
   smtpModalOpen.value = false
   fillForm(savedSettings.value || props.status?.settings)
+  setModalQuery(null)
 }
 
 function openPolicyModal() {
   policyMsg.value = null
+  fillForm(savedSettings.value || props.status?.settings)
   policyModalOpen.value = true
+  setModalQuery('policy')
 }
 
 function closePolicyModal() {
   policyModalOpen.value = false
   fillForm(savedSettings.value || props.status?.settings)
+  setModalQuery(null)
 }
 
 async function saveSMTP() {
