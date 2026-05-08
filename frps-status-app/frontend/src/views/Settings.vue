@@ -333,16 +333,16 @@ async function saveRetentionDays() {
 
 <style scoped>
 .sysset-page { display: flex; flex-direction: column; gap: 12px; }
-.sysset-header { min-height: 86px; padding: 18px 24px; }
-.sysset-main { display: grid; gap: 14px; }
+.sysset-header { min-height: auto; }
+.sysset-main { display: grid; gap: 14px; padding: 0 24px 24px; }
 .card-surface {
   background: #fff;
-  border: 1px solid #e7eef8;
-  border-radius: 14px;
+  border: 1px solid #d9e4f3;
+  border-radius: 8px;
   box-shadow: 0 8px 28px rgba(15, 23, 42, .05);
 }
 .summary-card {
-  padding: 14px 18px;
+  padding: 14px 16px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
@@ -351,65 +351,65 @@ async function saveRetentionDays() {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 10px;
+  padding: 6px 8px;
 }
 .summary-icon {
-  width: 58px;
-  height: 58px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 28px;
-  font-weight: 700;
+  font-size: var(--fs-metric);
+  font-weight: var(--fw-strong);
 }
 .summary-icon.in { color: #2563eb; background: #dbeafe; }
 .summary-icon.out { color: #10b981; background: #dcfce7; }
 .summary-icon.total { color: #f59e0b; background: #fef3c7; }
 .summary-icon.smtp { color: #7c3aed; background: #ede9fe; }
-.summary-item b { display: block; font-size: 24px; color: #0f172a; line-height: 1.15; }
-.summary-item small { color: #475569; font-size: 14px; }
+.summary-item b { display: block; font-size: var(--fs-metric); color: #0f172a; line-height: 1.15; }
+.summary-item small { color: #475569; font-size: var(--fs-caption); }
 
 .feature-card {
-  padding: 18px 20px;
+  padding: 16px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
-.feature-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.feature-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .feature-logo {
-  width: 74px;
-  height: 74px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   color: #fff;
-  font-size: 38px;
+  font-size: var(--fs-icon);
   background: linear-gradient(145deg, #3b82f6, #1d4ed8);
 }
-.feature-left h3 { margin: 0 0 6px; font-size: 34px; line-height: 1.05; color: #0f172a; }
-.feature-left p { margin: 0; color: #64748b; font-size: 16px; }
+.feature-left h3 { margin: 0 0 4px; font-size: var(--fs-section-title); line-height: 1.25; font-weight: var(--fw-section); color: #0f172a; }
+.feature-left p { margin: 0; color: #64748b; font-size: var(--fs-body); }
 .feature-tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
-.feature-tags span { border: 1px solid #cfe0fb; color: #2563eb; background: #eff6ff; border-radius: 8px; font-size: 14px; padding: 3px 8px; }
-.btn-lg { min-width: 150px; height: 46px; font-size: 18px; }
+.feature-tags span { border: 1px solid #cfe0fb; color: #2563eb; background: #eff6ff; border-radius: 6px; font-size: var(--fs-caption); padding: 3px 8px; }
+.btn-lg { min-width: 118px; height: 36px; font-size: var(--fs-body); }
 
 .mail-right { display: flex; align-items: center; gap: 16px; }
-.mail-status { color: #16a34a; font-size: 18px; display: inline-flex; align-items: center; gap: 8px; }
+.mail-status { color: #16a34a; font-size: var(--fs-body); display: inline-flex; align-items: center; gap: 8px; }
 .mail-status i { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
 .mail-status.off { color: #ef4444; }
 
 .db-card {
-  padding: 18px 20px;
+  padding: 16px 18px;
   display: grid;
   grid-template-columns: 1.45fr 1fr;
   gap: 16px;
 }
 .db-main { border-right: 1px solid #ecf2fb; padding-right: 16px; }
 .db-side { display: grid; gap: 12px; }
-.db-item h4 { margin: 0; font-size: 21px; color: #0f172a; }
-.db-item p { margin: 8px 0 12px; color: #64748b; font-size: 14px; }
-.purge-row { display: flex; align-items: center; gap: 8px; color: #334155; }
-.purge-row input { width: 58px; height: 34px; border: 1px solid #d5e2f6; border-radius: 8px; text-align: center; font-size: 14px; }
+.db-item h4 { margin: 0; font-size: var(--fs-section-title); font-weight: var(--fw-section); color: #0f172a; }
+.db-item p { margin: 8px 0 12px; color: #64748b; font-size: var(--fs-body); }
+.purge-row { display: flex; align-items: center; gap: 8px; color: #334155; font-size: var(--fs-body); }
+.purge-row input { width: 58px; height: 34px; border: 1px solid #d5e2f6; border-radius: 8px; text-align: center; font-size: var(--fs-body); }
 .db-messages { grid-column: 1 / -1; display: grid; gap: 8px; }
 
 .btn-dark { border-color: #2563eb; background: #2563eb; color: #fff; }
@@ -424,10 +424,10 @@ async function saveRetentionDays() {
 @media (max-width: 860px) {
   .feature-card { flex-direction: column; align-items: flex-start; }
   .mail-right { width: 100%; justify-content: space-between; }
-  .summary-item b { font-size: 24px; }
-  .feature-left h3 { font-size: 24px; }
-  .feature-left p { font-size: 16px; }
-  .db-item h4 { font-size: 18px; }
-  .db-item p { font-size: 15px; }
+  .summary-item b { font-size: var(--fs-metric); }
+  .feature-left h3 { font-size: var(--fs-section-title); }
+  .feature-left p { font-size: var(--fs-body); }
+  .db-item h4 { font-size: var(--fs-section-title); }
+  .db-item p { font-size: var(--fs-body); }
 }
 </style>

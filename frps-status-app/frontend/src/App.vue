@@ -31,22 +31,18 @@
         <RouterLink class="nav-item" to="/settings"><span class="nav-icon">⚙️</span> 系统配置</RouterLink>
       </nav>
       <div class="sidebar-footer">
-        <span>{{ updatedAt || '加载中…' }}</span>
+        <button class="collapse-btn" type="button" @click="sidebarCollapsed = !sidebarCollapsed">
+          <svg v-if="sidebarCollapsed" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          <span>{{ sidebarCollapsed ? '展开菜单' : '收起菜单' }}</span>
+        </button>
+        <span class="sidebar-time">{{ updatedAt || '加载中…' }}</span>
       </div>
     </aside>
-    <button
-      class="sidebar-collapse-btn"
-      type="button"
-      :aria-label="sidebarCollapsed ? '展开菜单' : '收起菜单'"
-      @click="sidebarCollapsed = !sidebarCollapsed"
-    >
-      <svg v-if="sidebarCollapsed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-      <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-    </button>
     <div class="main-wrap">
       <div class="top-tools">
         <div class="tools-right">
-          <div v-if="warnings.length > 0" class="warn-anchor">
+          <div class="warn-anchor">
             <button
               class="warn-bell"
               :class="{ open: warnOpen }"
@@ -54,7 +50,7 @@
               @click.stop="warnOpen = !warnOpen"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-              <span class="warn-badge">{{ warnings.length }}</span>
+              <span v-if="warnings.length > 0" class="warn-badge">{{ warnings.length }}</span>
             </button>
             <Transition name="warn-drop">
               <div v-if="warnOpen" class="warn-panel" @click.stop>
@@ -76,17 +72,17 @@
             </Transition>
           </div>
           <div class="user-anchor">
-          <button class="top-user" type="button" @click.stop="userMenuOpen = !userMenuOpen">
-            <span class="sidebar-user-avatar">{{ userInitial }}</span>
-            <span class="top-user-name">{{ currentUser.username || '加载中' }}</span>
-            <svg class="top-user-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-          </button>
-          <Transition name="warn-drop">
-            <div v-if="userMenuOpen" class="user-menu" @click.stop>
-              <button type="button" class="user-menu-item" @click="openAccount">账户设置</button>
-              <button type="button" class="user-menu-item danger" @click="logout">退出登录</button>
-            </div>
-          </Transition>
+            <button class="top-user" type="button" @click.stop="userMenuOpen = !userMenuOpen">
+              <span class="sidebar-user-avatar">{{ userInitial }}</span>
+              <span class="top-user-name">{{ currentUser.username || '加载中' }}</span>
+              <svg class="top-user-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <Transition name="warn-drop">
+              <div v-if="userMenuOpen" class="user-menu" @click.stop>
+                <button type="button" class="user-menu-item" @click="openAccount">账户设置</button>
+                <button type="button" class="user-menu-item danger" @click="logout">退出登录</button>
+              </div>
+            </Transition>
           </div>
         </div>
       </div>
@@ -251,7 +247,10 @@ onUnmounted(() => {
 .top-tools {
   display: flex;
   justify-content: flex-end;
-  padding: 14px 24px 0;
+  min-height: 64px;
+  padding: 14px 24px 10px;
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
 }
 .tools-right {
   display: flex;
@@ -265,30 +264,30 @@ onUnmounted(() => {
 
 .warn-bell {
   position: relative;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: none;
-  background: #7f1d1d;
-  color: #fca5a5;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #d5e0f0;
+  background: #fff;
+  color: #334155;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,.35);
+  box-shadow: none;
   transition: background .15s, transform .15s;
   animation: warn-pulse 2.4s ease-in-out infinite;
 }
 .warn-bell:hover,
 .warn-bell.open {
-  background: #991b1b;
-  transform: scale(1.08);
+  background: #f8fafc;
+  transform: none;
   animation: none;
 }
 
 @keyframes warn-pulse {
-  0%, 100% { box-shadow: 0 2px 8px rgba(0,0,0,.35); }
-  50%       { box-shadow: 0 2px 16px rgba(239,68,68,.6); }
+  0%, 100% { box-shadow: none; }
+  50%       { box-shadow: 0 0 0 3px rgba(239,68,68,.10); }
 }
 
 .warn-badge {
@@ -306,7 +305,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 0 4px;
-  border: 2px solid #0f172a;
+  border: 2px solid #fff;
   line-height: 1;
 }
 
@@ -506,24 +505,6 @@ onUnmounted(() => {
 .user-menu-item:hover { background: #eff6ff; color: #0f172a; }
 .user-menu-item.danger:hover { background: #fff1f2; color: #be123c; }
 
-.sidebar-user {
-  margin: 10px 8px 6px;
-  padding: 10px;
-  border: 1px solid rgba(148, 163, 184, .16);
-  border-radius: var(--r);
-  background: rgba(15, 23, 42, .72);
-  color: var(--sb-active-text);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  text-align: left;
-  transition: background .15s, border-color .15s;
-}
-.sidebar-user:hover {
-  background: var(--sb-active);
-  border-color: rgba(148, 163, 184, .28);
-}
 .sidebar-user-avatar {
   width: 32px;
   height: 32px;
@@ -537,24 +518,6 @@ onUnmounted(() => {
   font-weight: 700;
   flex-shrink: 0;
 }
-.sidebar-user-meta {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-}
-.sidebar-user-label {
-  color: var(--sb-text);
-  font-size: 11px;
-}
-.sidebar-user-name {
-  max-width: 130px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 600;
-}
-
 .sidebar.collapsed .sidebar-logo {
   font-size: 0;
   justify-content: center;
@@ -574,31 +537,18 @@ onUnmounted(() => {
 }
 .sidebar.collapsed .nav-toggle,
 .sidebar.collapsed .nav-children,
-.sidebar.collapsed .sidebar-footer span {
+.sidebar.collapsed .collapse-btn span,
+.sidebar.collapsed .sidebar-time {
   display: none;
 }
 .sidebar.collapsed .sidebar-footer {
   justify-content: center;
 }
-.sidebar-collapse-btn {
-  position: fixed;
-  left: calc(var(--sw) - 14px);
-  top: 78px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px solid #d5e2f6;
-  background: #fff;
-  color: #334155;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 80;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, .12);
+.sidebar-footer {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
 }
-.sidebar-collapse-btn:hover { color: #2563eb; border-color: #bfdbfe; }
-.layout.sidebar-collapsed .sidebar-collapse-btn { left: 58px; }
 .sidebar.collapsed { width: 72px; }
 .sidebar.collapsed .nav-item {
   font-size: 0;
@@ -606,9 +556,25 @@ onUnmounted(() => {
   padding-left: 8px;
   padding-right: 8px;
 }
+.collapse-btn {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(148, 163, 184, .14);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, .28);
+  color: var(--sb-text);
+  font: inherit;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.collapse-btn:hover { background: var(--sb-active); color: var(--sb-active-text); }
+.sidebar-time { font-size: 12px; color: var(--sb-text); }
 
 @media (max-width: 900px) {
-  .sidebar-collapse-btn { display: none; }
   .layout {
     flex-direction: column;
     height: auto;
@@ -623,10 +589,6 @@ onUnmounted(() => {
   .sidebar-logo {
     padding: 12px 14px;
     font-size: 15px;
-  }
-  .sidebar-user {
-    margin: 8px 10px 4px;
-    padding: 8px 10px;
   }
   .sidebar nav {
     display: flex;

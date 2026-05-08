@@ -525,18 +525,18 @@ onUnmounted(() => {
   min-height: 0;
 }
 .dashboard-shell :deep(.page-header) {
-  min-height: 86px;
-  padding: 18px 24px;
+  min-height: auto;
+  padding: 16px 24px 14px;
 }
 .dashboard-shell :deep(.page-title) {
-  font-size: 19px;
+  font-size: 24px;
   line-height: 1.2;
-  font-weight: 600;
+  font-weight: 700;
 }
 .dashboard-shell :deep(.page-sub) {
-  margin-top: 6px;
+  margin-top: 4px;
   color: #64748b;
-  font-size: 12px;
+  font-size: 13px;
 }
 .page-actions {
   display: flex;
@@ -585,7 +585,7 @@ onUnmounted(() => {
 }
 .summary-card {
   position: relative;
-  min-height: 122px;
+  min-height: 172px;
   min-width: 0;
   padding: 14px 18px;
   background: #fff;
