@@ -260,7 +260,7 @@ onUnmounted(() => {
 .tools-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   pointer-events: auto;
 }
 .warn-anchor {

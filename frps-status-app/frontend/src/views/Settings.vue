@@ -342,7 +342,7 @@ async function saveRetentionDays() {
 <style scoped>
 .sysset-page { display: flex; flex-direction: column; gap: 0; }
 .sysset-header { min-height: auto; }
-.sysset-main { display: grid; gap: 16px; padding: 0 24px 24px; }
+.sysset-main { display: grid; gap: 12px; padding: 0 24px 24px; }
 .card-surface {
   background: #fff;
   border: 1px solid #d9e4f3;
@@ -350,7 +350,7 @@ async function saveRetentionDays() {
   box-shadow: 0 8px 28px rgba(15, 23, 42, .05);
 }
 .summary-card {
-  min-height: 150px;
+  min-height: 118px;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -359,20 +359,20 @@ async function saveRetentionDays() {
 .summary-item {
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 28px 30px;
+  gap: 14px;
+  padding: 14px 18px;
   min-width: 0;
 }
 .summary-item + .summary-item {
   border-left: 1px solid #e2e8f0;
 }
 .summary-icon {
-  width: 60px;
-  height: 60px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: var(--fs-metric);
+  font-size: 18px;
   font-weight: var(--fw-strong);
 }
 .summary-icon.in { color: #2563eb; background: #dbeafe; }
@@ -380,57 +380,57 @@ async function saveRetentionDays() {
 .summary-icon.total { color: #f59e0b; background: #fef3c7; }
 .summary-icon.smtp { color: #7c3aed; background: #ede9fe; }
 .summary-item h3 {
-  margin: 0 0 16px;
-  font-size: var(--fs-section-title);
+  margin: 0 0 8px;
+  font-size: var(--fs-card-title);
   line-height: 1.2;
   font-weight: var(--fw-title);
   color: #0f172a;
 }
 .summary-metrics {
   display: flex;
-  gap: 28px;
+  gap: 18px;
   min-width: 0;
 }
 .summary-metrics span {
   display: grid;
-  gap: 8px;
-  min-width: 62px;
+  gap: 4px;
+  min-width: 54px;
 }
-.summary-item b { display: block; font-size: var(--fs-metric); color: #0f172a; line-height: 1.15; white-space: nowrap; }
+.summary-item b { display: block; font-size: var(--fs-page-title-sm); color: #0f172a; line-height: 1.15; white-space: nowrap; }
 .summary-item small { color: #64748b; font-size: var(--fs-caption); }
 
 .feature-card {
-  min-height: 132px;
-  padding: 22px 32px;
+  min-height: 116px;
+  padding: 14px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 16px;
 }
-.feature-left { display: flex; align-items: center; gap: 22px; min-width: 0; }
+.feature-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .feature-logo {
-  width: 76px;
-  height: 76px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   color: #fff;
-  font-size: var(--fs-icon);
+  font-size: var(--fs-icon-sm);
   background: linear-gradient(145deg, #3b82f6, #1d4ed8);
 }
-.feature-left h3 { margin: 0 0 6px; font-size: var(--fs-modal-title); line-height: 1.25; font-weight: var(--fw-title); color: #0f172a; }
-.feature-left p { margin: 0; color: #64748b; font-size: var(--fs-body); }
-.feature-tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
-.feature-tags span { border: 1px solid #cfe0fb; color: #2563eb; background: #eff6ff; border-radius: 6px; font-size: var(--fs-caption); padding: 3px 8px; }
-.btn-lg { min-width: 118px; height: 40px; font-size: var(--fs-body); }
+.feature-left h3 { margin: 0 0 4px; font-size: var(--fs-section-title); line-height: 1.25; font-weight: var(--fw-section); color: #0f172a; }
+.feature-left p { margin: 0; color: #64748b; font-size: var(--fs-caption); }
+.feature-tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.feature-tags span { border: 1px solid #cfe0fb; color: #2563eb; background: #eff6ff; border-radius: 6px; font-size: var(--fs-caption); padding: 2px 7px; }
+.btn-lg { min-width: 96px; height: 34px; font-size: var(--fs-caption); }
 
-.mail-right { display: flex; align-items: center; gap: 16px; }
-.mail-status { color: #16a34a; font-size: var(--fs-body); display: inline-flex; align-items: center; gap: 8px; }
-.mail-status i { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+.mail-right { display: flex; align-items: center; gap: 12px; }
+.mail-status { color: #16a34a; font-size: var(--fs-caption); display: inline-flex; align-items: center; gap: 6px; }
+.mail-status i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .mail-status.off { color: #ef4444; }
 
 .db-card {
-  min-height: 178px;
+  min-height: 132px;
   padding: 0;
   display: grid;
   grid-template-columns: 1.2fr .8fr 1fr;
@@ -440,23 +440,23 @@ async function saveRetentionDays() {
 .db-main {
   display: flex;
   align-items: center;
-  padding: 28px 32px;
+  padding: 14px 18px;
   border-right: 1px solid #e2e8f0;
 }
 .db-maintain {
   display: contents;
 }
 .db-item {
-  padding: 28px 32px;
+  padding: 14px 18px;
   border-right: 1px solid #e2e8f0;
 }
 .db-item:last-child {
   border-right: 0;
 }
-.db-item h4 { margin: 0; font-size: var(--fs-section-title); font-weight: var(--fw-section); color: #0f172a; }
-.db-item p { margin: 8px 0 12px; color: #64748b; font-size: var(--fs-body); }
-.purge-row { display: flex; align-items: center; gap: 8px; color: #334155; font-size: var(--fs-body); }
-.purge-row input { width: 58px; height: 34px; border: 1px solid #d5e2f6; border-radius: 8px; text-align: center; font-size: var(--fs-body); }
+.db-item h4 { margin: 0; font-size: var(--fs-card-title); font-weight: var(--fw-section); color: #0f172a; }
+.db-item p { margin: 6px 0 10px; color: #64748b; font-size: var(--fs-caption); }
+.purge-row { display: flex; align-items: center; gap: 6px; color: #334155; font-size: var(--fs-caption); }
+.purge-row input { width: 54px; height: 30px; border: 1px solid #d5e2f6; border-radius: 6px; text-align: center; font-size: var(--fs-caption); }
 .db-messages { grid-column: 1 / -1; display: grid; gap: 8px; }
 
 .btn-dark { border-color: #2563eb; background: #2563eb; color: #fff; }
@@ -487,7 +487,7 @@ async function saveRetentionDays() {
   .summary-item:first-child { border-top: 0; }
   .feature-card { flex-direction: column; align-items: flex-start; }
   .mail-right { width: 100%; justify-content: space-between; }
-  .summary-item b { font-size: var(--fs-metric); }
+  .summary-item b { font-size: var(--fs-page-title-sm); }
   .feature-left h3 { font-size: var(--fs-section-title); }
   .feature-left p { font-size: var(--fs-body); }
   .db-item h4 { font-size: var(--fs-section-title); }

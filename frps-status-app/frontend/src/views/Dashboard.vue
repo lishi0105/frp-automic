@@ -40,12 +40,10 @@
               <div class="traffic-label"><span>出站</span><b>{{ humanBytesKB(ifaceMonthOutKB) }} ({{ outPctText }})</b></div>
               <div class="thin-progress"><div class="green" :style="{ width: outPct + '%' }"></div></div>
             </div>
-          </div>
-          <div class="iface-month-summary">
-            <span>网卡汇总</span>
-            <b>入站 {{ humanBytesKB(ifaceMonthInKB) }}</b>
-            <b>出站 {{ humanBytesKB(ifaceMonthOutKB) }}</b>
-            <b>{{ humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }}</b>
+            <div class="traffic-line">
+              <div class="traffic-label"><span>总量</span><b>{{ humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }} ({{ totalPctText }})</b></div>
+              <div class="thin-progress"><div class="green" :style="{ width: totalPct + '%' }"></div></div>
+            </div>
           </div>
         </section>
 
@@ -540,7 +538,7 @@ onUnmounted(() => {
 .page-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 .page-actions .btn {
   height: 30px;
