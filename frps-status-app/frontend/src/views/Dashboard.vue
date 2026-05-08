@@ -24,6 +24,7 @@
               <div class="service-status"><i class="status-dot" :class="bindOk ? 'ok' : 'bad'"></i>{{ bindOk ? '在线' : '离线' }}</div>
               <div class="summary-sub">{{ bindLatency }}ms · Dashboard {{ dashOk ? dashLatency + 'ms' : '离线' }}</div>
               <div class="summary-sub">域名 {{ frpsDomain }}</div>
+              <div class="summary-sub">已运行 {{ runDays }} 天</div>
               <div class="summary-sub">公网IP {{ hostPublicIP || '-' }} · 网卡 {{ hostIface || '-' }}</div>
             </div>
           </div>
@@ -207,10 +208,22 @@ const dashLatency = computed(() => props.status?.frps?.dashboard?.latency_ms ?? 
 
 const limitInGB = computed(() => props.status?.settings?.limit_in_gb || 0)
 const limitOutGB = computed(() => props.status?.settings?.limit_out_gb || 0)
+const limitTotalGB = computed(() => props.status?.settings?.limit_total_gb || 0)
 const inPct = computed(() => percent(ifaceMonthInKB.value * 1024, limitInGB.value))
 const outPct = computed(() => percent(ifaceMonthOutKB.value * 1024, limitOutGB.value))
+const totalPct = computed(() => percent((ifaceMonthInKB.value + ifaceMonthOutKB.value) * 1024, limitTotalGB.value))
 const inPctText = computed(() => (limitInGB.value > 0 ? `${inPct.value}%` : '不限'))
 const outPctText = computed(() => (limitOutGB.value > 0 ? `${outPct.value}%` : '不限'))
+const totalPctText = computed(() => (limitTotalGB.value > 0 ? `${totalPct.value}%` : '不限'))
+const runDays = computed(() => {
+  const raw = props.status?.settings?.deploy_date
+  if (!raw) return '-'
+  const start = new Date(`${raw}T00:00:00`)
+  if (Number.isNaN(start.getTime())) return '-'
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.max(1, Math.floor((today - start) / 86400000) + 1)
+})
 
 const proxies = computed(() => props.status?.proxies ?? [])
 const onlineProxies = computed(() => proxies.value.filter(p => p.online).length)

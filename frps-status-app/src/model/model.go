@@ -55,6 +55,9 @@ type PublicSettings struct {
 	LimitInGB            float64 `json:"limit_in_gb"`
 	LimitOutGB           float64 `json:"limit_out_gb"`
 	LimitTotalGB         float64 `json:"limit_total_gb"`
+	InitialInGB          float64 `json:"initial_in_gb"`
+	InitialOutGB         float64 `json:"initial_out_gb"`
+	DeployDate           string  `json:"deploy_date"`
 	HistoryRetentionDays int     `json:"history_retention_days"`
 	SMTPHost             string  `json:"smtp_host"`
 	SMTPPort             int     `json:"smtp_port"`

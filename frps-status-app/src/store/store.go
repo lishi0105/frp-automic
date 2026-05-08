@@ -101,6 +101,8 @@ func (s *Store) InitDB() error {
 		"limit_in_gb":            "0",
 		"limit_out_gb":           "0",
 		"limit_total_gb":         "0",
+		"initial_in_gb":          "0",
+		"initial_out_gb":         "0",
 		"smtp_port":              "465",
 		"smtp_enabled":           "false",
 		"alert_proxy_offline":    "false",
@@ -113,6 +115,9 @@ func (s *Store) InitDB() error {
 		if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)`, k, v); err != nil {
 			return logStoreErr("init default setting "+k, err)
 		}
+	}
+	if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES('deploy_date',?)`, time.Now().Format("2006-01-02")); err != nil {
+		return logStoreErr("init deploy date setting", err)
 	}
 	return nil
 }
@@ -136,6 +141,9 @@ func (s *Store) PublicSettings() (model.PublicSettings, error) {
 		LimitInGB:            parseFloat(s.Setting("limit_in_gb")),
 		LimitOutGB:           parseFloat(s.Setting("limit_out_gb")),
 		LimitTotalGB:         parseFloat(s.Setting("limit_total_gb")),
+		InitialInGB:          parseFloat(s.Setting("initial_in_gb")),
+		InitialOutGB:         parseFloat(s.Setting("initial_out_gb")),
+		DeployDate:           s.Setting("deploy_date"),
 		HistoryRetentionDays: int(parseFloatDefault(s.Setting("history_retention_days"), 60)),
 		SMTPHost:             s.Setting("smtp_host"),
 		SMTPPort:             int(parseFloatDefault(s.Setting("smtp_port"), 465)),

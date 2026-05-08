@@ -138,6 +138,7 @@ func (a *App) Refresh(ctx context.Context) error {
 	settings, _ := a.store.PublicSettings()
 	a.collectInterfaceTraffic()
 	monthIn, monthOut, _ := a.store.MonthInterfaceTotals(month)
+	monthIn, monthOut = applyInitialTrafficToMonth(settings, month, monthIn, monthOut)
 	certs := frps.Certificates(a.cfg.CertDir, a.cfg.Domains)
 	inferProxyCertificateDomains(proxies, certs)
 	_ = a.checkAlerts(settings, month, monthIn, monthOut)
@@ -1336,7 +1337,99 @@ func (a *App) handleDailyInterface(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
+	settings, _ := a.store.PublicSettings()
+	data = applyInitialTrafficToDailyRows(settings, data, fromDay, toDay)
 	writeJSON(w, data)
+}
+
+func applyInitialTrafficToMonth(settings model.PublicSettings, month string, inBytes, outBytes uint64) (uint64, uint64) {
+	if !initialTrafficApplies(settings, month) {
+		return inBytes, outBytes
+	}
+	return inBytes + mail.GBToBytes(settings.InitialInGB), outBytes + mail.GBToBytes(settings.InitialOutGB)
+}
+
+func applyInitialTrafficToDailyRows(settings model.PublicSettings, rows []map[string]any, fromDay, toDay string) []map[string]any {
+	if settings.InitialInGB <= 0 && settings.InitialOutGB <= 0 {
+		return rows
+	}
+	deployDay := strings.TrimSpace(settings.DeployDate)
+	if !dateInRange(deployDay, fromDay, toDay) {
+		return rows
+	}
+	initialRxKB := mail.GBToBytes(settings.InitialInGB) / 1024
+	initialTxKB := mail.GBToBytes(settings.InitialOutGB) / 1024
+	if initialRxKB == 0 && initialTxKB == 0 {
+		return rows
+	}
+	if rows == nil {
+		rows = []map[string]any{}
+	}
+	for _, row := range rows {
+		if fmt.Sprint(row["day"]) != deployDay {
+			continue
+		}
+		row["rx_kb"] = numericAnyToUint64(row["rx_kb"]) + initialRxKB
+		row["tx_kb"] = numericAnyToUint64(row["tx_kb"]) + initialTxKB
+		row["initial_adjusted"] = true
+		return rows
+	}
+	rows = append(rows, map[string]any{
+		"day":              deployDay,
+		"iface":            "initial",
+		"public_ip":        "initial",
+		"rx_kb":            initialRxKB,
+		"tx_kb":            initialTxKB,
+		"initial_adjusted": true,
+	})
+	sort.Slice(rows, func(i, j int) bool {
+		di, dj := fmt.Sprint(rows[i]["day"]), fmt.Sprint(rows[j]["day"])
+		if di == dj {
+			return fmt.Sprint(rows[i]["iface"]) < fmt.Sprint(rows[j]["iface"])
+		}
+		return di < dj
+	})
+	return rows
+}
+
+func initialTrafficApplies(settings model.PublicSettings, month string) bool {
+	deployDay := strings.TrimSpace(settings.DeployDate)
+	return len(deployDay) >= 7 && deployDay[:7] == month && (settings.InitialInGB > 0 || settings.InitialOutGB > 0)
+}
+
+func dateInRange(day, fromDay, toDay string) bool {
+	if len(day) != 10 {
+		return false
+	}
+	if strings.TrimSpace(fromDay) != "" && day < fromDay {
+		return false
+	}
+	if strings.TrimSpace(toDay) != "" && day > toDay {
+		return false
+	}
+	return true
+}
+
+func numericAnyToUint64(v any) uint64 {
+	switch n := v.(type) {
+	case uint64:
+		return n
+	case uint:
+		return uint64(n)
+	case int64:
+		if n > 0 {
+			return uint64(n)
+		}
+	case int:
+		if n > 0 {
+			return uint64(n)
+		}
+	case float64:
+		if n > 0 {
+			return uint64(n)
+		}
+	}
+	return 0
 }
 
 func detectOutboundPublicIP() (string, error) {
@@ -1431,7 +1524,7 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		smtpKeys := map[string]bool{"smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true}
-		allowed := map[string]bool{"threshold_in_gb": true, "threshold_out_gb": true, "threshold_total_gb": true, "limit_in_gb": true, "limit_out_gb": true, "limit_total_gb": true, "history_retention_days": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true, "alert_proxy_offline": true, "alert_cert_expiry": true, "alert_cert_days": true}
+		allowed := map[string]bool{"threshold_in_gb": true, "threshold_out_gb": true, "threshold_total_gb": true, "limit_in_gb": true, "limit_out_gb": true, "limit_total_gb": true, "initial_in_gb": true, "initial_out_gb": true, "history_retention_days": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true, "alert_proxy_offline": true, "alert_cert_expiry": true, "alert_cert_days": true}
 		smtpChanged := false
 		for key, value := range in {
 			if !allowed[key] {

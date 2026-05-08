@@ -53,6 +53,24 @@
         </div>
 
         <div class="group">
+          <h4>首月初始流量</h4>
+          <div class="grid initial-grid">
+            <label>
+              <span>初始入站流量 (GB)</span>
+              <input v-model.number="form.initial_in_gb" type="number" min="0" step="0.1" />
+            </label>
+            <label>
+              <span>初始出站流量 (GB)</span>
+              <input v-model.number="form.initial_out_gb" type="number" min="0" step="0.1" />
+            </label>
+            <div class="deploy-note">
+              <span>部署日期</span>
+              <b>{{ form.deploy_date || '-' }}</b>
+            </div>
+          </div>
+        </div>
+
+        <div class="group">
           <h4>事件告警</h4>
           <div class="events">
             <div class="event-item">
@@ -130,6 +148,10 @@ function toggle(key) {
 .grid span { color: #334155; font-size: var(--fs-body); font-weight: var(--fw-medium); }
 .grid input { height: 36px; border: 1px solid #d7e1ef; border-radius: 8px; padding: 0 12px; font-size: var(--fs-base); color: #0f172a; font-weight: var(--fw-medium); }
 .grid small { color: #64748b; font-size: var(--fs-caption); }
+.deploy-note { min-height: 36px; border: 1px solid #e5ecf8; border-radius: 8px; padding: 8px 10px; display: grid; gap: 4px; background: #f8fbff; }
+.deploy-note span { color: #334155; font-size: var(--fs-body); font-weight: var(--fw-medium); }
+.deploy-note b { color: #0f172a; font-size: var(--fs-base); }
+.deploy-note small { color: #64748b; font-size: var(--fs-caption); }
 .events { display: grid; gap: 10px; }
 .event-item { border: 1px solid #e5ecf8; border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .event-item b { display: block; font-size: var(--fs-base); color: #0f172a; }
