@@ -10,8 +10,6 @@
       </header>
 
       <div class="policy-body">
-        <div v-if="msg" class="alert save-feedback" :class="msg.ok ? 'alert-success save-feedback-ok' : 'alert-error'">{{ msg.text }}</div>
-
         <div class="group">
           <h4>流量阈值设置</h4>
           <div class="grid">
@@ -119,7 +117,6 @@
 const props = defineProps({
   open: Boolean,
   form: Object,
-  msg: Object,
   saving: Boolean
 })
 defineEmits(['close', 'save'])

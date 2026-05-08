@@ -1,5 +1,5 @@
 <template>
-  <RouterView v-if="isLogin" />
+  <RouterView v-if="isLogin" @toast="pushToast" />
   <div v-else class="layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
     <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-logo">
@@ -96,13 +96,19 @@
         <span>当前仍在使用初始密码，请先更新密码后继续使用控制台。</span>
         <span class="initial-password-action">立即修改</span>
       </button>
-      <RouterView :status="status" :daily="daily" :loading="loading" @refresh="load" />
+      <RouterView :status="status" :daily="daily" :loading="loading" @refresh="load" @toast="pushToast" />
     </div>
     <AccountSettingsModal
       v-model="accountOpen"
       @saved="handleAccountSaved"
     />
   </div>
+  <TransitionGroup name="toast" tag="div" class="toast-stack">
+    <div v-for="toast in toasts" :key="toast.id" class="toast-item" :class="toast.type">
+      <span class="toast-icon">{{ toast.type === 'error' ? '!' : '✓' }}</span>
+      <span>{{ toast.message }}</span>
+    </div>
+  </TransitionGroup>
 </template>
 
 <script setup>
@@ -125,6 +131,7 @@ const warnOpen = ref(false)
 const accountOpen = ref(false)
 const userMenuOpen = ref(false)
 const currentUser = ref({ username: '' })
+const toasts = ref([])
 
 const isLogin = computed(() => route.path === '/login')
 const isSettings = computed(() => route.path === '/settings')
@@ -179,6 +186,20 @@ function fmtTime(iso) {
 function onDocClick() {
   if (warnOpen.value) warnOpen.value = false
   if (userMenuOpen.value) userMenuOpen.value = false
+}
+
+function pushToast(input) {
+  const id = Date.now() + Math.random()
+  const toast = {
+    id,
+    type: input?.type === 'error' ? 'error' : 'success',
+    message: input?.message || ''
+  }
+  if (!toast.message) return
+  toasts.value.push(toast)
+  setTimeout(() => {
+    toasts.value = toasts.value.filter(item => item.id !== id)
+  }, input?.duration || 2600)
 }
 
 async function load() {
@@ -510,6 +531,57 @@ onUnmounted(() => {
 }
 .user-menu-item:hover { background: #eff6ff; color: #0f172a; }
 .user-menu-item.danger:hover { background: #fff1f2; color: #be123c; }
+
+.toast-stack {
+  position: fixed;
+  top: 76px;
+  right: 24px;
+  z-index: 200;
+  display: grid;
+  gap: 10px;
+  pointer-events: none;
+}
+.toast-item {
+  min-width: 220px;
+  max-width: 360px;
+  min-height: 40px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #d9e5f6;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, .18);
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: auto;
+}
+.toast-item.success { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+.toast-item.error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+.toast-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: currentColor;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+}
+.toast-enter-active,
+.toast-leave-active {
+  transition: opacity .18s ease, transform .18s ease;
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
 
 .sidebar-user-avatar {
   width: 32px;

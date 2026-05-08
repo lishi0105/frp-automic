@@ -7,8 +7,6 @@
       </div>
 
       <div class="smtp-modal-body">
-        <div v-if="smtpMsg" class="alert mt-3 save-feedback" :class="smtpMsg.ok ? 'alert-success save-feedback-ok' : 'alert-error'">{{ smtpMsg.text }}</div>
-
         <label class="smtp-line">
           <span class="smtp-label"><i>*</i> 名称</span>
           <div class="smtp-input-wrap">
@@ -91,7 +89,6 @@ import { ref } from 'vue'
 const props = defineProps({
   open: Boolean,
   form: Object,
-  smtpMsg: Object,
   savingSMTP: Boolean,
   testingEmail: Boolean
 })

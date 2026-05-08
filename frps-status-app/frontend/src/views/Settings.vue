@@ -121,7 +121,6 @@
     <TrafficPolicyModal
       :open="policyModalOpen"
       :form="form"
-      :msg="policyMsg"
       :saving="savingPolicy"
       @close="closePolicyModal"
       @save="savePolicy"
@@ -130,7 +129,6 @@
     <SMTPConfigModal
       :open="smtpModalOpen"
       :form="form"
-      :smtp-msg="smtpMsg"
       :saving-smtp="savingSMTP"
       :testing-email="testingEmail"
       @close="closeSMTPModal"
@@ -148,7 +146,7 @@ import SMTPConfigModal from '../components/SMTPConfigModal.vue'
 import TrafficPolicyModal from '../components/TrafficPolicyModal.vue'
 
 const props = defineProps({ status: Object })
-defineEmits(['refresh'])
+const emit = defineEmits(['refresh', 'toast'])
 const route = useRoute()
 const router = useRouter()
 
@@ -183,8 +181,6 @@ const vacuuming = ref(false)
 const purging = ref(false)
 const purgeDays = ref(60)
 
-const smtpMsg = ref(null)
-const policyMsg = ref(null)
 const vacuumMsg = ref(null)
 const retentionMsg = ref(null)
 const savedSettings = ref(null)
@@ -243,8 +239,11 @@ function flash(msgRef, ok, text, ms = 4000) {
   setTimeout(() => { msgRef.value = null }, ms)
 }
 
+function toast(ok, message) {
+  emit('toast', { type: ok ? 'success' : 'error', message })
+}
+
 function openSMTPModal() {
-  smtpMsg.value = null
   fillForm(savedSettings.value || props.status?.settings)
   smtpModalOpen.value = true
   setModalQuery('smtp')
@@ -257,7 +256,6 @@ function closeSMTPModal() {
 }
 
 function openPolicyModal() {
-  policyMsg.value = null
   fillForm(savedSettings.value || props.status?.settings)
   policyModalOpen.value = true
   setModalQuery('policy')
@@ -284,9 +282,9 @@ async function saveSMTP() {
     savedSettings.value = saved
     fillForm(saved)
     formInitialized.value = true
-    flash(smtpMsg, true, 'SMTP 配置已保存')
+    toast(true, 'SMTP 配置已保存')
   } catch (e) {
-    flash(smtpMsg, false, '保存失败：' + e.message)
+    toast(false, '保存失败：' + e.message)
   } finally {
     savingSMTP.value = false
   }
@@ -294,13 +292,12 @@ async function saveSMTP() {
 
 async function testEmail() {
   testingEmail.value = true
-  smtpMsg.value = null
   try {
     const r = await api.testEmail()
-    if (r.ok) flash(smtpMsg, true, '测试邮件发送成功')
-    else smtpMsg.value = { ok: false, text: '发送失败：' + r.error }
+    if (r.ok) toast(true, '测试邮件发送成功')
+    else toast(false, '发送失败：' + r.error)
   } catch (e) {
-    smtpMsg.value = { ok: false, text: '发送失败：' + e.message }
+    toast(false, '发送失败：' + e.message)
   } finally {
     testingEmail.value = false
   }
@@ -325,9 +322,9 @@ async function savePolicy() {
     savedSettings.value = saved
     fillForm(saved)
     formInitialized.value = true
-    flash(policyMsg, true, '策略已保存')
+    toast(true, '策略已保存')
   } catch (e) {
-    flash(policyMsg, false, '保存失败：' + e.message)
+    toast(false, '保存失败：' + e.message)
   } finally {
     savingPolicy.value = false
   }
