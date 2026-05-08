@@ -6,7 +6,7 @@
         <div class="page-sub">公网IP：{{ currentPublicIP || '-' }} · 网卡：{{ currentIface || '-' }}</div>
       </div>
       <div class="flex-center">
-        <button class="btn btn-outline btn-sm" :disabled="loadingData" @click="fetchRows">↻ 刷新</button>
+        <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loadingData" @click="fetchRows">↻</button>
       </div>
     </div>
 

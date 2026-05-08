@@ -299,8 +299,7 @@ async function savePolicy() {
       initial_out_gb: form.initial_out_gb,
       alert_proxy_offline: form.alert_proxy_offline,
       alert_cert_expiry: form.alert_cert_expiry,
-      alert_cert_days: form.alert_cert_days,
-      smtp_enabled: form.smtp_enabled
+      alert_cert_days: form.alert_cert_days
     })
     savedSettings.value = saved
     fillForm(saved)

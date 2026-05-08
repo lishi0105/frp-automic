@@ -5,10 +5,10 @@
         <div class="page-title">{{ selectedProxyName ? '历史统计 / ' + selectedProxyName : '历史统计' }}</div>
       </div>
       <div class="flex-center">
-        <a class="btn btn-outline btn-sm" :href="exportUrl">⬇ 导出 CSV</a>
-        <button class="btn btn-outline btn-sm" :disabled="loading || ifaceLoading" @click="refreshPage">
+        <a class="btn btn-outline btn-sm icon-btn" title="导出 CSV" aria-label="导出 CSV" :href="exportUrl">⇩</a>
+        <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loading || ifaceLoading" @click="refreshPage">
           <span v-if="loading" class="spinner"></span>
-          <span v-else>↻</span> 刷新
+          <span v-else>↻</span>
         </button>
       </div>
     </div>

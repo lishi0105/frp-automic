@@ -6,10 +6,10 @@
         <div class="page-sub">当前代理：{{ proxyName }}</div>
       </div>
       <div class="flex-center">
-        <button class="btn btn-outline btn-sm" @click="router.push('/statistics')">返回总览</button>
-        <button class="btn btn-outline btn-sm" :disabled="loading" @click="$emit('refresh')">
+        <button class="btn btn-outline btn-sm icon-btn" title="返回总览" aria-label="返回总览" @click="router.push('/statistics')">←</button>
+        <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loading" @click="$emit('refresh')">
           <span v-if="loading" class="spinner"></span>
-          <span v-else>↻</span> 刷新
+          <span v-else>↻</span>
         </button>
       </div>
     </div>

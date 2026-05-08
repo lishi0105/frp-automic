@@ -21,9 +21,9 @@
           </div>
         </div>
         <div class="flex-center">
-          <button class="btn btn-outline btn-sm" :disabled="loading || localLoading" @click="$emit('refresh')">
+          <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loading || localLoading" @click="$emit('refresh')">
             <span v-if="loading || localLoading" class="spinner"></span>
-            <span v-else>↻</span> 刷新
+            <span v-else>↻</span>
           </button>
         </div>
       </div>

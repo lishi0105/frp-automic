@@ -6,10 +6,10 @@
         <div class="page-sub">{{ updatedAt ? '最后更新：' + updatedAt : '加载中…' }}</div>
       </div>
       <div class="page-actions">
-        <button class="btn btn-outline btn-sm" @click="openLogModal"><span class="btn-doc-icon" aria-hidden="true"></span>日志</button>
-        <button class="btn btn-outline btn-sm" :disabled="loading" @click="$emit('refresh')">
+        <button class="btn btn-outline btn-sm icon-btn" title="日志" aria-label="日志" @click="openLogModal"><span class="btn-doc-icon" aria-hidden="true"></span></button>
+        <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loading" @click="$emit('refresh')">
           <span v-if="loading" class="spinner"></span>
-          <span v-else class="btn-refresh-icon" aria-hidden="true">↻</span>刷新
+          <span v-else class="btn-refresh-icon" aria-hidden="true">↻</span>
         </button>
       </div>
     </div>
@@ -555,7 +555,9 @@ onUnmounted(() => {
 }
 .page-actions .btn {
   height: 36px;
-  padding: 0 12px;
+  width: 36px;
+  padding: 0;
+  justify-content: center;
   gap: 6px;
   border-color: #d7e1ed;
   background: #fff;

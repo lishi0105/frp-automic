@@ -58,14 +58,17 @@
             <label>
               <span>初始入站流量 (GB)</span>
               <input v-model.number="form.initial_in_gb" type="number" min="0" step="0.1" />
+              <small>仅部署月份计入统计</small>
             </label>
             <label>
               <span>初始出站流量 (GB)</span>
               <input v-model.number="form.initial_out_gb" type="number" min="0" step="0.1" />
+              <small>次月自动不再叠加</small>
             </label>
             <div class="deploy-note">
               <span>部署日期</span>
               <b>{{ form.deploy_date || '-' }}</b>
+              <small>根据数据库初始化日期自动生成</small>
             </div>
           </div>
         </div>
@@ -93,13 +96,6 @@
                   <span>天</span>
                 </template>
               </div>
-            </div>
-            <div class="event-item">
-              <div>
-                <b>邮件通知联动</b>
-                <small>启用后通过邮件发送告警通知</small>
-              </div>
-              <button class="switch-btn" :class="{ on: form.smtp_enabled === 'true' }" type="button" @click="toggle('smtp_enabled')"><span></span></button>
             </div>
           </div>
         </div>
