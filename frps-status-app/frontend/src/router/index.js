@@ -2,8 +2,8 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import Dashboard from '../views/Dashboard.vue'
 import ProxyList from '../views/ProxyList.vue'
 import CertificateList from '../views/CertificateList.vue'
-import Statistics from '../views/Statistics.vue'
 import TrafficStatistics from '../views/TrafficStatistics.vue'
+import StatisticsProxy from '../views/StatisticsProxy.vue'
 import Settings from '../views/Settings.vue'
 import Login from '../views/Login.vue'
 import { api } from '../api/index.js'
@@ -14,9 +14,8 @@ const router = createRouter({
     { path: '/', component: Dashboard },
     { path: '/proxies', component: ProxyList },
     { path: '/certificates', component: CertificateList },
-    { path: '/statistics', component: Statistics },
-    { path: '/statistics/:proxyName', component: Statistics },
-    { path: '/traffic-statistics', component: TrafficStatistics },
+    { path: '/statistics', component: TrafficStatistics },
+    { path: '/statistics/:proxyName', component: StatisticsProxy },
     { path: '/settings', component: Settings },
     { path: '/account', redirect: '/?account=1' },
     { path: '/login', component: Login, meta: { public: true } }
@@ -25,6 +24,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   if (to.meta.public) return true
+  if (sessionStorage.getItem('frps_status_logged_in') !== '1') return '/login'
   try {
     const session = await api.getSession()
     return session.authenticated ? true : '/login'

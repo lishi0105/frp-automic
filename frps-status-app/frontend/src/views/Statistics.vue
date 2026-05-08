@@ -5,10 +5,10 @@
         <div class="page-title">{{ selectedProxyName ? '历史统计 / ' + selectedProxyName : '历史统计' }}</div>
       </div>
       <div class="flex-center">
-        <a class="btn btn-outline btn-sm" :href="exportUrl">⬇ 导出 CSV</a>
-        <button class="btn btn-outline btn-sm" :disabled="loading" @click="$emit('refresh')">
+        <a class="btn btn-outline btn-sm icon-btn" title="导出 CSV" aria-label="导出 CSV" :href="exportUrl">⇩</a>
+        <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loading || ifaceLoading" @click="refreshPage">
           <span v-if="loading" class="spinner"></span>
-          <span v-else>↻</span> 刷新
+          <span v-else>↻</span>
         </button>
       </div>
     </div>
@@ -17,12 +17,12 @@
       <section class="analytics-overview">
         <div>
           <div class="section-title">所选时间范围</div>
-          <div class="text-muted text-sm">{{ startDate || minDay || '-' }} 至 {{ endDate || maxDay || '-' }} · {{ selectedProxyName || '全部代理汇总' }}</div>
+          <div class="text-muted text-sm">{{ startDate || minDay || '-' }} 至 {{ endDate || maxDay || '-' }} · {{ selectedProxyName || '网卡流量汇总' }}</div>
         </div>
         <div class="analytics-overview-metrics">
           <div><b>{{ humanBytes(totalTraffic) }}</b><small>总流量</small></div>
-          <div><b>{{ humanBytes(totalIn) }}</b><small>上行</small></div>
-          <div><b>{{ humanBytes(totalOut) }}</b><small>下行</small></div>
+          <div><b>{{ humanBytes(totalIn) }}</b><small>入站</small></div>
+          <div><b>{{ humanBytes(totalOut) }}</b><small>出站</small></div>
         </div>
       </section>
 
@@ -47,14 +47,14 @@
 
         <section class="card stats-table-card">
           <div class="section-head">
-            <div class="section-title">{{ selectedProxyName ? '当前代理每日明细' : '每日明细（全局聚合）' }}</div>
+            <div class="section-title">{{ selectedProxyName ? '当前代理每日明细' : '每日明细（网卡聚合）' }}</div>
             <span class="text-muted text-sm">{{ filteredRows.length }} 条</span>
           </div>
           <div class="table-wrap stats-table-scroll">
             <table class="stats-detail-table">
               <thead>
-                <tr v-if="selectedProxyName"><th class="col-date">日期</th><th class="col-type">类型</th><th class="col-num">上行</th><th class="col-num">下行</th><th class="col-num">合计</th></tr>
-                <tr v-else><th class="col-date">日期</th><th class="col-count">代理数</th><th class="col-num">上行</th><th class="col-num">下行</th><th class="col-num">合计</th></tr>
+                <tr v-if="selectedProxyName"><th class="col-date">日期</th><th class="col-type">类型</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num">合计</th></tr>
+                <tr v-else><th class="col-date">日期</th><th class="col-count">网卡记录</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num">合计</th></tr>
               </thead>
               <tbody>
                 <tr v-if="!pagedRows.length"><td colspan="5" class="empty">暂无数据</td></tr>
@@ -97,7 +97,7 @@ import { humanBytes } from '../utils/format.js'
 import { api } from '../api/index.js'
 
 const props = defineProps({ status: Object, daily: Array, loading: Boolean })
-defineEmits(['refresh'])
+const emit = defineEmits(['refresh'])
 const route = useRoute()
 
 const exportUrl = api.exportCSVUrl
@@ -107,10 +107,19 @@ const startDate = ref('')
 const endDate = ref('')
 const page = ref(1)
 const PAGE_SIZE = 15
+const ifaceRows = ref([])
+const ifaceLoading = ref(false)
 
 const rows = computed(() => props.daily ?? [])
 const selectedProxyName = computed(() => decodeURIComponent(route.params.proxyName || ''))
-const proxyRows = computed(() => selectedProxyName.value ? rows.value.filter(r => r.name === selectedProxyName.value) : rows.value)
+const globalRows = computed(() => ifaceRows.value.map(r => ({
+  day: r.day,
+  in: Number(r.rx_kb || 0) * 1024,
+  out: Number(r.tx_kb || 0) * 1024,
+  iface: r.iface || '',
+  public_ip: r.public_ip || ''
+})))
+const proxyRows = computed(() => selectedProxyName.value ? rows.value.filter(r => r.name === selectedProxyName.value) : globalRows.value)
 const proxyInfo = computed(() => (props.status?.proxies ?? []).find(p => p.name === selectedProxyName.value) || null)
 const proxyType = computed(() => proxyInfo.value?.type || proxyRows.value[0]?.type || '')
 const minDay = computed(() => proxyRows.value.length ? [...proxyRows.value].sort((a, b) => a.day.localeCompare(b.day))[0].day : '')
@@ -131,14 +140,13 @@ const filteredRows = computed(() => {
     }
     return Object.values(byDayType).sort((a, b) => b.day.localeCompare(a.day))
   }
-  for (const r of rows.value) {
+  for (const r of globalRows.value) {
     if (startDate.value && r.day < startDate.value) continue
     if (endDate.value && r.day > endDate.value) continue
-    byDay[r.day] ??= { day: r.day, in: 0, out: 0, proxy_count: 0, peak_conns: 0, seen: new Set() }
+    byDay[r.day] ??= { day: r.day, in: 0, out: 0, proxy_count: 0, seen: new Set() }
     byDay[r.day].in += Number(r.in || 0)
     byDay[r.day].out += Number(r.out || 0)
-    byDay[r.day].peak_conns += Number(r.peak_conns || 0)
-    const key = `${r.name}:${r.type}`
+    const key = `${r.iface || '-'}:${r.public_ip || '-'}`
     if (!byDay[r.day].seen.has(key)) {
       byDay[r.day].seen.add(key)
       byDay[r.day].proxy_count++
@@ -185,6 +193,25 @@ function resetFilter() {
   endDate.value = ''
 }
 
+async function loadIfaceRows() {
+  ifaceLoading.value = true
+  try {
+    const data = await api.getDailyInterface()
+    ifaceRows.value = Array.isArray(data) ? data : []
+  } catch {
+    ifaceRows.value = []
+  } finally {
+    ifaceLoading.value = false
+  }
+}
+
+async function refreshPage() {
+  await Promise.all([
+    loadIfaceRows(),
+    Promise.resolve(emit('refresh'))
+  ])
+}
+
 function formatLocalDate(d) {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -208,7 +235,7 @@ function buildChart() {
         return `${d}<br/>${params.map(p => `${p.marker}${p.seriesName}: <b>${humanBytes(p.value)}</b>`).join('<br/>')}`
       }
     },
-    legend: { data: ['上行', '下行'], top: 0, left: 'center', textStyle: { color: '#334155', fontSize: 13 }, itemWidth: 22, itemHeight: 10 },
+    legend: { data: ['入站', '出站'], top: 0, left: 'center', textStyle: { color: '#334155', fontSize: 13 }, itemWidth: 22, itemHeight: 10 },
     grid: { left: 74, right: 22, top: 48, bottom: 42 },
     xAxis: {
       type: 'category',
@@ -226,17 +253,21 @@ function buildChart() {
       axisTick: { show: false }
     },
     series: [
-      { name: '上行', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => d.in), itemStyle: { color: '#1f7ae0' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(31,122,224,.08)' } },
-      { name: '下行', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => d.out), itemStyle: { color: '#12b76a' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(18,183,106,.15)' } }
+      { name: '入站', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => d.in), itemStyle: { color: '#1f7ae0' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(31,122,224,.08)' } },
+      { name: '出站', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => d.out), itemStyle: { color: '#12b76a' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(18,183,106,.15)' } }
     ]
   })
 }
 
 watch(filteredRows, buildChart)
+watch(() => props.status?.generated_at, () => {
+  if (!selectedProxyName.value) loadIfaceRows()
+})
 const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => chart?.resize()) : null
 onMounted(async () => {
   await nextTick()
   quickThisMonth()
+  await loadIfaceRows()
   chart = echarts.init(chartEl.value)
   buildChart()
   ro?.observe(chartEl.value)
@@ -336,11 +367,6 @@ onUnmounted(() => {
 .page-num {
   min-width: 34px;
   padding: 0 8px;
-}
-.page-num.active {
-  color: #bfdbfe;
-  border-color: #1d4ed8;
-  background: #172554;
 }
 @media (max-width: 1200px) {
   .stats-page { flex: none; min-height: auto; overflow: visible; }

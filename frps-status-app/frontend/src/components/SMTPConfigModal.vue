@@ -64,7 +64,6 @@
           <li>25端口为SMTP协议，587端口为STARTTLS协议</li>
         </ul>
 
-        <div v-if="smtpMsg" class="alert mt-3" :class="smtpMsg.ok ? 'alert-success' : 'alert-error'">{{ smtpMsg.text }}</div>
       </div>
 
       <div class="smtp-modal-foot">
@@ -90,7 +89,6 @@ import { ref } from 'vue'
 const props = defineProps({
   open: Boolean,
   form: Object,
-  smtpMsg: Object,
   savingSMTP: Boolean,
   testingEmail: Boolean
 })
@@ -106,25 +104,25 @@ function toggleSMTP() {
 .smtp-mask { position: fixed; inset: 0; background: rgba(15, 23, 42, .56); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 60; }
 .smtp-modal { width: min(640px, 100%); max-height: 90vh; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 24px 80px rgba(15, 23, 42, .34); }
 .smtp-modal-head { height: 62px; border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; justify-content: space-between; align-items: center; }
-.smtp-modal-head h3 { font-size: 18px; font-weight: 700; color: var(--text); }
+.smtp-modal-head h3 { font-size: var(--fs-modal-title); font-weight: var(--fw-title); color: var(--text); }
 .smtp-close { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-2); font-size: 22px; line-height: 1; cursor: pointer; }
 .smtp-close:hover { background: var(--surface-2); color: var(--text); }
 .smtp-modal-body { padding: 20px 24px 12px; overflow-y: auto; flex: 1; }
 .smtp-line { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 12px; margin-bottom: 10px; }
 .smtp-line-top { align-items: flex-start; }
-.smtp-label { text-align: right; color: var(--text-2); font-size: 14px; }
+.smtp-label { text-align: right; color: var(--text-2); font-size: var(--fs-base); }
 .smtp-label i { color: #ef4444; font-style: normal; margin-right: 4px; }
 .smtp-input-wrap { width: 100%; }
 .smtp-input-wrap input, .smtp-input-wrap textarea { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 0 12px; font: inherit; background: var(--surface-2); color: var(--text); }
 .smtp-input-wrap input { height: 36px; }
 .smtp-input-wrap textarea { resize: vertical; min-height: 80px; padding-top: 9px; padding-bottom: 9px; }
 .password-row { display: grid; grid-template-columns: minmax(0, 1fr) 62px; gap: 10px; }
-.pass-toggle { height: 36px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-2); font-size: 12px; cursor: pointer; }
+.pass-toggle { height: 36px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-2); font-size: var(--fs-caption); cursor: pointer; }
 .switch-btn { width: 50px; height: 24px; border: 0; border-radius: 999px; background: #475569; padding: 0 3px; display: flex; align-items: center; cursor: pointer; transition: background .15s; }
 .switch-btn span { width: 18px; height: 18px; border-radius: 50%; background: #f8fafc; transform: translateX(0); transition: transform .15s; }
 .switch-btn.on { background: #10b981; }
 .switch-btn.on span { transform: translateX(26px); }
-.smtp-tips { margin: 4px 0 10px 124px; color: var(--text-2); font-size: 13px; line-height: 1.7; }
+.smtp-tips { margin: 4px 0 10px 124px; color: var(--text-2); font-size: var(--fs-body); line-height: 1.7; }
 .smtp-modal-foot { background: var(--surface-2); min-height: 62px; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .foot-right { display: flex; gap: 10px; }
 .smtp-action { min-width: 72px; height: 32px; }

@@ -21,10 +21,10 @@
           </div>
         </div>
         <div class="flex-center">
-          <button class="btn btn-outline btn-sm" @click="exportCsv">导出列表</button>
-          <button class="btn btn-outline btn-sm" :disabled="loading || localLoading" @click="$emit('refresh')">
+          <button class="btn btn-outline btn-sm icon-btn" title="导出列表" aria-label="导出列表" @click="exportCsv">⇩</button>
+          <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loading || localLoading" @click="$emit('refresh')">
             <span v-if="loading || localLoading" class="spinner"></span>
-            <span v-else>↻</span> 刷新
+            <span v-else>↻</span>
           </button>
         </div>
       </div>
@@ -56,8 +56,8 @@
                   <th class="col-type">类型</th>
                   <th class="col-status">状态</th>
                   <th class="col-num sortable" @click="toggleSort('conn')">连接 <span :class="sortClass('conn')">↕</span></th>
-                  <th class="col-num sortable" @click="toggleSort('in')">本月上行 <span :class="sortClass('in')">↕</span></th>
-                  <th class="col-num sortable" @click="toggleSort('out')">本月下行 <span :class="sortClass('out')">↕</span></th>
+                  <th class="col-num sortable" @click="toggleSort('in')">本月入站 <span :class="sortClass('in')">↕</span></th>
+                  <th class="col-num sortable" @click="toggleSort('out')">本月出站 <span :class="sortClass('out')">↕</span></th>
                   <th class="col-num sortable" @click="toggleSort('total')">总流量 <span :class="sortClass('total')">↕</span></th>
                   <th class="col-action">操作</th>
                 </tr>
@@ -123,8 +123,8 @@
             </div>
             <div class="detail-row"><span>当前连接</span><b>{{ selectedProxy.cur_conns }}</b></div>
             <div class="detail-pair">
-              <div class="detail-row"><span>上行</span><b>{{ humanBytes(selectedProxy.month_in) }}</b></div>
-              <div class="detail-row"><span>下行</span><b>{{ humanBytes(selectedProxy.month_out) }}</b></div>
+              <div class="detail-row"><span>入站</span><b>{{ humanBytes(selectedProxy.month_in) }}</b></div>
+              <div class="detail-row"><span>出站</span><b>{{ humanBytes(selectedProxy.month_out) }}</b></div>
             </div>
             <div class="detail-row"><span>总流量</span><b>{{ humanBytes(selectedProxy.month_in + selectedProxy.month_out) }}</b></div>
             <div class="detail-pair">
@@ -136,8 +136,8 @@
               <div class="out" :style="{ width: selectedTotal ? ((selectedProxy.month_out / selectedTotal) * 100).toFixed(1) + '%' : '0%' }"></div>
             </div>
             <div class="detail-legend">
-              <span><i class="dot in"></i>上行 {{ humanBytes(selectedProxy.month_in) }}</span>
-              <span><i class="dot out"></i>下行 {{ humanBytes(selectedProxy.month_out) }}</span>
+              <span><i class="dot in"></i>入站 {{ humanBytes(selectedProxy.month_in) }}</span>
+              <span><i class="dot out"></i>出站 {{ humanBytes(selectedProxy.month_out) }}</span>
             </div>
             <div class="detail-cert-title">证书状态</div>
             <div v-if="selectedCerts.length" class="detail-certs">
@@ -339,17 +339,17 @@ onMounted(() => {
   min-width: 74px;
 }
 .header-summary b {
-  font-size: 18px;
+  font-size: var(--fs-page-title-sm);
   line-height: 1;
 }
 .header-summary span {
   color: var(--text-2);
-  font-size: 12px;
+  font-size: var(--fs-caption);
   margin-left: 3px;
 }
 .header-summary small {
   color: var(--text-3);
-  font-size: 11px;
+  font-size: var(--fs-table-head);
   white-space: nowrap;
 }
 .proxy-table-wrap, .proxy-detail {
@@ -366,12 +366,12 @@ onMounted(() => {
 }
 .proxy-table-wrap .section-title,
 .proxy-detail .section-title {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--fs-section-title);
+  font-weight: var(--fw-section);
 }
 .proxy-table-wrap .text-muted,
 .proxy-detail .text-muted {
-  font-size: 12px;
+  font-size: var(--fs-caption);
 }
 .proxy-table-tools {
   display: flex;
@@ -487,11 +487,6 @@ onMounted(() => {
   min-width: 34px;
   padding: 0 8px;
 }
-.page-num.active {
-  color: #bfdbfe;
-  border-color: #1d4ed8;
-  background: #172554;
-}
 .quick-jump {
   display: inline-flex;
   align-items: center;
@@ -534,7 +529,7 @@ onMounted(() => {
   font-size: 12px;
 }
 .sort-idle { color: var(--text-2); }
-.sort-asc, .sort-desc { color: #60a5fa; font-weight: 700; }
+.sort-asc, .sort-desc { font-weight: 700; }
 .sort-asc::before { content: '↑'; }
 .sort-desc::before { content: '↓'; }
 .sort-asc, .sort-desc { font-size: 0; }

@@ -25,6 +25,9 @@ VPS_PUBLIC_IP = ""
 FRPS_SERVER_PORT   = 0
 FRPS_TOKEN         = ""
 FRPS_DASHBOARD_HTTP = False
+FRPS_ENABLE_PROMETHEUS = True
+FRPC_USE_ENCRYPTION = True
+FRPC_USE_COMPRESSION = True
 STATUS_APP_ENABLED   = True
 STATUS_APP_PORT      = 0
 STATUS_APP_HTTP      = False
@@ -79,6 +82,8 @@ def _validate_runtime_config_shape(data: Dict[str, Any]) -> None:
 
     _require_object(data.get("frps"), "frps")
     _require_object(data.get("status"), "status")
+    if "frpc" in data:
+        _require_object(data.get("frpc"), "frpc")
 
     services = data.get("services", DEFAULT_SERVICES)
     if not isinstance(services, list):
@@ -99,7 +104,7 @@ def _bool_config(value: Any, default: bool = False) -> bool:
 
 
 def load_runtime_config() -> None:
-    global CONFIG, SERVICES, ROOT_DOMAIN, CERT_EMAIL, VPS_PUBLIC_IP, FRPS_SERVER_PORT, FRPS_TOKEN, FRPS_DASHBOARD_HTTP, STATUS_APP_ENABLED, STATUS_APP_PORT, STATUS_APP_HTTP, STATUS_APP_USER, STATUS_APP_PASSWORD
+    global CONFIG, SERVICES, ROOT_DOMAIN, CERT_EMAIL, VPS_PUBLIC_IP, FRPS_SERVER_PORT, FRPS_TOKEN, FRPS_DASHBOARD_HTTP, FRPS_ENABLE_PROMETHEUS, FRPC_USE_ENCRYPTION, FRPC_USE_COMPRESSION, STATUS_APP_ENABLED, STATUS_APP_PORT, STATUS_APP_HTTP, STATUS_APP_USER, STATUS_APP_PASSWORD
 
     CONFIG = load_config_file()
     _validate_runtime_config_shape(CONFIG)
@@ -121,6 +126,11 @@ def load_runtime_config() -> None:
         raise ValueError(f"frps.server_port 必须是整数：{raw_server_port!r}") from exc
 
     FRPS_DASHBOARD_HTTP = _bool_config(frps_config.get("dashboard_http", False), default=False)
+    FRPS_ENABLE_PROMETHEUS = _bool_config(frps_config.get("enable_prometheus", True), default=True)
+
+    frpc_config = _require_object(CONFIG.get("frpc", {}), "frpc")
+    FRPC_USE_ENCRYPTION = _bool_config(frpc_config.get("use_encryption", True), default=True)
+    FRPC_USE_COMPRESSION = _bool_config(frpc_config.get("use_compression", True), default=True)
 
     status_config = _require_object(CONFIG.get("status"), "status")
 

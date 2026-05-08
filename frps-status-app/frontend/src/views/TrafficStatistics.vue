@@ -6,7 +6,7 @@
         <div class="page-sub">公网IP：{{ currentPublicIP || '-' }} · 网卡：{{ currentIface || '-' }}</div>
       </div>
       <div class="flex-center">
-        <button class="btn btn-outline btn-sm" :disabled="loadingData" @click="fetchRows">↻ 刷新</button>
+        <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loadingData" @click="fetchRows">↻</button>
       </div>
     </div>
 
@@ -17,8 +17,8 @@
           <div class="text-muted text-sm">{{ startDate }} 至 {{ endDate }} · {{ currentPublicIP || '-' }} / {{ currentIface || '-' }}</div>
         </div>
         <div class="analytics-overview-metrics">
-          <div><b>{{ humanBytesKB(totalRxKB) }}</b><small>上行</small></div>
-          <div><b>{{ humanBytesKB(totalTxKB) }}</b><small>下行</small></div>
+          <div><b>{{ humanBytesKB(totalRxKB) }}</b><small>入站</small></div>
+          <div><b>{{ humanBytesKB(totalTxKB) }}</b><small>出站</small></div>
           <div><b>{{ humanBytesKB(totalKB) }}</b><small>总流量</small></div>
         </div>
       </section>
@@ -48,7 +48,7 @@
           <div class="table-wrap stats-table-scroll">
             <table class="stats-detail-table">
               <thead>
-                <tr><th class="col-date">日期</th><th>公网IP</th><th>网卡</th><th class="col-num">上行</th><th class="col-num">下行</th><th class="col-num">总流量</th></tr>
+                <tr><th class="col-date">日期</th><th>公网IP</th><th>网卡</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num">总流量</th></tr>
               </thead>
               <tbody>
                 <tr v-if="!pagedRows.length"><td colspan="6" class="empty">暂无数据</td></tr>
@@ -191,13 +191,13 @@ function buildChart() {
         return `${d}<br/>${params.map(p => `${p.marker}${p.seriesName}: <b>${humanBytesKB(p.value)}</b>`).join('<br/>')}`
       }
     },
-    legend: { data: ['上行', '下行'], top: 0, left: 'center', textStyle: { color: '#334155', fontSize: 13 } },
+    legend: { data: ['入站', '出站'], top: 0, left: 'center', textStyle: { color: '#334155', fontSize: 13 } },
     grid: { left: 74, right: 22, top: 48, bottom: 42 },
     xAxis: { type: 'category', data: days.map(d => d.day), boundaryGap: false, axisLabel: { color: '#64748b', fontSize: 12 }, axisLine: { lineStyle: { color: '#475569' } }, axisTick: { show: false } },
     yAxis: { type: 'value', axisLabel: { color: '#64748b', fontSize: 12, formatter: v => humanBytesKB(v) }, splitLine: { lineStyle: { color: '#dbe3ee', type: 'dashed' } }, axisLine: { show: false }, axisTick: { show: false } },
     series: [
-      { name: '上行', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => d.rx_kb), itemStyle: { color: '#1f7ae0' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(31,122,224,.08)' } },
-      { name: '下行', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => d.tx_kb), itemStyle: { color: '#12b76a' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(18,183,106,.15)' } }
+      { name: '入站', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => d.rx_kb), itemStyle: { color: '#1f7ae0' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(31,122,224,.08)' } },
+      { name: '出站', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => d.tx_kb), itemStyle: { color: '#12b76a' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(18,183,106,.15)' } }
     ]
   })
 }
@@ -283,7 +283,6 @@ onUnmounted(() => {
 .analytics-pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .page-num-list { display: flex; gap: 6px; }
 .page-num { min-width: 34px; padding: 0 8px; }
-.page-num.active { color: #bfdbfe; border-color: #1d4ed8; background: #172554; }
 @media (max-width: 1200px) {
   .stats-page { flex: none; min-height: auto; overflow: visible; }
   .stats-main { grid-template-columns: 1fr; overflow: visible; }

@@ -1,6 +1,7 @@
 """证书申请与 Docker Compose 容器操作。"""
 from __future__ import annotations
 
+from pathlib import Path
 import secrets
 import time
 import urllib.request
@@ -82,19 +83,18 @@ def _cert_file_exists(path) -> bool:
         return True
 
 
-def fix_certbot_conf_permissions() -> None:
+def fix_certbot_dir_permissions(dirpath: Path) -> None:
     try:
-        exists = CERTBOT_CONF_DIR.exists()
+        exists = dirpath.exists()
     except PermissionError:
         exists = True
     if not exists:
         return
 
-    print(f"\n修正 certbot 证书目录权限：{CERTBOT_CONF_DIR}")
     ret = run(
         [
             "docker", "run", "--rm",
-            "-v", f"{CERTBOT_CONF_DIR}:/target",
+            "-v", f"{dirpath}:/target",
             "alpine",
             "chmod", "-R", "777", "/target",
         ],
@@ -110,7 +110,7 @@ def issue_certs(ctx: DeployContext) -> None:
         print("没有需要申请证书的域名，跳过证书申请。")
         return
 
-    fix_certbot_conf_permissions()
+    fix_certbot_dir_permissions(CERTBOT_CONF_DIR)
 
     for domain in domains:
         cert_file = CERTBOT_CONF_DIR / "live" / domain / "fullchain.pem"
@@ -130,6 +130,7 @@ def issue_certs(ctx: DeployContext) -> None:
         ]
         ret = run(certbot_cmd, cwd=BASE_DIR, check=False)
         if ret.returncode == 0:
+            fix_certbot_dir_permissions(CERTBOT_CONF_DIR)
             continue
         print("certbot 首次申请失败，等待 15 秒后重试一次...")
         time.sleep(15)

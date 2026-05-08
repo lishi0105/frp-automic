@@ -1,4 +1,5 @@
 # 内网穿透运维工具
+![界面预览](dashboard.png)
 
 基于 frp 的内网穿透场景，提供从服务端部署、域名入口配置、HTTPS 证书申领到运行状态监控、流量统计和异常告警的一体化运维能力。它用于快速搭建可公网访问的内网服务入口，并持续观察代理、证书和主机网络状态，减少手动配置、巡检和告警处理成本。
 
@@ -41,6 +42,9 @@ python3 vps-install-frps.py
 | `frps.server_port`    | frps serverPort；小于 `1000` 或留空时随机生成                |
 | `frps.token`          | frps 认证 token；留空时随机生成                              |
 | `frps.dashboard_http` | 是否允许 frps dashboard 通过 `VPS_IP:dashboardPort` 公网直通，默认关闭 |
+| `frps.enable_prometheus` | 是否在 frps dashboard `/metrics` 开启 Prometheus 指标，默认开启 |
+| `frpc.use_encryption` | 是否为生成的 frpc 代理开启传输加密，默认开启                  |
+| `frpc.use_compression` | 是否为生成的 frpc 代理开启传输压缩，默认开启                 |
 | `status.enabled`      | 是否启用状态面板与 `status.<root_domain>` 反代，默认启用     |
 | `status.port`         | 状态面板本机 HTTP 端口；小于 `1000` 或留空时随机生成         |
 | `status.http`         | 是否允许状态面板通过 `VPS_IP:status.port` 公网直通，默认关闭 |
@@ -57,7 +61,12 @@ python3 vps-install-frps.py
   "frps": {
     "server_port": 0,
     "token": "",
-    "dashboard_http": false
+    "dashboard_http": false,
+    "enable_prometheus": true
+  },
+  "frpc": {
+    "use_encryption": true,
+    "use_compression": true
   },
   "status": {
     "enabled": true,
@@ -191,7 +200,7 @@ https://frps.<root_domain>
 | 代理列表 | 代理在线状态、连接数、月度流量、证书关联，后端分页/排序/筛选 |
 | 证书列表 | 证书有效期、剩余天数、公网 TLS 握手状态、关联代理与异常信息  |
 | 历史统计 | 每日流量明细、本月 Top 5、趋势折线图、导出 CSV               |
-| 流量统计 | 公网 IP/网卡维度日流量汇总，支持按日期查询上行、下行与总量趋势 |
+| 流量统计 | 公网 IP/网卡维度日流量汇总，支持按日期查询入站、出站与总量趋势 |
 | 系统配置 | SMTP 告警（含测试发送）、流量阈值、数据库压缩与清理          |
 
 ### 2.2. 环境变量

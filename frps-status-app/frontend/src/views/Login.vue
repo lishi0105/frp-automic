@@ -122,6 +122,7 @@ async function submit() {
   loading.value = true
   try {
     const result = await api.login(form)
+    sessionStorage.setItem('frps_status_logged_in', '1')
     if (result.force_change) {
       router.replace('/?force_change=1')
     } else {

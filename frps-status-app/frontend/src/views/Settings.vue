@@ -1,121 +1,134 @@
 <template>
-  <div>
-    <div class="page-header">
+  <div class="sysset-page">
+    <div class="page-header sysset-header">
       <div>
         <div class="page-title">系统配置</div>
-        <div class="page-sub">管理 FRPS 监控平台的全局参数与数据存储</div>
+        <div class="page-sub">管理 FRPS 监控平台的全局参数与通知策略</div>
       </div>
-      <button class="btn btn-outline btn-sm" @click="$emit('refresh')">↻ 刷新</button>
     </div>
 
-    <div class="page-body settings-page">
-      <section class="analytics-overview">
-        <div>
-          <div class="section-title">告警配置概览</div>
-          <div class="text-muted text-sm">月流量阈值、事件告警、SMTP 与数据库维护策略</div>
+    <div class="sysset-main">
+      <section class="summary-card card-surface">
+        <div class="summary-item">
+          <div class="summary-icon in">↓</div>
+          <div>
+            <h3>入站策略</h3>
+            <div class="summary-metrics">
+              <span><small>阈值</small><b>{{ form.threshold_in_gb || 0 }} GB</b></span>
+              <span><small>限额</small><b>{{ form.limit_in_gb || 0 }} GB</b></span>
+            </div>
+          </div>
         </div>
-        <div class="analytics-overview-metrics">
-          <div><b>{{ form.alert_in_gb || 0 }} GB</b><small>月上行阈值</small></div>
-          <div><b>{{ form.alert_out_gb || 0 }} GB</b><small>月下行阈值</small></div>
-          <div><b>SMTP</b><small>{{ form.smtp_enabled === 'true' ? '已启用' : '未启用' }}</small></div>
+        <div class="summary-item">
+          <div class="summary-icon out">↑</div>
+          <div>
+            <h3>出站策略</h3>
+            <div class="summary-metrics">
+              <span><small>阈值</small><b>{{ form.threshold_out_gb || 0 }} GB</b></span>
+              <span><small>限额</small><b>{{ form.limit_out_gb || 0 }} GB</b></span>
+            </div>
+          </div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-icon total">◔</div>
+          <div>
+            <h3>总量策略</h3>
+            <div class="summary-metrics">
+              <span><small>阈值</small><b>{{ form.threshold_total_gb || 0 }} GB</b></span>
+              <span><small>限额</small><b>{{ form.limit_total_gb || 0 }} GB</b></span>
+            </div>
+          </div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-icon smtp">✉</div>
+          <div>
+            <h3>SMTP 状态</h3>
+            <b>{{ smtpReady ? '已配置' : '未配置' }}</b>
+          </div>
         </div>
       </section>
 
-      <div class="settings-grid">
-        <section class="settings-card threshold-card">
-          <h3 class="settings-card-title">流量阈值设置</h3>
-          <div class="threshold-grid">
-            <label class="threshold-item">
-              <span>月上行 (GB)</span>
-              <input v-model.number="form.alert_in_gb" type="number" min="0" step="0.1" />
-            </label>
-            <label class="threshold-item">
-              <span>月下行 (GB)</span>
-              <input v-model.number="form.alert_out_gb" type="number" min="0" step="0.1" />
-            </label>
-            <label class="threshold-item threshold-span">
-              <span>上下行总量 (GB)</span>
-              <input v-model.number="form.alert_total_gb" type="number" min="0" step="0.1" />
-            </label>
-          </div>
-          <div class="section-actions">
-            <button class="btn btn-dark btn-sm" :disabled="savingThreshold" @click="saveThreshold">
-              {{ savingThreshold ? '保存中…' : '保存阈值' }}
-            </button>
-            <div v-if="saveMsg" class="alert" :class="saveMsg.ok ? 'alert-success' : 'alert-error'">{{ saveMsg.text }}</div>
-          </div>
-        </section>
-
-        <section class="settings-card event-alert-card">
-          <h3 class="settings-card-title">事件告警</h3>
-          <div class="event-rows">
-            <div class="event-row">
-              <span class="event-label">代理离线告警</span>
-              <button class="switch-btn" :class="{ on: form.alert_proxy_offline === 'true' }" type="button" @click="toggleField('alert_proxy_offline')"><span></span></button>
-            </div>
-            <div class="event-row">
-              <span class="event-label">SSL证书到期告警</span>
-              <div class="event-row-right">
-                <button class="switch-btn" :class="{ on: form.alert_cert_expiry === 'true' }" type="button" @click="toggleField('alert_cert_expiry')"><span></span></button>
-                <template v-if="form.alert_cert_expiry === 'true'">
-                  <span class="event-sub">提前</span>
-                  <input v-model.number="form.alert_cert_days" type="number" min="1" max="90" class="event-days-input" />
-                  <span class="event-sub">天</span>
-                </template>
+      <section class="feature-card card-surface">
+        <div class="feature-left">
+          <div class="feature-logo">∿</div>
+          <div>
+            <h3>流量与告警策略</h3>
+            <div class="feature-meta">
+              <p>统一配置流量阈值、总量限额与事件告警策略</p>
+              <div class="feature-tags">
+                <span>流量阈值</span>
+                <span>总量限额</span>
+                <span>事件告警</span>
+                <span>通知策略</span>
               </div>
             </div>
           </div>
-          <div class="section-actions">
-            <button class="btn btn-dark btn-sm" :disabled="savingEvents" @click="saveEvents">
-              {{ savingEvents ? '保存中…' : '保存策略' }}
-            </button>
-            <div v-if="eventMsg" class="alert" :class="eventMsg.ok ? 'alert-success' : 'alert-error'">{{ eventMsg.text }}</div>
-          </div>
-        </section>
+        </div>
+        <button class="btn btn-dark btn-lg" @click="openPolicyModal">前往配置</button>
+      </section>
 
-        <section class="settings-card notify-card">
-          <h3 class="settings-card-title notify-title">告警通知 (SMTP)</h3>
-          <div class="notify-line">
-            <div class="smtp-ready-box" :class="{ ok: smtpReady }">
-              <span class="smtp-ready-dot"></span>
-              <span>{{ smtpReady ? 'SMTP 已就绪' : 'SMTP 未就绪' }}</span>
-            </div>
-            <span class="smtp-current">{{ smtpRecipientsPreview }}</span>
+      <section class="feature-card card-surface">
+        <div class="feature-left">
+          <div class="feature-logo">✉</div>
+          <div>
+            <h3>邮件通知配置</h3>
+            <p>配置 SMTP 服务，用于告警邮件发送</p>
           </div>
-          <div class="notify-foot">
-            <button class="btn btn-outline btn-sm" :disabled="testingEmail" @click="testEmail">{{ testingEmail ? '发送中…' : '测试邮件' }}</button>
-            <button class="btn btn-dark btn-sm" @click="openSMTPModal">配置邮件</button>
-          </div>
-          <div v-if="smtpMsg" class="alert mt-3" :class="smtpMsg.ok ? 'alert-success' : 'alert-error'">{{ smtpMsg.text }}</div>
-        </section>
+        </div>
+        <div class="mail-right">
+          <span class="mail-status" :class="{ off: !smtpReady }">
+            <i></i>{{ smtpReady ? '已配置' : '未配置' }}
+          </span>
+          <button class="btn btn-dark btn-lg" @click="openSMTPModal">配置邮件</button>
+        </div>
+      </section>
 
-        <section class="settings-card db-card">
-          <h3 class="settings-card-title">数据库维护</h3>
-          <div class="db-line db-line-vacuum">
+      <section class="db-card card-surface">
+        <div class="db-main">
+          <div class="feature-left">
+            <div class="feature-logo">◍</div>
             <div>
-              <div class="db-title">空间碎片整理 (VACUUM)</div>
-              <div class="text-muted text-sm">释放数据库文件空间，减少碎片</div>
+              <h3>数据库维护</h3>
+              <p>优化数据库性能，清理冗余数据，释放存储空间</p>
             </div>
-            <button class="btn btn-dark btn-sm" :disabled="vacuuming" @click="doVacuum">{{ vacuuming ? '执行中…' : '执行' }}</button>
           </div>
-          <div class="db-line db-line-purge">
-            <div class="purge-inline">
+        </div>
+        <div class="db-maintain">
+          <div class="db-item">
+            <h4>空间碎片整理（VACUUM）</h4>
+            <p>释放数据库文件空间，减少碎片</p>
+            <button class="btn btn-outline btn-sm" :disabled="vacuuming" @click="doVacuum">{{ vacuuming ? '执行中…' : '立即执行' }}</button>
+          </div>
+          <div class="db-item">
+            <h4>历史数据保留天数</h4>
+            <p>设置历史数据保留天数，超期数据由后端自动清理</p>
+            <div class="purge-row">
               <span>保留近</span>
               <input v-model.number="purgeDays" type="number" min="1" max="365" />
-              <span>天历史记录</span>
+              <span>天</span>
+              <span>历史记录</span>
+              <button class="btn btn-dark btn-sm" :disabled="purging" @click="saveRetentionDays">{{ purging ? '保存中…' : '保存' }}</button>
             </div>
-            <button class="btn btn-sm btn-warn" :disabled="purging" @click="doPurge">{{ purging ? '执行中…' : '清理' }}</button>
           </div>
-          <div v-if="vacuumMsg" class="alert mt-3" :class="vacuumMsg.ok ? 'alert-success' : 'alert-error'">{{ vacuumMsg.text }}</div>
-          <div v-if="purgeMsg" class="alert mt-3" :class="purgeMsg.ok ? 'alert-success' : 'alert-error'">{{ purgeMsg.text }}</div>
-        </section>
-      </div>
+        </div>
+        <div class="db-messages">
+          <div v-if="vacuumMsg" class="alert" :class="vacuumMsg.ok ? 'alert-success' : 'alert-error'">{{ vacuumMsg.text }}</div>
+          <div v-if="retentionMsg" class="alert" :class="retentionMsg.ok ? 'alert-success' : 'alert-error'">{{ retentionMsg.text }}</div>
+        </div>
+      </section>
     </div>
+
+    <TrafficPolicyModal
+      :open="policyModalOpen"
+      :form="form"
+      :saving="savingPolicy"
+      @close="closePolicyModal"
+      @save="savePolicy"
+    />
 
     <SMTPConfigModal
       :open="smtpModalOpen"
       :form="form"
-      :smtp-msg="smtpMsg"
       :saving-smtp="savingSMTP"
       :testing-email="testingEmail"
       @close="closeSMTPModal"
@@ -127,11 +140,15 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/index.js'
 import SMTPConfigModal from '../components/SMTPConfigModal.vue'
+import TrafficPolicyModal from '../components/TrafficPolicyModal.vue'
 
 const props = defineProps({ status: Object })
-defineEmits(['refresh'])
+const emit = defineEmits(['refresh', 'toast'])
+const route = useRoute()
+const router = useRouter()
 
 const form = reactive({
   smtp_host: '',
@@ -141,41 +158,37 @@ const form = reactive({
   smtp_from: '',
   smtp_to: '',
   smtp_enabled: 'false',
-  alert_in_gb: 0,
-  alert_out_gb: 0,
-  alert_total_gb: 0,
+  threshold_in_gb: 0,
+  threshold_out_gb: 0,
+  threshold_total_gb: 0,
+  limit_in_gb: 0,
+  limit_out_gb: 0,
+  limit_total_gb: 0,
+  initial_in_gb: 0,
+  initial_out_gb: 0,
+  deploy_date: '',
   alert_proxy_offline: 'false',
   alert_cert_expiry: 'false',
   alert_cert_days: 15
 })
 
 const smtpModalOpen = ref(false)
-const savingThreshold = ref(false)
+const policyModalOpen = ref(false)
 const savingSMTP = ref(false)
-const savingEvents = ref(false)
+const savingPolicy = ref(false)
 const testingEmail = ref(false)
 const vacuuming = ref(false)
 const purging = ref(false)
 const purgeDays = ref(60)
 
-const saveMsg = ref(null)
-const smtpMsg = ref(null)
-const eventMsg = ref(null)
 const vacuumMsg = ref(null)
-const purgeMsg = ref(null)
+const retentionMsg = ref(null)
 const savedSettings = ref(null)
 const formInitialized = ref(false)
 
 const smtpReady = computed(() =>
   Boolean(form.smtp_host && form.smtp_from && form.smtp_to && form.smtp_auth_code)
 )
-
-const smtpRecipientsPreview = computed(() => {
-  if (!form.smtp_to) return '未设置'
-  const list = form.smtp_to.split(',').map((s) => s.trim()).filter(Boolean)
-  if (!list.length) return '未设置'
-  return list.length > 1 ? `${list[0]} ...` : list[0]
-})
 
 function fillForm(s) {
   if (!s) return
@@ -185,81 +198,93 @@ function fillForm(s) {
   form.smtp_from = s.smtp_from || ''
   form.smtp_to = s.smtp_to || ''
   form.smtp_enabled = s.smtp_enabled ? 'true' : 'false'
-  form.alert_in_gb = s.alert_in_gb || 0
-  form.alert_out_gb = s.alert_out_gb || 0
-  form.alert_total_gb = s.alert_total_gb || 0
-  form.smtp_auth_code = s.smtp_auth_code || ''
+  form.threshold_in_gb = s.threshold_in_gb || 0
+  form.threshold_out_gb = s.threshold_out_gb || 0
+  form.threshold_total_gb = s.threshold_total_gb || 0
+  form.limit_in_gb = s.limit_in_gb || 0
+  form.limit_out_gb = s.limit_out_gb || 0
+  form.limit_total_gb = s.limit_total_gb || 0
+  form.initial_in_gb = s.initial_in_gb || 0
+  form.initial_out_gb = s.initial_out_gb || 0
+  form.deploy_date = s.deploy_date || ''
   form.alert_proxy_offline = s.alert_proxy_offline ? 'true' : 'false'
   form.alert_cert_expiry = s.alert_cert_expiry ? 'true' : 'false'
   form.alert_cert_days = s.alert_cert_days || 15
+  form.smtp_auth_code = s.smtp_auth_code || ''
+  purgeDays.value = Number(s.history_retention_days) > 0 ? Number(s.history_retention_days) : 60
 }
 
 watch(() => props.status?.settings, (settings) => {
-  if (smtpModalOpen.value) return
-  if (formInitialized.value) return
   savedSettings.value = settings || savedSettings.value
+  if (formInitialized.value && (smtpModalOpen.value || policyModalOpen.value)) return
+  if (formInitialized.value) return
   fillForm(settings)
   if (settings) formInitialized.value = true
 }, { immediate: true })
 
+watch(() => route.query.modal, (modal) => {
+  policyModalOpen.value = modal === 'policy'
+  smtpModalOpen.value = modal === 'smtp'
+}, { immediate: true })
+
+function setModalQuery(modal) {
+  const query = { ...route.query }
+  if (modal) query.modal = modal
+  else delete query.modal
+  router.replace({ path: route.path, query })
+}
+
 function flash(msgRef, ok, text, ms = 4000) {
   msgRef.value = { ok, text }
-  setTimeout(() => {
-    msgRef.value = null
-  }, ms)
+  setTimeout(() => { msgRef.value = null }, ms)
 }
 
-function makePayload() {
-  return { ...form }
-}
-
-function makeSMTPPayload() {
-  return {
-    smtp_host: form.smtp_host,
-    smtp_port: form.smtp_port,
-    smtp_user: form.smtp_user,
-    smtp_auth_code: form.smtp_auth_code,
-    smtp_from: form.smtp_from,
-    smtp_to: form.smtp_to,
-    smtp_enabled: form.smtp_enabled
-  }
+function toast(ok, message) {
+  emit('toast', { type: ok ? 'success' : 'error', message })
 }
 
 function openSMTPModal() {
-  smtpMsg.value = null
+  fillForm(savedSettings.value || props.status?.settings)
   smtpModalOpen.value = true
+  setModalQuery('smtp')
 }
 
 function closeSMTPModal() {
   smtpModalOpen.value = false
   fillForm(savedSettings.value || props.status?.settings)
+  setModalQuery(null)
 }
 
-async function saveThreshold() {
-  savingThreshold.value = true
-  try {
-    const saved = await api.saveSettings(makePayload())
-    savedSettings.value = saved
-    fillForm(saved)
-    formInitialized.value = true
-    flash(saveMsg, true, '阈值已保存')
-  } catch (e) {
-    flash(saveMsg, false, '保存失败：' + e.message)
-  } finally {
-    savingThreshold.value = false
-  }
+function openPolicyModal() {
+  fillForm(savedSettings.value || props.status?.settings)
+  policyModalOpen.value = true
+  setModalQuery('policy')
+}
+
+function closePolicyModal() {
+  policyModalOpen.value = false
+  fillForm(savedSettings.value || props.status?.settings)
+  setModalQuery(null)
 }
 
 async function saveSMTP() {
   savingSMTP.value = true
   try {
-    const saved = await api.saveSettings(makeSMTPPayload())
+    const saved = await api.saveSettings({
+      smtp_host: form.smtp_host,
+      smtp_port: form.smtp_port,
+      smtp_user: form.smtp_user,
+      smtp_auth_code: form.smtp_auth_code,
+      smtp_from: form.smtp_from,
+      smtp_to: form.smtp_to,
+      smtp_enabled: form.smtp_enabled
+    })
     savedSettings.value = saved
     fillForm(saved)
     formInitialized.value = true
-    flash(smtpMsg, true, 'SMTP 配置已保存')
+    toast(true, 'SMTP 配置已保存')
   } catch (e) {
-    flash(smtpMsg, false, '保存失败：' + e.message)
+    toast(false, '保存失败：' + e.message)
   } finally {
     savingSMTP.value = false
   }
@@ -267,29 +292,29 @@ async function saveSMTP() {
 
 async function testEmail() {
   testingEmail.value = true
-  smtpMsg.value = null
   try {
     const r = await api.testEmail()
-    if (r.ok) {
-      flash(smtpMsg, true, '测试邮件发送成功')
-    } else {
-      smtpMsg.value = { ok: false, text: '发送失败：' + r.error }
-    }
+    if (r.ok) toast(true, '测试邮件发送成功')
+    else toast(false, '发送失败：' + r.error)
   } catch (e) {
-    smtpMsg.value = { ok: false, text: '发送失败：' + e.message }
+    toast(false, '发送失败：' + e.message)
   } finally {
     testingEmail.value = false
   }
 }
 
-function toggleField(key) {
-  form[key] = form[key] === 'true' ? 'false' : 'true'
-}
-
-async function saveEvents() {
-  savingEvents.value = true
+async function savePolicy() {
+  savingPolicy.value = true
   try {
     const saved = await api.saveSettings({
+      threshold_in_gb: form.threshold_in_gb,
+      threshold_out_gb: form.threshold_out_gb,
+      threshold_total_gb: form.threshold_total_gb,
+      limit_in_gb: form.limit_in_gb,
+      limit_out_gb: form.limit_out_gb,
+      limit_total_gb: form.limit_total_gb,
+      initial_in_gb: form.initial_in_gb,
+      initial_out_gb: form.initial_out_gb,
       alert_proxy_offline: form.alert_proxy_offline,
       alert_cert_expiry: form.alert_cert_expiry,
       alert_cert_days: form.alert_cert_days
@@ -297,11 +322,11 @@ async function saveEvents() {
     savedSettings.value = saved
     fillForm(saved)
     formInitialized.value = true
-    flash(eventMsg, true, '事件告警配置已保存')
+    toast(true, '策略已保存')
   } catch (e) {
-    flash(eventMsg, false, '保存失败：' + e.message)
+    toast(false, '保存失败：' + e.message)
   } finally {
-    savingEvents.value = false
+    savingPolicy.value = false
   }
 }
 
@@ -318,15 +343,23 @@ async function doVacuum() {
   }
 }
 
-async function doPurge() {
-  if (!confirm(`确定删除 ${purgeDays.value} 天前的流量记录？此操作不可恢复。`)) return
+async function saveRetentionDays() {
+  if (!Number.isFinite(purgeDays.value) || purgeDays.value < 1) {
+    purgeDays.value = 60
+  }
+  purgeDays.value = Math.min(365, Math.max(1, Math.floor(purgeDays.value)))
   purging.value = true
-  purgeMsg.value = null
+  retentionMsg.value = null
   try {
-    const r = await api.purge(purgeDays.value)
-    flash(purgeMsg, true, `已删除 ${r.deleted} 条记录`)
+    const saved = await api.saveSettings({
+      history_retention_days: purgeDays.value
+    })
+    savedSettings.value = saved
+    fillForm(saved)
+    formInitialized.value = true
+    flash(retentionMsg, true, `历史数据保留天数已更新为 ${purgeDays.value} 天`)
   } catch (e) {
-    flash(purgeMsg, false, '清理失败：' + e.message)
+    flash(retentionMsg, false, '保存失败：' + e.message)
   } finally {
     purging.value = false
   }
@@ -334,120 +367,158 @@ async function doPurge() {
 </script>
 
 <style scoped>
-.settings-page { display: grid; gap: 12px; }
-.settings-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
-.settings-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 14px;
-  box-shadow: var(--shadow);
-}
-.settings-card-title { font-size: 15px; font-weight: 700; margin-bottom: 10px; }
-.threshold-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.threshold-item { display: grid; gap: 6px; }
-.threshold-item span { color: var(--text-2); font-size: 12px; }
-.threshold-item input {
-  height: 36px;
-  border: 1px solid var(--border);
+.sysset-page { display: flex; flex-direction: column; gap: 0; }
+.sysset-header { min-height: auto; }
+.sysset-main { display: grid; gap: 10px; padding: 0 24px 24px; }
+.card-surface {
+  background: #fff;
+  border: 1px solid #d9e4f3;
   border-radius: 8px;
-  padding: 0 10px;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, .05);
 }
-.section-actions { margin-top: 12px; display: flex; align-items: center; gap: 10px; }
-.event-rows { display: grid; gap: 10px; }
-.event-row {
-  display: flex; justify-content: space-between; align-items: center;
-  border: 1px solid var(--border); border-radius: 8px; padding: 10px; min-height: 48px;
+.summary-card {
+  min-height: 94px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
 }
-.event-label { font-size: 13px; }
-.event-row-right { display: flex; align-items: center; gap: 8px; }
-.event-sub { color: var(--text-2); font-size: 12px; }
-.event-days-input {
-  width: 58px; height: 30px; border: 1px solid var(--border); border-radius: 8px;
-  text-align: center;
-}
-.notify-card { display: grid; align-content: start; gap: 10px; }
-.notify-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.smtp-ready-box {
-  height: 28px; border-radius: 8px; border: 1px solid #991b1b; background: #7f1d1d;
-  display: flex; align-items: center; gap: 8px; padding: 0 12px; color: #fca5a5; font-size: 12px;
-}
-.smtp-ready-box.ok { background: #14532d; border-color: #166534; color: #86efac; }
-.smtp-ready-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.smtp-current { color: var(--text-2); font-size: 12px; }
-.notify-foot { display: flex; gap: 8px; justify-content: flex-end; }
-.db-card { grid-column: 2; grid-row: 2; }
-.db-line {
-  border-radius: 8px; display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; padding: 10px; margin-top: 8px;
-}
-.db-line-vacuum { background: var(--surface-2); }
-.db-line-purge { background: #451a03; color: #fde68a; }
-.db-title { font-size: 13px; font-weight: 600; }
-.purge-inline { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.purge-inline input {
-  width: 52px; height: 30px; border-radius: 8px; border: 1px solid #d97706;
-  text-align: center; background: var(--surface); color: var(--text);
-}
-.btn-warn { background: #d97706; border-color: #d97706; color: #fff; }
-
-.switch-btn {
-  width: 50px;
-  height: 24px;
-  border: 0;
-  border-radius: 999px;
-  background: #475569;
-  padding: 0 3px;
+.summary-item {
   display: flex;
   align-items: center;
-  cursor: pointer;
-  transition: background .15s;
+  gap: 12px;
+  padding: 10px 16px;
+  min-width: 0;
 }
-
-.switch-btn span {
-  width: 18px;
-  height: 18px;
+.summary-item + .summary-item {
+  border-left: 1px solid #e2e8f0;
+}
+.summary-icon {
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: #f8fafc;
-  transform: translateX(0);
-  transition: transform .15s;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  font-weight: var(--fw-strong);
 }
-
-.switch-btn.on {
-  background: #10b981;
+.summary-icon.in { color: #2563eb; background: #dbeafe; }
+.summary-icon.out { color: #10b981; background: #dcfce7; }
+.summary-icon.total { color: #f59e0b; background: #fef3c7; }
+.summary-icon.smtp { color: #7c3aed; background: #ede9fe; }
+.summary-item h3 {
+  margin: 0 0 6px;
+  font-size: var(--fs-card-title);
+  line-height: 1.2;
+  font-weight: var(--fw-title);
+  color: #0f172a;
 }
-
-.switch-btn.on span {
-  transform: translateX(26px);
+.summary-metrics {
+  display: flex;
+  gap: 14px;
+  min-width: 0;
 }
+.summary-metrics span {
+  display: grid;
+  gap: 2px;
+  min-width: 50px;
+}
+.summary-item b { display: block; font-size: var(--fs-section-title); color: #0f172a; line-height: 1.15; white-space: nowrap; }
+.summary-item small { color: #64748b; font-size: var(--fs-caption); }
 
-.btn-dark {
-  display: inline-flex;
+.feature-card {
+  min-height: 88px;
+  padding: 10px 16px;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-color: var(--primary);
-  background: var(--primary);
+  justify-content: space-between;
+  gap: 14px;
+}
+.feature-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.feature-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
   color: #fff;
-  transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease;
+  font-size: var(--fs-icon-sm);
+  background: linear-gradient(145deg, #3b82f6, #1d4ed8);
+}
+.feature-left h3 { margin: 0 0 4px; font-size: var(--fs-section-title); line-height: 1.25; font-weight: var(--fw-section); color: #0f172a; }
+.feature-left p { margin: 0; color: #64748b; font-size: var(--fs-caption); }
+.feature-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.feature-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.feature-tags span { border: 1px solid #cfe0fb; color: #2563eb; background: #eff6ff; border-radius: 6px; font-size: var(--fs-caption); padding: 2px 7px; }
+.btn-lg { min-width: 96px; height: 34px; font-size: var(--fs-caption); }
+
+.mail-right { display: flex; align-items: center; gap: 12px; }
+.mail-status { color: #16a34a; font-size: var(--fs-caption); display: inline-flex; align-items: center; gap: 6px; }
+.mail-status i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.mail-status.off { color: #ef4444; }
+
+.db-card {
+  min-height: 104px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1.2fr .8fr 1fr;
+  gap: 0;
+  overflow: hidden;
+}
+.db-main {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  border-right: 1px solid #e2e8f0;
+}
+.db-maintain {
+  display: contents;
+}
+.db-item {
+  padding: 10px 16px;
+  border-right: 1px solid #e2e8f0;
+}
+.db-item:last-child {
+  border-right: 0;
+}
+.db-item h4 { margin: 0; font-size: var(--fs-card-title); font-weight: var(--fw-section); color: #0f172a; }
+.db-item p { margin: 4px 0 8px; color: #64748b; font-size: var(--fs-caption); }
+.purge-row { display: flex; align-items: center; gap: 6px; color: #334155; font-size: var(--fs-caption); }
+.purge-row input { width: 54px; height: 30px; border: 1px solid #d5e2f6; border-radius: 6px; text-align: center; font-size: var(--fs-caption); }
+.db-messages { grid-column: 1 / -1; display: grid; gap: 8px; }
+
+.btn-dark { border-color: #2563eb; background: #2563eb; color: #fff; }
+.btn-dark:hover { background: #1d4ed8; border-color: #1d4ed8; }
+
+@media (max-width: 1200px) {
+  .summary-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summary-item:nth-child(odd) { border-left: 0; }
+  .summary-item:nth-child(n + 3) { border-top: 1px solid #e2e8f0; }
+  .db-card { grid-template-columns: 1fr; }
+  .db-main,
+  .db-item {
+    border-right: 0;
+    border-bottom: 1px solid #ecf2fb;
+  }
+  .db-item:last-child { border-bottom: 0; }
 }
 
-.btn-dark.is-busy {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(15, 23, 42, .16);
-}
-
-button:disabled {
-  opacity: .65;
-  cursor: not-allowed;
-}
-@media (max-width: 980px) {
-  .settings-grid { grid-template-columns: 1fr; }
-  .db-card { grid-column: auto; grid-row: auto; }
-  .threshold-grid { grid-template-columns: 1fr; }
-  .db-line { flex-direction: column; align-items: flex-start; }
-}
-@media (max-width: 640px) {
-  .notify-foot { justify-content: flex-start; }
+@media (max-width: 860px) {
+  .sysset-main { padding: 0 12px 12px; }
+  .summary-card { grid-template-columns: 1fr; }
+  .summary-item,
+  .summary-item:nth-child(n) {
+    border-left: 0;
+    border-top: 1px solid #e2e8f0;
+    padding: 18px;
+  }
+  .summary-item:first-child { border-top: 0; }
+  .feature-card { flex-direction: column; align-items: flex-start; }
+  .mail-right { width: 100%; justify-content: space-between; }
+  .summary-item b { font-size: var(--fs-page-title-sm); }
+  .feature-left h3 { font-size: var(--fs-section-title); }
+  .feature-left p { font-size: var(--fs-body); }
+  .db-item h4 { font-size: var(--fs-section-title); }
+  .db-item p { font-size: var(--fs-body); }
 }
 </style>

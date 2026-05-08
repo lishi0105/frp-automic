@@ -45,6 +45,7 @@ server {
 
 server {
     listen 443 ssl default_server;
+    http2 on;
     server_name _;
     ssl_reject_handshake on;
 }
@@ -56,6 +57,10 @@ def generate_frps_toml(ctx: DeployContext) -> None:
     lines = [
         'bindAddr = "0.0.0.0"',
         f"bindPort = {ctx.bind_port}",
+    ]
+    if config.FRPS_ENABLE_PROMETHEUS:
+        lines.append("enablePrometheus = true")
+    lines += [
         "",
         "[auth]",
         'method = "token"',
@@ -100,6 +105,10 @@ def generate_frpc_toml(ctx: DeployContext) -> None:
             f"localPort = {local_port(item)}",
             f"remotePort = {remote_port(item)}",
         ]
+        if config.FRPC_USE_ENCRYPTION:
+            lines.append("transport.useEncryption = true")
+        if config.FRPC_USE_COMPRESSION:
+            lines.append("transport.useCompression = true")
     FRPC_TOML_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -260,7 +269,8 @@ server {{
 }}
 
 server {{
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on;
     server_name {frps_domain};
 
     ssl_certificate /etc/letsencrypt/live/{frps_domain}/fullchain.pem;
@@ -299,7 +309,8 @@ server {{
 }}
 
 server {{
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on;
     server_name {status_host};
 
     ssl_certificate /etc/letsencrypt/live/{status_host}/fullchain.pem;
@@ -349,7 +360,8 @@ server {{
 }}
 
 server {{
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on;
     server_name {domain};
 
     ssl_certificate /etc/letsencrypt/live/{domain}/fullchain.pem;

@@ -1,58 +1,19 @@
 <template>
-  <RouterView v-if="isLogin" />
-  <div v-else class="layout">
-    <Teleport to="body">
-      <div v-if="warnings.length > 0" class="warn-anchor" :class="{ 'with-initial-banner': currentUser.is_initial_password }">
-        <button
-          class="warn-bell"
-          :class="{ open: warnOpen }"
-          :aria-label="`${warnings.length} 条告警`"
-          @click.stop="warnOpen = !warnOpen"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span class="warn-badge">{{ warnings.length }}</span>
-        </button>
-        <Transition name="warn-drop">
-          <div v-if="warnOpen" class="warn-panel" @click.stop>
-            <div class="warn-panel-hd">
-              <span class="warn-panel-title">系统告警</span>
-              <span class="warn-count-chip">{{ warnings.length }}</span>
-              <button class="warn-panel-close" @click="warnOpen = false">✕</button>
-            </div>
-            <ul class="warn-list">
-              <li v-for="w in warnings" :key="w.key" class="warn-item">
-                <span class="warn-item-dot" :class="warnCategory(w.key)"></span>
-                <div class="warn-item-body">
-                  <span class="warn-item-msg">{{ w.message }}</span>
-                  <span class="warn-item-time">{{ fmtTime(w.created_at) }}</span>
-                </div>
-              </li>
-            </ul>
-          </div>
-        </Transition>
-      </div>
-    </Teleport>
-
-    <aside class="sidebar">
+  <RouterView v-if="isLogin" @toast="pushToast" />
+  <div v-else class="layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+    <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-logo">
         <img :src="logoUrl" class="logo-icon" alt="FRPS状态监控" />
         FRPS状态监控
         <span class="logo-dot" :class="{ offline: !frpsOnline }"></span>
       </div>
-      <button class="sidebar-user" type="button" @click="openAccount(false)">
-        <span class="sidebar-user-avatar">{{ userInitial }}</span>
-        <span class="sidebar-user-meta">
-          <span class="sidebar-user-label">当前用户</span>
-          <span class="sidebar-user-name">{{ currentUser.username || '加载中' }}</span>
-        </span>
-      </button>
       <nav>
         <RouterLink class="nav-item" to="/"><span class="nav-icon">📊</span> 数据看板</RouterLink>
         <RouterLink class="nav-item" to="/proxies"><span class="nav-icon">🔗</span> 代理列表</RouterLink>
         <RouterLink class="nav-item" to="/certificates"><span class="nav-icon">🔒</span> 证书列表</RouterLink>
         <div class="nav-group">
           <div class="nav-row">
-            <RouterLink class="nav-item nav-parent" to="/statistics"><span class="nav-icon">📈</span> 历史统计</RouterLink>
+            <RouterLink class="nav-item nav-parent" to="/statistics"><span class="nav-icon">🛰️</span> 流量统计</RouterLink>
             <button class="nav-toggle" type="button" :aria-expanded="statsOpen" @click="statsOpen = !statsOpen">{{ statsOpen ? '⌄' : '›' }}</button>
           </div>
           <div v-if="statsOpen" class="nav-children">
@@ -67,15 +28,64 @@
             </RouterLink>
           </div>
         </div>
-        <RouterLink class="nav-item" to="/traffic-statistics"><span class="nav-icon">🛰️</span> 流量统计</RouterLink>
         <RouterLink class="nav-item" to="/settings"><span class="nav-icon">⚙️</span> 系统配置</RouterLink>
       </nav>
       <div class="sidebar-footer">
-        <span>{{ updatedAt || '加载中…' }}</span>
-        <button class="logout-btn" type="button" @click="logout">退出</button>
+        <button class="collapse-btn" type="button" @click="sidebarCollapsed = !sidebarCollapsed">
+          <svg v-if="sidebarCollapsed" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          <span>{{ sidebarCollapsed ? '展开菜单' : '收起菜单' }}</span>
+        </button>
+        <span class="sidebar-time">{{ updatedAt || '加载中…' }}</span>
       </div>
     </aside>
-    <div class="main-wrap">
+    <div class="main-wrap" :class="{ 'has-initial-banner': currentUser.is_initial_password }">
+      <div class="top-tools">
+        <div class="tools-right">
+          <div class="warn-anchor">
+            <button
+              class="warn-bell"
+              :class="{ open: warnOpen }"
+              :aria-label="`${warnings.length} 条告警`"
+              @click.stop="warnOpen = !warnOpen"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <span v-if="warnings.length > 0" class="warn-badge">{{ warnings.length }}</span>
+            </button>
+            <Transition name="warn-drop">
+              <div v-if="warnOpen" class="warn-panel" @click.stop>
+                <div class="warn-panel-hd">
+                  <span class="warn-panel-title">系统告警</span>
+                  <span class="warn-count-chip">{{ warnings.length }}</span>
+                  <button class="warn-panel-close" @click="warnOpen = false">✕</button>
+                </div>
+                <ul class="warn-list">
+                  <li v-for="w in warnings" :key="w.key" class="warn-item">
+                    <span class="warn-item-dot" :class="warnCategory(w.key)"></span>
+                    <div class="warn-item-body">
+                      <span class="warn-item-msg">{{ w.message }}</span>
+                      <span class="warn-item-time">{{ fmtTime(w.created_at) }}</span>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            </Transition>
+          </div>
+          <div class="user-anchor">
+            <button class="top-user" type="button" @click.stop="userMenuOpen = !userMenuOpen">
+              <span class="sidebar-user-avatar">{{ userInitial }}</span>
+              <span class="top-user-name">{{ currentUser.username || '加载中' }}</span>
+              <svg class="top-user-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <Transition name="warn-drop">
+              <div v-if="userMenuOpen" class="user-menu" @click.stop>
+                <button type="button" class="user-menu-item" @click="openAccount">账户设置</button>
+                <button type="button" class="user-menu-item danger" @click="logout">退出登录</button>
+              </div>
+            </Transition>
+          </div>
+        </div>
+      </div>
       <button
         v-if="currentUser.is_initial_password"
         class="initial-password-banner"
@@ -86,13 +96,19 @@
         <span>当前仍在使用初始密码，请先更新密码后继续使用控制台。</span>
         <span class="initial-password-action">立即修改</span>
       </button>
-      <RouterView :status="status" :daily="daily" :loading="loading" @refresh="load" />
+      <RouterView :status="status" :daily="daily" :loading="loading" @refresh="load" @toast="pushToast" />
     </div>
     <AccountSettingsModal
       v-model="accountOpen"
       @saved="handleAccountSaved"
     />
   </div>
+  <TransitionGroup name="toast" tag="div" class="toast-stack">
+    <div v-for="toast in toasts" :key="toast.id" class="toast-item" :class="toast.type">
+      <span class="toast-icon">{{ toast.type === 'error' ? '!' : '✓' }}</span>
+      <span>{{ toast.message }}</span>
+    </div>
+  </TransitionGroup>
 </template>
 
 <script setup>
@@ -109,10 +125,13 @@ const daily = ref([])
 const loading = ref(false)
 const updatedAt = ref('')
 const statsOpen = ref(false)
+const sidebarCollapsed = ref(false)
 const warnings = ref([])
 const warnOpen = ref(false)
 const accountOpen = ref(false)
+const userMenuOpen = ref(false)
 const currentUser = ref({ username: '' })
+const toasts = ref([])
 
 const isLogin = computed(() => route.path === '/login')
 const isSettings = computed(() => route.path === '/settings')
@@ -166,6 +185,21 @@ function fmtTime(iso) {
 
 function onDocClick() {
   if (warnOpen.value) warnOpen.value = false
+  if (userMenuOpen.value) userMenuOpen.value = false
+}
+
+function pushToast(input) {
+  const id = Date.now() + Math.random()
+  const toast = {
+    id,
+    type: input?.type === 'error' ? 'error' : 'success',
+    message: input?.message || ''
+  }
+  if (!toast.message) return
+  toasts.value.push(toast)
+  setTimeout(() => {
+    toasts.value = toasts.value.filter(item => item.id !== id)
+  }, input?.duration || 2600)
 }
 
 async function load() {
@@ -192,6 +226,7 @@ async function loadUser() {
 }
 
 function openAccount() {
+  userMenuOpen.value = false
   accountOpen.value = true
 }
 
@@ -207,6 +242,7 @@ function handleAccountSaved(user) {
 
 async function logout() {
   await api.logout()
+  sessionStorage.removeItem('frps_status_logged_in')
   router.replace('/login')
 }
 
@@ -229,40 +265,56 @@ onUnmounted(() => {
 
 <style scoped>
 /* ── warning anchor ── */
-.warn-anchor {
-  position: fixed;
-  top: 86px;
-  right: 22px;
-  z-index: 200;
+.top-tools {
+  position: absolute;
+  top: 16px;
+  right: 24px;
+  z-index: 90;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  pointer-events: none;
 }
-.warn-anchor.with-initial-banner { top: 138px; }
+.main-wrap.has-initial-banner .top-tools { top: 82px; }
+.tools-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+.warn-anchor {
+  position: relative;
+  z-index: 50;
+}
 
 .warn-bell {
   position: relative;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: none;
-  background: #7f1d1d;
-  color: #fca5a5;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #d5e0f0;
+  background: #fff;
+  color: #334155;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,.35);
+  box-shadow: none;
   transition: background .15s, transform .15s;
   animation: warn-pulse 2.4s ease-in-out infinite;
 }
 .warn-bell:hover,
 .warn-bell.open {
-  background: #991b1b;
-  transform: scale(1.08);
+  background: #f8fafc;
+  transform: none;
   animation: none;
 }
 
 @keyframes warn-pulse {
-  0%, 100% { box-shadow: 0 2px 8px rgba(0,0,0,.35); }
-  50%       { box-shadow: 0 2px 16px rgba(239,68,68,.6); }
+  0%, 100% { box-shadow: none; }
+  50%       { box-shadow: 0 0 0 3px rgba(239,68,68,.10); }
 }
 
 .warn-badge {
@@ -280,7 +332,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 0 4px;
-  border: 2px solid #0f172a;
+  border: 2px solid #fff;
   line-height: 1;
 }
 
@@ -426,24 +478,111 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-.sidebar-user {
-  margin: 10px 8px 6px;
-  padding: 10px;
-  border: 1px solid rgba(148, 163, 184, .16);
-  border-radius: var(--r);
-  background: rgba(15, 23, 42, .72);
-  color: var(--sb-active-text);
+.top-user {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #334155;
+  height: 36px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.top-user:hover { background: #eef4ff; color: #0f172a; }
+.top-user-name {
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 600;
+}
+.top-user-caret { color: #64748b; }
+
+.user-anchor {
+  position: relative;
+  z-index: 60;
+}
+.user-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 136px;
+  border: 1px solid #d9e5f6;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .12);
+  padding: 6px;
+  display: grid;
+  gap: 3px;
+}
+.user-menu-item {
+  border: 0;
+  background: transparent;
+  color: #334155;
+  height: 34px;
+  border-radius: 8px;
+  text-align: left;
+  padding: 0 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.user-menu-item:hover { background: #eff6ff; color: #0f172a; }
+.user-menu-item.danger:hover { background: #fff1f2; color: #be123c; }
+
+.toast-stack {
+  position: fixed;
+  top: 76px;
+  right: 24px;
+  z-index: 200;
+  display: grid;
+  gap: 10px;
+  pointer-events: none;
+}
+.toast-item {
+  min-width: 220px;
+  max-width: 360px;
+  min-height: 40px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #d9e5f6;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, .18);
+  color: #0f172a;
   display: flex;
   align-items: center;
   gap: 10px;
-  cursor: pointer;
-  text-align: left;
-  transition: background .15s, border-color .15s;
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: auto;
 }
-.sidebar-user:hover {
-  background: var(--sb-active);
-  border-color: rgba(148, 163, 184, .28);
+.toast-item.success { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+.toast-item.error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+.toast-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: currentColor;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
 }
+.toast-enter-active,
+.toast-leave-active {
+  transition: opacity .18s ease, transform .18s ease;
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
 .sidebar-user-avatar {
   width: 32px;
   height: 32px;
@@ -457,23 +596,61 @@ onUnmounted(() => {
   font-weight: 700;
   flex-shrink: 0;
 }
-.sidebar-user-meta {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
+.sidebar.collapsed .sidebar-logo {
+  font-size: 0;
+  justify-content: center;
 }
-.sidebar-user-label {
+.sidebar.collapsed .sidebar-logo .logo-icon {
+  margin-right: 0;
+}
+.sidebar.collapsed .nav-item {
+  font-size: 0;
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+.sidebar.collapsed .nav-item .nav-icon {
+  margin-right: 0;
+  font-size: 18px;
+}
+.sidebar.collapsed .nav-toggle,
+.sidebar.collapsed .nav-children,
+.sidebar.collapsed .collapse-btn span,
+.sidebar.collapsed .sidebar-time {
+  display: none;
+}
+.sidebar.collapsed .sidebar-footer {
+  justify-content: center;
+}
+.sidebar-footer {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.sidebar.collapsed { width: 72px; }
+.sidebar.collapsed .nav-item {
+  font-size: 0;
+  justify-content: center;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.collapse-btn {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(148, 163, 184, .14);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, .28);
   color: var(--sb-text);
-  font-size: 11px;
-}
-.sidebar-user-name {
-  max-width: 130px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font: inherit;
   font-size: 13px;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
 }
+.collapse-btn:hover { background: var(--sb-active); color: var(--sb-active-text); }
+.sidebar-time { font-size: 12px; color: var(--sb-text); }
 
 @media (max-width: 900px) {
   .layout {
@@ -490,10 +667,6 @@ onUnmounted(() => {
   .sidebar-logo {
     padding: 12px 14px;
     font-size: 15px;
-  }
-  .sidebar-user {
-    margin: 8px 10px 4px;
-    padding: 8px 10px;
   }
   .sidebar nav {
     display: flex;
@@ -546,12 +719,17 @@ onUnmounted(() => {
     font-size: 12px;
     gap: 8px;
   }
-  .warn-anchor {
-    top: 66px;
-    right: 12px;
+  .top-tools {
+    position: static;
+    padding: 10px 12px 0;
+    justify-content: flex-end;
+    pointer-events: auto;
   }
-  .warn-anchor.with-initial-banner {
-    top: 116px;
+  .main-wrap.has-initial-banner .top-tools {
+    top: auto;
+  }
+  .tools-right {
+    pointer-events: auto;
   }
   .warn-panel {
     width: min(92vw, 360px);

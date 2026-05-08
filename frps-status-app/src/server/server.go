@@ -32,12 +32,13 @@ import (
 )
 
 type App struct {
-	cfg    config.Config
-	store  *store.Store
-	frps   *frps.Client
-	secret []byte
-	mu     sync.RWMutex
-	latest model.Snapshot
+	cfg              config.Config
+	store            *store.Store
+	frps             *frps.Client
+	secret           []byte
+	mu               sync.RWMutex
+	latest           model.Snapshot
+	lastAutoPurgeDay string
 }
 
 func New(cfg config.Config, st *store.Store, fc *frps.Client) *App {
@@ -82,7 +83,41 @@ func (a *App) PollLoop() {
 		if err := a.Refresh(context.Background()); err != nil {
 			logger.Warn("定时刷新失败: %v", err)
 		}
+		a.autoPurgeHistoryIfNeeded()
 	}
+}
+
+func (a *App) autoPurgeHistoryIfNeeded() {
+	now := time.Now()
+	hour := now.Hour()
+	if hour < 2 || hour >= 4 {
+		return
+	}
+	day := now.Format("2006-01-02")
+	a.mu.RLock()
+	alreadyDone := a.lastAutoPurgeDay == day
+	a.mu.RUnlock()
+	if alreadyDone {
+		return
+	}
+	settings, err := a.store.PublicSettings()
+	if err != nil {
+		logger.Warn("自动清理读取设置失败: %v", err)
+		return
+	}
+	days := settings.HistoryRetentionDays
+	if days < 1 {
+		days = 60
+	}
+	deleted, err := a.store.Purge(days)
+	if err != nil {
+		logger.Error("自动清理历史数据失败 保留天数=%d 错误=%v", days, err)
+		return
+	}
+	a.mu.Lock()
+	a.lastAutoPurgeDay = day
+	a.mu.Unlock()
+	logger.Info("自动清理历史数据完成 日期=%s 保留天数=%d 已删除=%d", day, days, deleted)
 }
 
 func (a *App) Refresh(ctx context.Context) error {
@@ -101,7 +136,9 @@ func (a *App) Refresh(ctx context.Context) error {
 		proxies[i].MonthOut = out
 	}
 	settings, _ := a.store.PublicSettings()
-	monthIn, monthOut, _ := a.store.MonthTotals(month)
+	a.collectInterfaceTraffic()
+	monthIn, monthOut, _ := a.store.MonthInterfaceTotals(month)
+	monthIn, monthOut = applyInitialTrafficToMonth(settings, month, monthIn, monthOut)
 	certs := frps.Certificates(a.cfg.CertDir, a.cfg.Domains)
 	inferProxyCertificateDomains(proxies, certs)
 	_ = a.checkAlerts(settings, month, monthIn, monthOut)
@@ -110,7 +147,6 @@ func (a *App) Refresh(ctx context.Context) error {
 		a.checkProxyAlerts(settings, proxies)
 		a.syncProxyWarnings(proxies)
 	}
-	a.collectInterfaceTraffic()
 	a.checkCertAlerts(settings, certs)
 	a.syncCertWarnings(settings, certs)
 	a.syncTrafficWarnings(settings, monthIn, monthOut)
@@ -292,20 +328,35 @@ func (a *App) checkAlerts(settings model.PublicSettings, month string, monthIn, 
 	if !settings.SMTPEnabled {
 		return nil
 	}
+	thresholdInEnabled := settings.ThresholdInGB > 0
+	thresholdOutEnabled := settings.ThresholdOutGB > 0
+	thresholdTotalEnabled := settings.ThresholdTotalGB > 0 && thresholdInEnabled && thresholdOutEnabled
+	limitInEnabled := settings.LimitInGB > 0
+	limitOutEnabled := settings.LimitOutGB > 0
+	limitTotalEnabled := settings.LimitTotalGB > 0 && limitInEnabled && limitOutEnabled
 	total := monthIn + monthOut
-	if settings.AlertInGB > 0 && monthIn >= mail.GBToBytes(settings.AlertInGB) {
-		_ = a.sendAlertOnce(month, "in", monthIn, settings.AlertInGB, settings)
+	if thresholdInEnabled && monthIn >= mail.GBToBytes(settings.ThresholdInGB) {
+		_ = a.sendAlertOnce(month, "traffic_threshold_in", "入站阈值", monthIn, settings.ThresholdInGB, settings)
 	}
-	if settings.AlertOutGB > 0 && monthOut >= mail.GBToBytes(settings.AlertOutGB) {
-		_ = a.sendAlertOnce(month, "out", monthOut, settings.AlertOutGB, settings)
+	if thresholdOutEnabled && monthOut >= mail.GBToBytes(settings.ThresholdOutGB) {
+		_ = a.sendAlertOnce(month, "traffic_threshold_out", "出站阈值", monthOut, settings.ThresholdOutGB, settings)
 	}
-	if settings.AlertTotalGB > 0 && total >= mail.GBToBytes(settings.AlertTotalGB) {
-		_ = a.sendAlertOnce(month, "total", total, settings.AlertTotalGB, settings)
+	if thresholdTotalEnabled && total >= mail.GBToBytes(settings.ThresholdTotalGB) {
+		_ = a.sendAlertOnce(month, "traffic_threshold_total", "总量阈值", total, settings.ThresholdTotalGB, settings)
+	}
+	if limitInEnabled && monthIn >= mail.GBToBytes(settings.LimitInGB) {
+		_ = a.sendAlertOnce(month, "traffic_limit_in", "入站限额", monthIn, settings.LimitInGB, settings)
+	}
+	if limitOutEnabled && monthOut >= mail.GBToBytes(settings.LimitOutGB) {
+		_ = a.sendAlertOnce(month, "traffic_limit_out", "出站限额", monthOut, settings.LimitOutGB, settings)
+	}
+	if limitTotalEnabled && total >= mail.GBToBytes(settings.LimitTotalGB) {
+		_ = a.sendAlertOnce(month, "traffic_limit_total", "总量限额", total, settings.LimitTotalGB, settings)
 	}
 	return nil
 }
 
-func (a *App) sendAlertOnce(month, direction string, current uint64, thresholdGB float64, settings model.PublicSettings) error {
+func (a *App) sendAlertOnce(month, direction, directionLabel string, current uint64, thresholdGB float64, settings model.PublicSettings) error {
 	if a.store.AlertSent(month, direction) {
 		logger.Info("流量告警已发送，跳过重复发送 月份=%s 方向=%s", month, direction)
 		return nil
@@ -315,8 +366,8 @@ func (a *App) sendAlertOnce(month, direction string, current uint64, thresholdGB
 		logger.Warn("跳过流量告警，SMTP 配置不完整 月份=%s 方向=%s", month, direction)
 		return nil
 	}
-	subject := fmt.Sprintf("FRPS %s traffic alert %s", strings.ToUpper(direction), month)
-	body := fmt.Sprintf("FRPS monthly %s traffic is %s, threshold is %.2f GB.", direction, mail.HumanBytes(current), thresholdGB)
+	subject := fmt.Sprintf("FRPS 网卡%s流量告警 %s", directionLabel, month)
+	body := fmt.Sprintf("FRPS 本月网卡%s流量为 %s，阈值为 %.2f GB。", directionLabel, mail.HumanBytes(current), thresholdGB)
 	if err := mail.Send(settings, authCode, subject, body); err != nil {
 		logger.Error("发送流量告警邮件失败 月份=%s 方向=%s 错误=%v", month, direction, err)
 		return err
@@ -621,7 +672,6 @@ func (a *App) newSessionCookie() *http.Cookie {
 		Name:     "frps_status_session",
 		Value:    msg + "." + a.signSession(msg),
 		Path:     "/",
-		MaxAge:   12 * 60 * 60,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	}
@@ -1287,7 +1337,99 @@ func (a *App) handleDailyInterface(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
+	settings, _ := a.store.PublicSettings()
+	data = applyInitialTrafficToDailyRows(settings, data, fromDay, toDay)
 	writeJSON(w, data)
+}
+
+func applyInitialTrafficToMonth(settings model.PublicSettings, month string, inBytes, outBytes uint64) (uint64, uint64) {
+	if !initialTrafficApplies(settings, month) {
+		return inBytes, outBytes
+	}
+	return inBytes + mail.GBToBytes(settings.InitialInGB), outBytes + mail.GBToBytes(settings.InitialOutGB)
+}
+
+func applyInitialTrafficToDailyRows(settings model.PublicSettings, rows []map[string]any, fromDay, toDay string) []map[string]any {
+	if settings.InitialInGB <= 0 && settings.InitialOutGB <= 0 {
+		return rows
+	}
+	deployDay := strings.TrimSpace(settings.DeployDate)
+	if !dateInRange(deployDay, fromDay, toDay) {
+		return rows
+	}
+	initialRxKB := mail.GBToBytes(settings.InitialInGB) / 1024
+	initialTxKB := mail.GBToBytes(settings.InitialOutGB) / 1024
+	if initialRxKB == 0 && initialTxKB == 0 {
+		return rows
+	}
+	if rows == nil {
+		rows = []map[string]any{}
+	}
+	for _, row := range rows {
+		if fmt.Sprint(row["day"]) != deployDay {
+			continue
+		}
+		row["rx_kb"] = numericAnyToUint64(row["rx_kb"]) + initialRxKB
+		row["tx_kb"] = numericAnyToUint64(row["tx_kb"]) + initialTxKB
+		row["initial_adjusted"] = true
+		return rows
+	}
+	rows = append(rows, map[string]any{
+		"day":              deployDay,
+		"iface":            "initial",
+		"public_ip":        "initial",
+		"rx_kb":            initialRxKB,
+		"tx_kb":            initialTxKB,
+		"initial_adjusted": true,
+	})
+	sort.Slice(rows, func(i, j int) bool {
+		di, dj := fmt.Sprint(rows[i]["day"]), fmt.Sprint(rows[j]["day"])
+		if di == dj {
+			return fmt.Sprint(rows[i]["iface"]) < fmt.Sprint(rows[j]["iface"])
+		}
+		return di < dj
+	})
+	return rows
+}
+
+func initialTrafficApplies(settings model.PublicSettings, month string) bool {
+	deployDay := strings.TrimSpace(settings.DeployDate)
+	return len(deployDay) >= 7 && deployDay[:7] == month && (settings.InitialInGB > 0 || settings.InitialOutGB > 0)
+}
+
+func dateInRange(day, fromDay, toDay string) bool {
+	if len(day) != 10 {
+		return false
+	}
+	if strings.TrimSpace(fromDay) != "" && day < fromDay {
+		return false
+	}
+	if strings.TrimSpace(toDay) != "" && day > toDay {
+		return false
+	}
+	return true
+}
+
+func numericAnyToUint64(v any) uint64 {
+	switch n := v.(type) {
+	case uint64:
+		return n
+	case uint:
+		return uint64(n)
+	case int64:
+		if n > 0 {
+			return uint64(n)
+		}
+	case int:
+		if n > 0 {
+			return uint64(n)
+		}
+	case float64:
+		if n > 0 {
+			return uint64(n)
+		}
+	}
+	return 0
 }
 
 func detectOutboundPublicIP() (string, error) {
@@ -1382,7 +1524,7 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		smtpKeys := map[string]bool{"smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true}
-		allowed := map[string]bool{"alert_in_gb": true, "alert_out_gb": true, "alert_total_gb": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true, "alert_proxy_offline": true, "alert_cert_expiry": true, "alert_cert_days": true}
+		allowed := map[string]bool{"threshold_in_gb": true, "threshold_out_gb": true, "threshold_total_gb": true, "limit_in_gb": true, "limit_out_gb": true, "limit_total_gb": true, "initial_in_gb": true, "initial_out_gb": true, "history_retention_days": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true, "alert_proxy_offline": true, "alert_cert_expiry": true, "alert_cert_days": true}
 		smtpChanged := false
 		for key, value := range in {
 			if !allowed[key] {
@@ -1458,6 +1600,11 @@ func (a *App) handlePurge(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	if body.Days < 1 {
 		body.Days = 60
+	}
+	if err := a.store.SaveSetting("history_retention_days", strconv.Itoa(body.Days)); err != nil {
+		logger.Error("保存历史保留天数失败 保留天数=%d 错误=%v", body.Days, err)
+		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+		return
 	}
 	deleted, err := a.store.Purge(body.Days)
 	if err != nil {
@@ -1621,17 +1768,19 @@ func (a *App) syncSMTPWarnings(settings model.PublicSettings) {
 	authCode := a.store.Setting("smtp_auth_code")
 	configured := settings.SMTPHost != "" && settings.SMTPFrom != "" &&
 		settings.SMTPTo != "" && authCode != ""
+	verified := a.store.Setting("smtp_verified") == "true"
 	if !configured {
 		_ = a.store.SetWarning("smtp_not_configured", "SMTP 邮件未配置，将无法收到任何告警通知")
 		_ = a.store.ClearWarning("smtp_not_verified")
-	} else {
-		_ = a.store.ClearWarning("smtp_not_configured")
-		if a.store.Setting("smtp_verified") != "true" {
-			_ = a.store.SetWarning("smtp_not_verified", "SMTP 邮件配置未验证，请发送测试邮件确认配置正确")
-		} else {
-			_ = a.store.ClearWarning("smtp_not_verified")
-		}
+		return
 	}
+	if !verified {
+		_ = a.store.SetWarning("smtp_not_configured", "SMTP 邮件尚未验证，请在“配置邮件”中发送测试邮件完成验证")
+		_ = a.store.SetWarning("smtp_not_verified", "SMTP 邮件配置未验证，请发送测试邮件确认配置正确")
+		return
+	}
+	_ = a.store.ClearWarning("smtp_not_configured")
+	_ = a.store.ClearWarning("smtp_not_verified")
 }
 
 func (a *App) syncRecoveryEmailWarning() {
@@ -1672,24 +1821,48 @@ func (a *App) syncCertWarnings(settings model.PublicSettings, certs []model.Cert
 }
 
 func (a *App) syncTrafficWarnings(settings model.PublicSettings, monthIn, monthOut uint64) {
+	thresholdInEnabled := settings.ThresholdInGB > 0
+	thresholdOutEnabled := settings.ThresholdOutGB > 0
+	thresholdTotalEnabled := settings.ThresholdTotalGB > 0 && thresholdInEnabled && thresholdOutEnabled
+	limitInEnabled := settings.LimitInGB > 0
+	limitOutEnabled := settings.LimitOutGB > 0
+	limitTotalEnabled := settings.LimitTotalGB > 0 && limitInEnabled && limitOutEnabled
 	total := monthIn + monthOut
-	if settings.AlertInGB > 0 && monthIn >= mail.GBToBytes(settings.AlertInGB) {
-		msg := fmt.Sprintf("本月上行流量已超出阈值（当前：%s，阈值：%.2f GB）", mail.HumanBytes(monthIn), settings.AlertInGB)
+	if thresholdInEnabled && monthIn >= mail.GBToBytes(settings.ThresholdInGB) {
+		msg := fmt.Sprintf("本月网卡入站流量已超出阈值（当前：%s，阈值：%.2f GB）", mail.HumanBytes(monthIn), settings.ThresholdInGB)
 		_ = a.store.SetWarning("traffic_in", msg)
 	} else {
 		_ = a.store.ClearWarning("traffic_in")
 	}
-	if settings.AlertOutGB > 0 && monthOut >= mail.GBToBytes(settings.AlertOutGB) {
-		msg := fmt.Sprintf("本月下行流量已超出阈值（当前：%s，阈值：%.2f GB）", mail.HumanBytes(monthOut), settings.AlertOutGB)
+	if thresholdOutEnabled && monthOut >= mail.GBToBytes(settings.ThresholdOutGB) {
+		msg := fmt.Sprintf("本月网卡出站流量已超出阈值（当前：%s，阈值：%.2f GB）", mail.HumanBytes(monthOut), settings.ThresholdOutGB)
 		_ = a.store.SetWarning("traffic_out", msg)
 	} else {
 		_ = a.store.ClearWarning("traffic_out")
 	}
-	if settings.AlertTotalGB > 0 && total >= mail.GBToBytes(settings.AlertTotalGB) {
-		msg := fmt.Sprintf("本月总流量已超出阈值（当前：%s，阈值：%.2f GB）", mail.HumanBytes(total), settings.AlertTotalGB)
+	if thresholdTotalEnabled && total >= mail.GBToBytes(settings.ThresholdTotalGB) {
+		msg := fmt.Sprintf("本月网卡总流量已超出阈值（当前：%s，阈值：%.2f GB）", mail.HumanBytes(total), settings.ThresholdTotalGB)
 		_ = a.store.SetWarning("traffic_total", msg)
 	} else {
 		_ = a.store.ClearWarning("traffic_total")
+	}
+	if limitInEnabled && monthIn >= mail.GBToBytes(settings.LimitInGB) {
+		msg := fmt.Sprintf("本月网卡入站流量已达到限额（当前：%s，限额：%.2f GB）", mail.HumanBytes(monthIn), settings.LimitInGB)
+		_ = a.store.SetWarning("traffic_limit_in", msg)
+	} else {
+		_ = a.store.ClearWarning("traffic_limit_in")
+	}
+	if limitOutEnabled && monthOut >= mail.GBToBytes(settings.LimitOutGB) {
+		msg := fmt.Sprintf("本月网卡出站流量已达到限额（当前：%s，限额：%.2f GB）", mail.HumanBytes(monthOut), settings.LimitOutGB)
+		_ = a.store.SetWarning("traffic_limit_out", msg)
+	} else {
+		_ = a.store.ClearWarning("traffic_limit_out")
+	}
+	if limitTotalEnabled && total >= mail.GBToBytes(settings.LimitTotalGB) {
+		msg := fmt.Sprintf("本月网卡总流量已达到限额（当前：%s，限额：%.2f GB）", mail.HumanBytes(total), settings.LimitTotalGB)
+		_ = a.store.SetWarning("traffic_limit_total", msg)
+	} else {
+		_ = a.store.ClearWarning("traffic_limit_total")
 	}
 }
 

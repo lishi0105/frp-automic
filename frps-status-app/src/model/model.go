@@ -49,19 +49,26 @@ type ProxyTraffic struct {
 }
 
 type PublicSettings struct {
-	AlertInGB         float64 `json:"alert_in_gb"`
-	AlertOutGB        float64 `json:"alert_out_gb"`
-	AlertTotalGB      float64 `json:"alert_total_gb"`
-	SMTPHost          string  `json:"smtp_host"`
-	SMTPPort          int     `json:"smtp_port"`
-	SMTPUser          string  `json:"smtp_user"`
-	SMTPFrom          string  `json:"smtp_from"`
-	SMTPTo            string  `json:"smtp_to"`
-	SMTPEnabled       bool    `json:"smtp_enabled"`
-	SMTPAuthCode      string  `json:"smtp_auth_code"`
-	AlertProxyOffline bool    `json:"alert_proxy_offline"`
-	AlertCertExpiry   bool    `json:"alert_cert_expiry"`
-	AlertCertDays     int     `json:"alert_cert_days"`
+	ThresholdInGB        float64 `json:"threshold_in_gb"`
+	ThresholdOutGB       float64 `json:"threshold_out_gb"`
+	ThresholdTotalGB     float64 `json:"threshold_total_gb"`
+	LimitInGB            float64 `json:"limit_in_gb"`
+	LimitOutGB           float64 `json:"limit_out_gb"`
+	LimitTotalGB         float64 `json:"limit_total_gb"`
+	InitialInGB          float64 `json:"initial_in_gb"`
+	InitialOutGB         float64 `json:"initial_out_gb"`
+	DeployDate           string  `json:"deploy_date"`
+	HistoryRetentionDays int     `json:"history_retention_days"`
+	SMTPHost             string  `json:"smtp_host"`
+	SMTPPort             int     `json:"smtp_port"`
+	SMTPUser             string  `json:"smtp_user"`
+	SMTPFrom             string  `json:"smtp_from"`
+	SMTPTo               string  `json:"smtp_to"`
+	SMTPEnabled          bool    `json:"smtp_enabled"`
+	SMTPAuthCode         string  `json:"smtp_auth_code"`
+	AlertProxyOffline    bool    `json:"alert_proxy_offline"`
+	AlertCertExpiry      bool    `json:"alert_cert_expiry"`
+	AlertCertDays        int     `json:"alert_cert_days"`
 }
 
 type Snapshot struct {

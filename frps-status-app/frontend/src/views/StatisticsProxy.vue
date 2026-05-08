@@ -6,10 +6,10 @@
         <div class="page-sub">当前代理：{{ proxyName }}</div>
       </div>
       <div class="flex-center">
-        <button class="btn btn-outline btn-sm" @click="router.push('/statistics')">返回总览</button>
-        <button class="btn btn-outline btn-sm" :disabled="loading" @click="$emit('refresh')">
+        <button class="btn btn-outline btn-sm icon-btn" title="返回总览" aria-label="返回总览" @click="router.push('/statistics')">←</button>
+        <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loading" @click="$emit('refresh')">
           <span v-if="loading" class="spinner"></span>
-          <span v-else>↻</span> 刷新
+          <span v-else>↻</span>
         </button>
       </div>
     </div>
@@ -23,8 +23,8 @@
         </div>
         <div class="analytics-overview-metrics">
           <div><b>{{ humanBytes(totalTraffic) }}</b><small>总流量</small></div>
-          <div><b>{{ humanBytes(totalIn) }}</b><small>上行</small></div>
-          <div><b>{{ humanBytes(totalOut) }}</b><small>下行</small></div>
+          <div><b>{{ humanBytes(totalIn) }}</b><small>入站</small></div>
+          <div><b>{{ humanBytes(totalOut) }}</b><small>出站</small></div>
         </div>
       </section>
 
@@ -46,8 +46,8 @@
           <div class="section-head"><div class="section-title">代理详情</div></div>
           <div class="kv"><span>当前连接</span><b>{{ proxyCurConns }}</b></div>   
           <div class="kv"><span>日峰值连接</span><b>{{ peakConns }}</b></div>
-          <div class="kv"><span>上行占比</span><b>{{ ratioIn }}%</b></div>
-          <div class="kv"><span>下行占比</span><b>{{ ratioOut }}%</b></div>
+          <div class="kv"><span>入站占比</span><b>{{ ratioIn }}%</b></div>
+          <div class="kv"><span>出站占比</span><b>{{ ratioOut }}%</b></div>
           <div class="kv"><span>关联证书</span><b>{{ certDomain || '-' }}</b></div>
           <div class="kv"><span>证书剩余</span><b :style="{ color: certColor(certDaysLeft) }">{{ certDaysLeft != null ? certDaysLeft + ' 天' : '-' }}</b></div>
         </section>
@@ -60,7 +60,7 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>日期</th><th>类型</th><th>连接峰值</th><th>上行</th><th>下行</th><th>合计</th></tr></thead>
+            <thead><tr><th>日期</th><th>类型</th><th>连接峰值</th><th>入站</th><th>出站</th><th>合计</th></tr></thead>
             <tbody>
               <tr v-if="!pagedRows.length"><td colspan="6" class="empty">暂无数据</td></tr>
               <tr v-for="r in pagedRows" :key="r.day + r.type">
@@ -174,13 +174,13 @@ function buildChart() {
       const d = params[0]?.axisValue || ''
       return `${d}<br/>${params.map(p => `${p.marker}${p.seriesName}: <b>${humanBytes(p.value)}</b>`).join('<br/>')}`
     }},
-    legend: { data: ['上行', '下行'], top: 0, textStyle: { color: isDark ? '#94a3b8' : '#475569' } },
+    legend: { data: ['入站', '出站'], top: 0, textStyle: { color: isDark ? '#94a3b8' : '#475569' } },
     grid: { left: 56, right: 20, top: 38, bottom: 38 },
     xAxis: { type: 'category', data: days.map(d => d.day), axisLabel: { color: isDark ? '#94a3b8' : '#475569', fontSize: 11 } },
     yAxis: { type: 'value', axisLabel: { color: isDark ? '#94a3b8' : '#475569', fontSize: 11, formatter: v => humanBytes(v) }, splitLine: { lineStyle: { color: isDark ? '#1e293b' : '#f1f5f9' } } },
     series: [
-      { name: '上行', type: 'line', smooth: true, data: days.map(d => Number(d.in || 0)), itemStyle: { color: '#3b82f6' }, areaStyle: { color: 'rgba(59,130,246,.1)' } },
-      { name: '下行', type: 'line', smooth: true, data: days.map(d => Number(d.out || 0)), itemStyle: { color: '#10b981' }, areaStyle: { color: 'rgba(16,185,129,.1)' } }
+      { name: '入站', type: 'line', smooth: true, data: days.map(d => Number(d.in || 0)), itemStyle: { color: '#3b82f6' }, areaStyle: { color: 'rgba(59,130,246,.1)' } },
+      { name: '出站', type: 'line', smooth: true, data: days.map(d => Number(d.out || 0)), itemStyle: { color: '#10b981' }, areaStyle: { color: 'rgba(16,185,129,.1)' } }
     ]
   })
 }

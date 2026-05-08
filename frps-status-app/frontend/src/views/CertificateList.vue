@@ -21,9 +21,9 @@
           </div>
         </div>
         <div class="flex-center">
-          <button class="btn btn-outline btn-sm" :disabled="loading || localLoading" @click="$emit('refresh')">
+          <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loading || localLoading" @click="$emit('refresh')">
             <span v-if="loading || localLoading" class="spinner"></span>
-            <span v-else>↻</span> 刷新
+            <span v-else>↻</span>
           </button>
         </div>
       </div>
@@ -291,17 +291,17 @@ onMounted(() => {
   min-width: 74px;
 }
 .header-summary b {
-  font-size: 18px;
+  font-size: var(--fs-page-title-sm);
   line-height: 1;
 }
 .header-summary span {
   color: var(--text-2);
-  font-size: 12px;
+  font-size: var(--fs-caption);
   margin-left: 3px;
 }
 .header-summary small {
   color: var(--text-3);
-  font-size: 11px;
+  font-size: var(--fs-table-head);
   white-space: nowrap;
 }
 .cert-main-custom {
@@ -349,14 +349,13 @@ onMounted(() => {
 .col-num { width: 116px; text-align: right; }
 .col-action { width: 74px; text-align: right; }
 .sort-idle { color: var(--text-2); }
-.sort-asc, .sort-desc { color: #60a5fa; font-weight: 700; }
+.sort-asc, .sort-desc { font-weight: 700; }
 .sort-asc::before { content: '↑'; }
 .sort-desc::before { content: '↓'; }
 .sort-asc, .sort-desc { font-size: 0; }
 .proxy-pager { margin-top: 10px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .page-num-list { display: flex; gap: 6px; }
 .page-num { min-width: 34px; padding: 0 8px; }
-.page-num.active { color: #bfdbfe; border-color: #1d4ed8; background: #172554; }
 @media (max-width: 1200px) {
   .header-side {
     align-items: flex-start;
