@@ -64,7 +64,7 @@
           <li>25端口为SMTP协议，587端口为STARTTLS协议</li>
         </ul>
 
-        <div v-if="smtpMsg" class="alert mt-3" :class="smtpMsg.ok ? 'alert-success' : 'alert-error'">{{ smtpMsg.text }}</div>
+        <div v-if="smtpMsg" class="alert mt-3 save-feedback" :class="smtpMsg.ok ? 'alert-success save-feedback-ok' : 'alert-error'">{{ smtpMsg.text }}</div>
       </div>
 
       <div class="smtp-modal-foot">

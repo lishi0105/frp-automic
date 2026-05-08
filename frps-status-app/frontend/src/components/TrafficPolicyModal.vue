@@ -101,7 +101,7 @@
         </div>
 
         <div class="tip">SMTP 未配置时仅保留站内提醒，配置邮件后可发送告警通知。</div>
-        <div v-if="msg" class="alert" :class="msg.ok ? 'alert-success' : 'alert-error'">{{ msg.text }}</div>
+        <div v-if="msg" class="alert save-feedback" :class="msg.ok ? 'alert-success save-feedback-ok' : 'alert-error'">{{ msg.text }}</div>
       </div>
 
       <footer class="policy-foot">
