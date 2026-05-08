@@ -368,11 +368,6 @@ onUnmounted(() => {
   min-width: 34px;
   padding: 0 8px;
 }
-.page-num.active {
-  color: #bfdbfe;
-  border-color: #1d4ed8;
-  background: #172554;
-}
 @media (max-width: 1200px) {
   .stats-page { flex: none; min-height: auto; overflow: visible; }
   .stats-main { grid-template-columns: 1fr; overflow: visible; }

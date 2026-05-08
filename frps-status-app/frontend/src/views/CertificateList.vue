@@ -349,14 +349,13 @@ onMounted(() => {
 .col-num { width: 116px; text-align: right; }
 .col-action { width: 74px; text-align: right; }
 .sort-idle { color: var(--text-2); }
-.sort-asc, .sort-desc { color: #60a5fa; font-weight: 700; }
+.sort-asc, .sort-desc { font-weight: 700; }
 .sort-asc::before { content: '↑'; }
 .sort-desc::before { content: '↓'; }
 .sort-asc, .sort-desc { font-size: 0; }
 .proxy-pager { margin-top: 10px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .page-num-list { display: flex; gap: 6px; }
 .page-num { min-width: 34px; padding: 0 8px; }
-.page-num.active { color: #bfdbfe; border-color: #1d4ed8; background: #172554; }
 @media (max-width: 1200px) {
   .header-side {
     align-items: flex-start;

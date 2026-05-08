@@ -1,58 +1,19 @@
 <template>
   <RouterView v-if="isLogin" />
-  <div v-else class="layout">
-    <Teleport to="body">
-      <div v-if="warnings.length > 0" class="warn-anchor" :class="{ 'with-initial-banner': currentUser.is_initial_password }">
-        <button
-          class="warn-bell"
-          :class="{ open: warnOpen }"
-          :aria-label="`${warnings.length} 条告警`"
-          @click.stop="warnOpen = !warnOpen"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span class="warn-badge">{{ warnings.length }}</span>
-        </button>
-        <Transition name="warn-drop">
-          <div v-if="warnOpen" class="warn-panel" @click.stop>
-            <div class="warn-panel-hd">
-              <span class="warn-panel-title">系统告警</span>
-              <span class="warn-count-chip">{{ warnings.length }}</span>
-              <button class="warn-panel-close" @click="warnOpen = false">✕</button>
-            </div>
-            <ul class="warn-list">
-              <li v-for="w in warnings" :key="w.key" class="warn-item">
-                <span class="warn-item-dot" :class="warnCategory(w.key)"></span>
-                <div class="warn-item-body">
-                  <span class="warn-item-msg">{{ w.message }}</span>
-                  <span class="warn-item-time">{{ fmtTime(w.created_at) }}</span>
-                </div>
-              </li>
-            </ul>
-          </div>
-        </Transition>
-      </div>
-    </Teleport>
-
-    <aside class="sidebar">
+  <div v-else class="layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+    <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-logo">
         <img :src="logoUrl" class="logo-icon" alt="FRPS状态监控" />
         FRPS状态监控
         <span class="logo-dot" :class="{ offline: !frpsOnline }"></span>
       </div>
-      <button class="sidebar-user" type="button" @click="openAccount(false)">
-        <span class="sidebar-user-avatar">{{ userInitial }}</span>
-        <span class="sidebar-user-meta">
-          <span class="sidebar-user-label">当前用户</span>
-          <span class="sidebar-user-name">{{ currentUser.username || '加载中' }}</span>
-        </span>
-      </button>
       <nav>
         <RouterLink class="nav-item" to="/"><span class="nav-icon">📊</span> 数据看板</RouterLink>
         <RouterLink class="nav-item" to="/proxies"><span class="nav-icon">🔗</span> 代理列表</RouterLink>
         <RouterLink class="nav-item" to="/certificates"><span class="nav-icon">🔒</span> 证书列表</RouterLink>
         <div class="nav-group">
           <div class="nav-row">
-            <RouterLink class="nav-item nav-parent" to="/statistics"><span class="nav-icon">📈</span> 历史统计</RouterLink>
+            <RouterLink class="nav-item nav-parent" to="/statistics"><span class="nav-icon">🛰️</span> 流量统计</RouterLink>
             <button class="nav-toggle" type="button" :aria-expanded="statsOpen" @click="statsOpen = !statsOpen">{{ statsOpen ? '⌄' : '›' }}</button>
           </div>
           <div v-if="statsOpen" class="nav-children">
@@ -67,15 +28,52 @@
             </RouterLink>
           </div>
         </div>
-        <RouterLink class="nav-item" to="/traffic-statistics"><span class="nav-icon">🛰️</span> 流量统计</RouterLink>
         <RouterLink class="nav-item" to="/settings"><span class="nav-icon">⚙️</span> 系统配置</RouterLink>
       </nav>
       <div class="sidebar-footer">
         <span>{{ updatedAt || '加载中…' }}</span>
+        <button class="logout-btn" type="button" @click="sidebarCollapsed = !sidebarCollapsed">{{ sidebarCollapsed ? '展开菜单' : '收起菜单' }}</button>
         <button class="logout-btn" type="button" @click="logout">退出</button>
       </div>
     </aside>
     <div class="main-wrap">
+      <div class="top-tools">
+        <div class="tools-right">
+          <div v-if="warnings.length > 0" class="warn-anchor">
+            <button
+              class="warn-bell"
+              :class="{ open: warnOpen }"
+              :aria-label="`${warnings.length} 条告警`"
+              @click.stop="warnOpen = !warnOpen"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <span class="warn-badge">{{ warnings.length }}</span>
+            </button>
+            <Transition name="warn-drop">
+              <div v-if="warnOpen" class="warn-panel" @click.stop>
+                <div class="warn-panel-hd">
+                  <span class="warn-panel-title">系统告警</span>
+                  <span class="warn-count-chip">{{ warnings.length }}</span>
+                  <button class="warn-panel-close" @click="warnOpen = false">✕</button>
+                </div>
+                <ul class="warn-list">
+                  <li v-for="w in warnings" :key="w.key" class="warn-item">
+                    <span class="warn-item-dot" :class="warnCategory(w.key)"></span>
+                    <div class="warn-item-body">
+                      <span class="warn-item-msg">{{ w.message }}</span>
+                      <span class="warn-item-time">{{ fmtTime(w.created_at) }}</span>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            </Transition>
+          </div>
+          <button class="top-user" type="button" @click="openAccount(false)">
+            <span class="sidebar-user-avatar">{{ userInitial }}</span>
+            <span class="top-user-name">{{ currentUser.username || '加载中' }}</span>
+          </button>
+        </div>
+      </div>
       <button
         v-if="currentUser.is_initial_password"
         class="initial-password-banner"
@@ -109,6 +107,7 @@ const daily = ref([])
 const loading = ref(false)
 const updatedAt = ref('')
 const statsOpen = ref(false)
+const sidebarCollapsed = ref(false)
 const warnings = ref([])
 const warnOpen = ref(false)
 const accountOpen = ref(false)
@@ -229,13 +228,20 @@ onUnmounted(() => {
 
 <style scoped>
 /* ── warning anchor ── */
-.warn-anchor {
-  position: fixed;
-  top: 86px;
-  right: 22px;
-  z-index: 200;
+.top-tools {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 24px 0;
 }
-.warn-anchor.with-initial-banner { top: 138px; }
+.tools-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.warn-anchor {
+  position: relative;
+  z-index: 50;
+}
 
 .warn-bell {
   position: relative;
@@ -426,6 +432,27 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
+.top-user {
+  border: 1px solid #d7e1ed;
+  border-radius: 999px;
+  background: #fff;
+  color: #0f172a;
+  height: 40px;
+  padding: 0 12px 0 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.top-user-name {
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .sidebar-user {
   margin: 10px 8px 6px;
   padding: 10px;
@@ -473,6 +500,32 @@ onUnmounted(() => {
   white-space: nowrap;
   font-size: 13px;
   font-weight: 600;
+}
+
+.sidebar.collapsed .sidebar-logo {
+  font-size: 0;
+  justify-content: center;
+}
+.sidebar.collapsed .sidebar-logo .logo-icon {
+  margin-right: 0;
+}
+.sidebar.collapsed .nav-item {
+  font-size: 0;
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+.sidebar.collapsed .nav-item .nav-icon {
+  margin-right: 0;
+  font-size: 18px;
+}
+.sidebar.collapsed .nav-toggle,
+.sidebar.collapsed .nav-children,
+.sidebar.collapsed .sidebar-footer span {
+  display: none;
+}
+.sidebar.collapsed .sidebar-footer {
+  justify-content: center;
 }
 
 @media (max-width: 900px) {
@@ -546,12 +599,8 @@ onUnmounted(() => {
     font-size: 12px;
     gap: 8px;
   }
-  .warn-anchor {
-    top: 66px;
-    right: 12px;
-  }
-  .warn-anchor.with-initial-banner {
-    top: 116px;
+  .top-tools {
+    padding: 10px 12px 0;
   }
   .warn-panel {
     width: min(92vw, 360px);

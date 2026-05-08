@@ -487,11 +487,6 @@ onMounted(() => {
   min-width: 34px;
   padding: 0 8px;
 }
-.page-num.active {
-  color: #bfdbfe;
-  border-color: #1d4ed8;
-  background: #172554;
-}
 .quick-jump {
   display: inline-flex;
   align-items: center;
@@ -534,7 +529,7 @@ onMounted(() => {
   font-size: 12px;
 }
 .sort-idle { color: var(--text-2); }
-.sort-asc, .sort-desc { color: #60a5fa; font-weight: 700; }
+.sort-asc, .sort-desc { font-weight: 700; }
 .sort-asc::before { content: '↑'; }
 .sort-desc::before { content: '↓'; }
 .sort-asc, .sort-desc { font-size: 0; }
