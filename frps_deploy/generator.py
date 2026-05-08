@@ -45,6 +45,7 @@ server {
 
 server {
     listen 443 ssl default_server;
+    http2 on;
     server_name _;
     ssl_reject_handshake on;
 }
@@ -268,7 +269,8 @@ server {{
 }}
 
 server {{
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on;
     server_name {frps_domain};
 
     ssl_certificate /etc/letsencrypt/live/{frps_domain}/fullchain.pem;
@@ -307,7 +309,8 @@ server {{
 }}
 
 server {{
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on;
     server_name {status_host};
 
     ssl_certificate /etc/letsencrypt/live/{status_host}/fullchain.pem;
@@ -357,7 +360,8 @@ server {{
 }}
 
 server {{
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on;
     server_name {domain};
 
     ssl_certificate /etc/letsencrypt/live/{domain}/fullchain.pem;
