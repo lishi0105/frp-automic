@@ -1,6 +1,7 @@
 async function request(url, options = {}) {
   const r = await fetch(url, { cache: 'no-store', credentials: 'same-origin', ...options })
   if (r.status === 401 && !url.includes('/api/login') && location.hash !== '#/login') {
+    sessionStorage.removeItem('frps_status_logged_in')
     location.hash = '#/login'
   }
   if (!r.ok) throw new Error((await r.text()) || r.statusText)

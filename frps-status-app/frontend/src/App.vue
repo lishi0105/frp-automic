@@ -32,10 +32,17 @@
       </nav>
       <div class="sidebar-footer">
         <span>{{ updatedAt || '加载中…' }}</span>
-        <button class="logout-btn" type="button" @click="sidebarCollapsed = !sidebarCollapsed">{{ sidebarCollapsed ? '展开菜单' : '收起菜单' }}</button>
-        <button class="logout-btn" type="button" @click="logout">退出</button>
       </div>
     </aside>
+    <button
+      class="sidebar-collapse-btn"
+      type="button"
+      :aria-label="sidebarCollapsed ? '展开菜单' : '收起菜单'"
+      @click="sidebarCollapsed = !sidebarCollapsed"
+    >
+      <svg v-if="sidebarCollapsed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+    </button>
     <div class="main-wrap">
       <div class="top-tools">
         <div class="tools-right">
@@ -68,10 +75,19 @@
               </div>
             </Transition>
           </div>
-          <button class="top-user" type="button" @click="openAccount(false)">
+          <div class="user-anchor">
+          <button class="top-user" type="button" @click.stop="userMenuOpen = !userMenuOpen">
             <span class="sidebar-user-avatar">{{ userInitial }}</span>
             <span class="top-user-name">{{ currentUser.username || '加载中' }}</span>
+            <svg class="top-user-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
           </button>
+          <Transition name="warn-drop">
+            <div v-if="userMenuOpen" class="user-menu" @click.stop>
+              <button type="button" class="user-menu-item" @click="openAccount">账户设置</button>
+              <button type="button" class="user-menu-item danger" @click="logout">退出登录</button>
+            </div>
+          </Transition>
+          </div>
         </div>
       </div>
       <button
@@ -111,6 +127,7 @@ const sidebarCollapsed = ref(false)
 const warnings = ref([])
 const warnOpen = ref(false)
 const accountOpen = ref(false)
+const userMenuOpen = ref(false)
 const currentUser = ref({ username: '' })
 
 const isLogin = computed(() => route.path === '/login')
@@ -165,6 +182,7 @@ function fmtTime(iso) {
 
 function onDocClick() {
   if (warnOpen.value) warnOpen.value = false
+  if (userMenuOpen.value) userMenuOpen.value = false
 }
 
 async function load() {
@@ -191,6 +209,7 @@ async function loadUser() {
 }
 
 function openAccount() {
+  userMenuOpen.value = false
   accountOpen.value = true
 }
 
@@ -206,6 +225,7 @@ function handleAccountSaved(user) {
 
 async function logout() {
   await api.logout()
+  sessionStorage.removeItem('frps_status_logged_in')
   router.replace('/login')
 }
 
@@ -433,17 +453,18 @@ onUnmounted(() => {
 }
 
 .top-user {
-  border: 1px solid #d7e1ed;
-  border-radius: 999px;
-  background: #fff;
-  color: #0f172a;
-  height: 40px;
-  padding: 0 12px 0 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #334155;
+  height: 38px;
+  padding: 0 6px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
 }
+.top-user:hover { background: #eef4ff; color: #0f172a; }
 .top-user-name {
   max-width: 120px;
   white-space: nowrap;
@@ -452,6 +473,38 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 600;
 }
+.top-user-caret { color: #64748b; }
+
+.user-anchor {
+  position: relative;
+  z-index: 60;
+}
+.user-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 136px;
+  border: 1px solid #d9e5f6;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .12);
+  padding: 6px;
+  display: grid;
+  gap: 3px;
+}
+.user-menu-item {
+  border: 0;
+  background: transparent;
+  color: #334155;
+  height: 34px;
+  border-radius: 8px;
+  text-align: left;
+  padding: 0 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.user-menu-item:hover { background: #eff6ff; color: #0f172a; }
+.user-menu-item.danger:hover { background: #fff1f2; color: #be123c; }
 
 .sidebar-user {
   margin: 10px 8px 6px;
@@ -527,8 +580,35 @@ onUnmounted(() => {
 .sidebar.collapsed .sidebar-footer {
   justify-content: center;
 }
+.sidebar-collapse-btn {
+  position: fixed;
+  left: calc(var(--sw) - 14px);
+  top: 78px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid #d5e2f6;
+  background: #fff;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 80;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, .12);
+}
+.sidebar-collapse-btn:hover { color: #2563eb; border-color: #bfdbfe; }
+.layout.sidebar-collapsed .sidebar-collapse-btn { left: 58px; }
+.sidebar.collapsed { width: 72px; }
+.sidebar.collapsed .nav-item {
+  font-size: 0;
+  justify-content: center;
+  padding-left: 8px;
+  padding-right: 8px;
+}
 
 @media (max-width: 900px) {
+  .sidebar-collapse-btn { display: none; }
   .layout {
     flex-direction: column;
     height: auto;

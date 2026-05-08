@@ -24,6 +24,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   if (to.meta.public) return true
+  if (sessionStorage.getItem('frps_status_logged_in') !== '1') return '/login'
   try {
     const session = await api.getSession()
     return session.authenticated ? true : '/login'

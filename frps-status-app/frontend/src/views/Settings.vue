@@ -366,7 +366,7 @@ async function saveRetentionDays() {
 .summary-icon.out { color: #10b981; background: #dcfce7; }
 .summary-icon.total { color: #f59e0b; background: #fef3c7; }
 .summary-icon.smtp { color: #7c3aed; background: #ede9fe; }
-.summary-item b { display: block; font-size: 30px; color: #0f172a; line-height: 1.1; }
+.summary-item b { display: block; font-size: 24px; color: #0f172a; line-height: 1.15; }
 .summary-item small { color: #475569; font-size: 14px; }
 
 .feature-card {
@@ -387,8 +387,8 @@ async function saveRetentionDays() {
   font-size: 38px;
   background: linear-gradient(145deg, #3b82f6, #1d4ed8);
 }
-.feature-left h3 { margin: 0 0 6px; font-size: 40px; line-height: 1.05; color: #0f172a; }
-.feature-left p { margin: 0; color: #64748b; font-size: 19px; }
+.feature-left h3 { margin: 0 0 6px; font-size: 34px; line-height: 1.05; color: #0f172a; }
+.feature-left p { margin: 0; color: #64748b; font-size: 16px; }
 .feature-tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
 .feature-tags span { border: 1px solid #cfe0fb; color: #2563eb; background: #eff6ff; border-radius: 8px; font-size: 14px; padding: 3px 8px; }
 .btn-lg { min-width: 150px; height: 46px; font-size: 18px; }
@@ -406,10 +406,10 @@ async function saveRetentionDays() {
 }
 .db-main { border-right: 1px solid #ecf2fb; padding-right: 16px; }
 .db-side { display: grid; gap: 12px; }
-.db-item h4 { margin: 0; font-size: 27px; color: #0f172a; }
-.db-item p { margin: 8px 0 12px; color: #64748b; font-size: 18px; }
+.db-item h4 { margin: 0; font-size: 21px; color: #0f172a; }
+.db-item p { margin: 8px 0 12px; color: #64748b; font-size: 14px; }
 .purge-row { display: flex; align-items: center; gap: 8px; color: #334155; }
-.purge-row input { width: 58px; height: 34px; border: 1px solid #d5e2f6; border-radius: 8px; text-align: center; font-size: 16px; }
+.purge-row input { width: 58px; height: 34px; border: 1px solid #d5e2f6; border-radius: 8px; text-align: center; font-size: 14px; }
 .db-messages { grid-column: 1 / -1; display: grid; gap: 8px; }
 
 .btn-dark { border-color: #2563eb; background: #2563eb; color: #fff; }
@@ -425,9 +425,9 @@ async function saveRetentionDays() {
   .feature-card { flex-direction: column; align-items: flex-start; }
   .mail-right { width: 100%; justify-content: space-between; }
   .summary-item b { font-size: 24px; }
-  .feature-left h3 { font-size: 30px; }
+  .feature-left h3 { font-size: 24px; }
   .feature-left p { font-size: 16px; }
-  .db-item h4 { font-size: 22px; }
+  .db-item h4 { font-size: 18px; }
   .db-item p { font-size: 15px; }
 }
 </style>

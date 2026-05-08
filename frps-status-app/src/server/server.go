@@ -671,7 +671,6 @@ func (a *App) newSessionCookie() *http.Cookie {
 		Name:     "frps_status_session",
 		Value:    msg + "." + a.signSession(msg),
 		Path:     "/",
-		MaxAge:   12 * 60 * 60,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	}
