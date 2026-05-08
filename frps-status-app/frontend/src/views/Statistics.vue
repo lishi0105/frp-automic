@@ -21,8 +21,8 @@
         </div>
         <div class="analytics-overview-metrics">
           <div><b>{{ humanBytes(totalTraffic) }}</b><small>总流量</small></div>
-          <div><b>{{ humanBytes(totalIn) }}</b><small>上行</small></div>
-          <div><b>{{ humanBytes(totalOut) }}</b><small>下行</small></div>
+          <div><b>{{ humanBytes(totalIn) }}</b><small>入站</small></div>
+          <div><b>{{ humanBytes(totalOut) }}</b><small>出站</small></div>
         </div>
       </section>
 
@@ -53,8 +53,8 @@
           <div class="table-wrap stats-table-scroll">
             <table class="stats-detail-table">
               <thead>
-                <tr v-if="selectedProxyName"><th class="col-date">日期</th><th class="col-type">类型</th><th class="col-num">上行</th><th class="col-num">下行</th><th class="col-num">合计</th></tr>
-                <tr v-else><th class="col-date">日期</th><th class="col-count">代理数</th><th class="col-num">上行</th><th class="col-num">下行</th><th class="col-num">合计</th></tr>
+                <tr v-if="selectedProxyName"><th class="col-date">日期</th><th class="col-type">类型</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num">合计</th></tr>
+                <tr v-else><th class="col-date">日期</th><th class="col-count">代理数</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num">合计</th></tr>
               </thead>
               <tbody>
                 <tr v-if="!pagedRows.length"><td colspan="5" class="empty">暂无数据</td></tr>
@@ -208,7 +208,7 @@ function buildChart() {
         return `${d}<br/>${params.map(p => `${p.marker}${p.seriesName}: <b>${humanBytes(p.value)}</b>`).join('<br/>')}`
       }
     },
-    legend: { data: ['上行', '下行'], top: 0, left: 'center', textStyle: { color: '#334155', fontSize: 13 }, itemWidth: 22, itemHeight: 10 },
+    legend: { data: ['入站', '出站'], top: 0, left: 'center', textStyle: { color: '#334155', fontSize: 13 }, itemWidth: 22, itemHeight: 10 },
     grid: { left: 74, right: 22, top: 48, bottom: 42 },
     xAxis: {
       type: 'category',
@@ -226,8 +226,8 @@ function buildChart() {
       axisTick: { show: false }
     },
     series: [
-      { name: '上行', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => d.in), itemStyle: { color: '#1f7ae0' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(31,122,224,.08)' } },
-      { name: '下行', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => d.out), itemStyle: { color: '#12b76a' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(18,183,106,.15)' } }
+      { name: '入站', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => d.in), itemStyle: { color: '#1f7ae0' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(31,122,224,.08)' } },
+      { name: '出站', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => d.out), itemStyle: { color: '#12b76a' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(18,183,106,.15)' } }
     ]
   })
 }

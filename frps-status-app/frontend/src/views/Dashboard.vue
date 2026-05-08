@@ -23,6 +23,7 @@
             <div>
               <div class="service-status"><i class="status-dot" :class="bindOk ? 'ok' : 'bad'"></i>{{ bindOk ? '在线' : '离线' }}</div>
               <div class="summary-sub">{{ bindLatency }}ms · Dashboard {{ dashOk ? dashLatency + 'ms' : '离线' }}</div>
+              <div class="summary-sub">域名 {{ frpsDomain }}</div>
               <div class="summary-sub">公网IP {{ hostPublicIP || '-' }} · 网卡 {{ hostIface || '-' }}</div>
             </div>
           </div>
@@ -32,18 +33,18 @@
           <div class="summary-title">本月流量吞吐</div>
           <div class="traffic-bars">
             <div class="traffic-line">
-              <div class="traffic-label"><span>上行</span><b>{{ humanBytes(status?.month_totals?.in) }} ({{ inPct }}%)</b></div>
+              <div class="traffic-label"><span>入站</span><b>{{ humanBytesKB(ifaceMonthInKB) }} ({{ inPctText }})</b></div>
               <div class="thin-progress"><div class="blue" :style="{ width: inPct + '%' }"></div></div>
             </div>
             <div class="traffic-line">
-              <div class="traffic-label"><span>下行</span><b>{{ humanBytes(status?.month_totals?.out) }} ({{ outPct }}%)</b></div>
+              <div class="traffic-label"><span>出站</span><b>{{ humanBytesKB(ifaceMonthOutKB) }} ({{ outPctText }})</b></div>
               <div class="thin-progress"><div class="green" :style="{ width: outPct + '%' }"></div></div>
             </div>
           </div>
           <div class="iface-month-summary">
             <span>网卡汇总</span>
-            <b>{{ humanBytesKB(ifaceMonthInKB) }} ↑</b>
-            <b>{{ humanBytesKB(ifaceMonthOutKB) }} ↓</b>
+            <b>入站 {{ humanBytesKB(ifaceMonthInKB) }}</b>
+            <b>出站 {{ humanBytesKB(ifaceMonthOutKB) }}</b>
             <b>{{ humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }}</b>
           </div>
         </section>
@@ -84,7 +85,7 @@
             <table class="top5-table">
               <thead>
                 <tr>
-                  <th class="col-rank">排名</th><th class="col-name">代理名称</th><th class="col-num">上行</th><th class="col-num">下行</th><th class="col-num">总流量</th>
+                  <th class="col-rank">排名</th><th class="col-name">代理名称</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num">总流量</th>
                 </tr>
               </thead>
               <tbody>
@@ -206,10 +207,12 @@ const bindLatency = computed(() => props.status?.frps?.bind?.latency_ms ?? '-')
 const dashOk = computed(() => props.status?.frps?.dashboard?.ok ?? false)
 const dashLatency = computed(() => props.status?.frps?.dashboard?.latency_ms ?? '-')
 
-const alertInGB = computed(() => props.status?.settings?.alert_in_gb || 0)
-const alertOutGB = computed(() => props.status?.settings?.alert_out_gb || 0)
-const inPct = computed(() => percent(props.status?.month_totals?.in, alertInGB.value))
-const outPct = computed(() => percent(props.status?.month_totals?.out, alertOutGB.value))
+const limitInGB = computed(() => props.status?.settings?.limit_in_gb || 0)
+const limitOutGB = computed(() => props.status?.settings?.limit_out_gb || 0)
+const inPct = computed(() => percent(ifaceMonthInKB.value * 1024, limitInGB.value))
+const outPct = computed(() => percent(ifaceMonthOutKB.value * 1024, limitOutGB.value))
+const inPctText = computed(() => (limitInGB.value > 0 ? `${inPct.value}%` : '不限'))
+const outPctText = computed(() => (limitOutGB.value > 0 ? `${outPct.value}%` : '不限'))
 
 const proxies = computed(() => props.status?.proxies ?? [])
 const onlineProxies = computed(() => proxies.value.filter(p => p.online).length)
@@ -364,6 +367,11 @@ const certs = computed(() => {
   })
 })
 
+const frpsDomain = computed(() => {
+  const hit = certs.value.find(c => String(c?.domain || '').toLowerCase().startsWith('frps.'))
+  return hit?.domain || '-'
+})
+
 const certSummary = computed(() => props.status?.dashboard?.certificate || {
   total: certs.value.length,
   ok: certs.value.filter(c => c.ok && (c.days_left == null || c.days_left >= 15)).length,
@@ -398,8 +406,8 @@ function buildChart(daily) {
   const byDay = {}
   for (const r of monthRows) {
     byDay[r.day] ??= { in: 0, out: 0 }
-    byDay[r.day].in += Number(r.in)
-    byDay[r.day].out += Number(r.out)
+    byDay[r.day].in += Number(r.rx_kb || 0)
+    byDay[r.day].out += Number(r.tx_kb || 0)
   }
   const days = Object.keys(byDay).sort()
   chart.setOption({
@@ -408,10 +416,10 @@ function buildChart(daily) {
       trigger: 'axis',
       formatter: params => {
         const d = params[0]?.axisValue || ''
-        return `${d}<br/>${params.map(p => `${p.marker}${p.seriesName}: <b>${humanBytes(p.value)}</b>`).join('<br/>')}`
+        return `${d}<br/>${params.map(p => `${p.marker}${p.seriesName}: <b>${humanBytesKB(p.value)}</b>`).join('<br/>')}`
       }
     },
-    legend: { data: ['上行', '下行'], top: 0, left: 'center', textStyle: { color: '#334155', fontSize: 13 }, itemWidth: 22, itemHeight: 10 },
+    legend: { data: ['入站', '出站'], top: 0, left: 'center', textStyle: { color: '#334155', fontSize: 13 }, itemWidth: 22, itemHeight: 10 },
     grid: { left: 74, right: 22, top: 48, bottom: 42 },
     xAxis: {
       type: 'category',
@@ -423,14 +431,14 @@ function buildChart(daily) {
     },
     yAxis: {
       type: 'value',
-      axisLabel: { color: '#64748b', fontSize: 12, formatter: v => humanBytes(v) },
+      axisLabel: { color: '#64748b', fontSize: 12, formatter: v => humanBytesKB(v) },
       splitLine: { lineStyle: { color: '#dbe3ee', type: 'dashed' } },
       axisLine: { show: false },
       axisTick: { show: false }
     },
     series: [
-      { name: '上行', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => byDay[d].in), itemStyle: { color: '#1f7ae0' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(31,122,224,.08)' } },
-      { name: '下行', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => byDay[d].out), itemStyle: { color: '#12b76a' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(18,183,106,.15)' } }
+      { name: '入站', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => byDay[d].in), itemStyle: { color: '#1f7ae0' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(31,122,224,.08)' } },
+      { name: '出站', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => byDay[d].out), itemStyle: { color: '#12b76a' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(18,183,106,.15)' } }
     ]
   })
 }
@@ -460,9 +468,11 @@ async function loadIfaceMonthSummary() {
     }
     ifaceMonthInKB.value = inKB
     ifaceMonthOutKB.value = outKB
+    buildChart(rows)
   } catch {
     ifaceMonthInKB.value = 0
     ifaceMonthOutKB.value = 0
+    buildChart([])
   }
 }
 
@@ -477,7 +487,6 @@ async function loadHostNetwork() {
   }
 }
 
-watch(() => props.daily, (d) => buildChart(d))
 watch(() => props.status?.generated_at, () => {
   loadHostNetwork()
   loadIfaceMonthSummary()
@@ -487,7 +496,6 @@ const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => char
 onMounted(async () => {
   await nextTick()
   chart = echarts.init(chartEl.value)
-  if (props.daily?.length) buildChart(props.daily)
   loadHostNetwork()
   loadIfaceMonthSummary()
   ro?.observe(chartEl.value)

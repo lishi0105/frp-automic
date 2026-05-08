@@ -42,6 +42,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "server_port": 0,
         "token": "",
         "dashboard_http": False,
+        "enable_prometheus": True,
+    },
+    "frpc": {
+        "use_encryption": True,
+        "use_compression": True,
     },
     "status": {
         "enabled": True,

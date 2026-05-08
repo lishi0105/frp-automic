@@ -49,9 +49,12 @@ type ProxyTraffic struct {
 }
 
 type PublicSettings struct {
-	AlertInGB         float64 `json:"alert_in_gb"`
-	AlertOutGB        float64 `json:"alert_out_gb"`
-	AlertTotalGB      float64 `json:"alert_total_gb"`
+	ThresholdInGB     float64 `json:"threshold_in_gb"`
+	ThresholdOutGB    float64 `json:"threshold_out_gb"`
+	ThresholdTotalGB  float64 `json:"threshold_total_gb"`
+	LimitInGB         float64 `json:"limit_in_gb"`
+	LimitOutGB        float64 `json:"limit_out_gb"`
+	LimitTotalGB      float64 `json:"limit_total_gb"`
 	SMTPHost          string  `json:"smtp_host"`
 	SMTPPort          int     `json:"smtp_port"`
 	SMTPUser          string  `json:"smtp_user"`

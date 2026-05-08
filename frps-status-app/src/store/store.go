@@ -94,7 +94,20 @@ func (s *Store) InitDB() error {
 	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN last_seen_at TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_proxy_status_events_key_at ON proxy_status_events(key, at)`)
 	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_daily_iface_traffic_day ON daily_iface_traffic(day)`)
-	defaults := map[string]string{"alert_in_gb": "0", "alert_out_gb": "0", "alert_total_gb": "0", "smtp_port": "465", "smtp_enabled": "false", "alert_proxy_offline": "false", "alert_cert_expiry": "false", "alert_cert_days": "15", "smtp_verified": "false"}
+	defaults := map[string]string{
+		"threshold_in_gb":     "0",
+		"threshold_out_gb":    "0",
+		"threshold_total_gb":  "0",
+		"limit_in_gb":         "0",
+		"limit_out_gb":        "0",
+		"limit_total_gb":      "0",
+		"smtp_port":           "465",
+		"smtp_enabled":        "false",
+		"alert_proxy_offline": "false",
+		"alert_cert_expiry":   "false",
+		"alert_cert_days":     "15",
+		"smtp_verified":       "false",
+	}
 	for k, v := range defaults {
 		if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)`, k, v); err != nil {
 			return logStoreErr("init default setting "+k, err)
@@ -116,9 +129,12 @@ func (s *Store) SaveSetting(key, value string) error {
 
 func (s *Store) PublicSettings() (model.PublicSettings, error) {
 	return model.PublicSettings{
-		AlertInGB:         parseFloat(s.Setting("alert_in_gb")),
-		AlertOutGB:        parseFloat(s.Setting("alert_out_gb")),
-		AlertTotalGB:      parseFloat(s.Setting("alert_total_gb")),
+		ThresholdInGB:     parseFloat(s.Setting("threshold_in_gb")),
+		ThresholdOutGB:    parseFloat(s.Setting("threshold_out_gb")),
+		ThresholdTotalGB:  parseFloat(s.Setting("threshold_total_gb")),
+		LimitInGB:         parseFloat(s.Setting("limit_in_gb")),
+		LimitOutGB:        parseFloat(s.Setting("limit_out_gb")),
+		LimitTotalGB:      parseFloat(s.Setting("limit_total_gb")),
 		SMTPHost:          s.Setting("smtp_host"),
 		SMTPPort:          int(parseFloatDefault(s.Setting("smtp_port"), 465)),
 		SMTPUser:          s.Setting("smtp_user"),
@@ -371,6 +387,12 @@ func (s *Store) DailyInterfaceTraffic(fromDay, toDay string) ([]map[string]any, 
 		})
 	}
 	return out, nil
+}
+
+func (s *Store) MonthInterfaceTotals(month string) (uint64, uint64, error) {
+	var rxKB, txKB int64
+	err := s.db.QueryRow(`SELECT COALESCE(SUM(rx_kb),0), COALESCE(SUM(tx_kb),0) FROM daily_iface_traffic WHERE day LIKE ?`, month+"-%").Scan(&rxKB, &txKB)
+	return uint64(clampZero(rxKB)) * 1024, uint64(clampZero(txKB)) * 1024, logStoreErr("query month iface totals "+month, err)
 }
 
 func deltaCounter(old, current uint64) uint64 {

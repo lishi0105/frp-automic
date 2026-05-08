@@ -11,36 +11,53 @@
     <div class="page-body settings-page">
       <section class="analytics-overview">
         <div>
-          <div class="section-title">告警配置概览</div>
-          <div class="text-muted text-sm">月流量阈值、事件告警、SMTP 与数据库维护策略</div>
+          <div class="section-title">流量设置概览</div>
+          <div class="text-muted text-sm">流量阈值、流量限额、事件告警、SMTP 与数据库维护策略</div>
         </div>
         <div class="analytics-overview-metrics">
-          <div><b>{{ form.alert_in_gb || 0 }} GB</b><small>月上行阈值</small></div>
-          <div><b>{{ form.alert_out_gb || 0 }} GB</b><small>月下行阈值</small></div>
+          <div><b>{{ form.threshold_in_gb || 0 }} GB</b><small>月入站阈值</small></div>
+          <div><b>{{ form.threshold_out_gb || 0 }} GB</b><small>月出站阈值</small></div>
+          <div><b>{{ form.limit_total_gb || 0 }} GB</b><small>总量限额</small></div>
           <div><b>SMTP</b><small>{{ form.smtp_enabled === 'true' ? '已启用' : '未启用' }}</small></div>
         </div>
       </section>
 
       <div class="settings-grid">
         <section class="settings-card threshold-card">
-          <h3 class="settings-card-title">流量阈值设置</h3>
+          <h3 class="settings-card-title">流量设置</h3>
+          <div class="settings-subtitle">阈值设置</div>
           <div class="threshold-grid">
             <label class="threshold-item">
-              <span>月上行 (GB)</span>
-              <input v-model.number="form.alert_in_gb" type="number" min="0" step="0.1" />
+              <span>月入站 (GB)</span>
+              <input v-model.number="form.threshold_in_gb" type="number" min="0" step="0.1" />
             </label>
             <label class="threshold-item">
-              <span>月下行 (GB)</span>
-              <input v-model.number="form.alert_out_gb" type="number" min="0" step="0.1" />
+              <span>月出站 (GB)</span>
+              <input v-model.number="form.threshold_out_gb" type="number" min="0" step="0.1" />
             </label>
             <label class="threshold-item threshold-span">
-              <span>上下行总量 (GB)</span>
-              <input v-model.number="form.alert_total_gb" type="number" min="0" step="0.1" />
+              <span>网卡总量 (GB)</span>
+              <input v-model.number="form.threshold_total_gb" type="number" min="0" step="0.1" />
+            </label>
+          </div>
+          <div class="settings-subtitle">限额设置</div>
+          <div class="threshold-grid">
+            <label class="threshold-item">
+              <span>月入站限额 (GB)</span>
+              <input v-model.number="form.limit_in_gb" type="number" min="0" step="0.1" />
+            </label>
+            <label class="threshold-item">
+              <span>月出站限额 (GB)</span>
+              <input v-model.number="form.limit_out_gb" type="number" min="0" step="0.1" />
+            </label>
+            <label class="threshold-item threshold-span">
+              <span>网卡总量限额 (GB)</span>
+              <input v-model.number="form.limit_total_gb" type="number" min="0" step="0.1" />
             </label>
           </div>
           <div class="section-actions">
             <button class="btn btn-dark btn-sm" :disabled="savingThreshold" @click="saveThreshold">
-              {{ savingThreshold ? '保存中…' : '保存阈值' }}
+              {{ savingThreshold ? '保存中…' : '保存流量设置' }}
             </button>
             <div v-if="saveMsg" class="alert" :class="saveMsg.ok ? 'alert-success' : 'alert-error'">{{ saveMsg.text }}</div>
           </div>
@@ -83,7 +100,6 @@
             <span class="smtp-current">{{ smtpRecipientsPreview }}</span>
           </div>
           <div class="notify-foot">
-            <button class="btn btn-outline btn-sm" :disabled="testingEmail" @click="testEmail">{{ testingEmail ? '发送中…' : '测试邮件' }}</button>
             <button class="btn btn-dark btn-sm" @click="openSMTPModal">配置邮件</button>
           </div>
           <div v-if="smtpMsg" class="alert mt-3" :class="smtpMsg.ok ? 'alert-success' : 'alert-error'">{{ smtpMsg.text }}</div>
@@ -141,9 +157,12 @@ const form = reactive({
   smtp_from: '',
   smtp_to: '',
   smtp_enabled: 'false',
-  alert_in_gb: 0,
-  alert_out_gb: 0,
-  alert_total_gb: 0,
+  threshold_in_gb: 0,
+  threshold_out_gb: 0,
+  threshold_total_gb: 0,
+  limit_in_gb: 0,
+  limit_out_gb: 0,
+  limit_total_gb: 0,
   alert_proxy_offline: 'false',
   alert_cert_expiry: 'false',
   alert_cert_days: 15
@@ -185,9 +204,12 @@ function fillForm(s) {
   form.smtp_from = s.smtp_from || ''
   form.smtp_to = s.smtp_to || ''
   form.smtp_enabled = s.smtp_enabled ? 'true' : 'false'
-  form.alert_in_gb = s.alert_in_gb || 0
-  form.alert_out_gb = s.alert_out_gb || 0
-  form.alert_total_gb = s.alert_total_gb || 0
+  form.threshold_in_gb = s.threshold_in_gb || 0
+  form.threshold_out_gb = s.threshold_out_gb || 0
+  form.threshold_total_gb = s.threshold_total_gb || 0
+  form.limit_in_gb = s.limit_in_gb || 0
+  form.limit_out_gb = s.limit_out_gb || 0
+  form.limit_total_gb = s.limit_total_gb || 0
   form.smtp_auth_code = s.smtp_auth_code || ''
   form.alert_proxy_offline = s.alert_proxy_offline ? 'true' : 'false'
   form.alert_cert_expiry = s.alert_cert_expiry ? 'true' : 'false'
@@ -242,7 +264,7 @@ async function saveThreshold() {
     savedSettings.value = saved
     fillForm(saved)
     formInitialized.value = true
-    flash(saveMsg, true, '阈值已保存')
+    flash(saveMsg, true, '流量设置已保存')
   } catch (e) {
     flash(saveMsg, false, '保存失败：' + e.message)
   } finally {
@@ -344,6 +366,7 @@ async function doPurge() {
   box-shadow: var(--shadow);
 }
 .settings-card-title { font-size: 15px; font-weight: 700; margin-bottom: 10px; }
+.settings-subtitle { margin: 6px 0 10px; color: var(--text-2); font-size: 12px; font-weight: 600; }
 .threshold-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .threshold-item { display: grid; gap: 6px; }
 .threshold-item span { color: var(--text-2); font-size: 12px; }

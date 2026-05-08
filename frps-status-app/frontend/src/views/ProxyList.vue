@@ -56,8 +56,8 @@
                   <th class="col-type">类型</th>
                   <th class="col-status">状态</th>
                   <th class="col-num sortable" @click="toggleSort('conn')">连接 <span :class="sortClass('conn')">↕</span></th>
-                  <th class="col-num sortable" @click="toggleSort('in')">本月上行 <span :class="sortClass('in')">↕</span></th>
-                  <th class="col-num sortable" @click="toggleSort('out')">本月下行 <span :class="sortClass('out')">↕</span></th>
+                  <th class="col-num sortable" @click="toggleSort('in')">本月入站 <span :class="sortClass('in')">↕</span></th>
+                  <th class="col-num sortable" @click="toggleSort('out')">本月出站 <span :class="sortClass('out')">↕</span></th>
                   <th class="col-num sortable" @click="toggleSort('total')">总流量 <span :class="sortClass('total')">↕</span></th>
                   <th class="col-action">操作</th>
                 </tr>
@@ -123,8 +123,8 @@
             </div>
             <div class="detail-row"><span>当前连接</span><b>{{ selectedProxy.cur_conns }}</b></div>
             <div class="detail-pair">
-              <div class="detail-row"><span>上行</span><b>{{ humanBytes(selectedProxy.month_in) }}</b></div>
-              <div class="detail-row"><span>下行</span><b>{{ humanBytes(selectedProxy.month_out) }}</b></div>
+              <div class="detail-row"><span>入站</span><b>{{ humanBytes(selectedProxy.month_in) }}</b></div>
+              <div class="detail-row"><span>出站</span><b>{{ humanBytes(selectedProxy.month_out) }}</b></div>
             </div>
             <div class="detail-row"><span>总流量</span><b>{{ humanBytes(selectedProxy.month_in + selectedProxy.month_out) }}</b></div>
             <div class="detail-pair">
@@ -136,8 +136,8 @@
               <div class="out" :style="{ width: selectedTotal ? ((selectedProxy.month_out / selectedTotal) * 100).toFixed(1) + '%' : '0%' }"></div>
             </div>
             <div class="detail-legend">
-              <span><i class="dot in"></i>上行 {{ humanBytes(selectedProxy.month_in) }}</span>
-              <span><i class="dot out"></i>下行 {{ humanBytes(selectedProxy.month_out) }}</span>
+              <span><i class="dot in"></i>入站 {{ humanBytes(selectedProxy.month_in) }}</span>
+              <span><i class="dot out"></i>出站 {{ humanBytes(selectedProxy.month_out) }}</span>
             </div>
             <div class="detail-cert-title">证书状态</div>
             <div v-if="selectedCerts.length" class="detail-certs">

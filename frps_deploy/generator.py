@@ -56,6 +56,10 @@ def generate_frps_toml(ctx: DeployContext) -> None:
     lines = [
         'bindAddr = "0.0.0.0"',
         f"bindPort = {ctx.bind_port}",
+    ]
+    if config.FRPS_ENABLE_PROMETHEUS:
+        lines.append("enablePrometheus = true")
+    lines += [
         "",
         "[auth]",
         'method = "token"',
@@ -100,6 +104,10 @@ def generate_frpc_toml(ctx: DeployContext) -> None:
             f"localPort = {local_port(item)}",
             f"remotePort = {remote_port(item)}",
         ]
+        if config.FRPC_USE_ENCRYPTION:
+            lines.append("transport.useEncryption = true")
+        if config.FRPC_USE_COMPRESSION:
+            lines.append("transport.useCompression = true")
     FRPC_TOML_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
