@@ -5,7 +5,6 @@
         <div class="page-title">系统配置</div>
         <div class="page-sub">管理 FRPS 监控平台的全局参数与通知策略</div>
       </div>
-      <button class="btn btn-outline btn-sm" @click="$emit('refresh')">↻ 刷新</button>
     </div>
 
     <div class="sysset-main">
@@ -13,29 +12,38 @@
         <div class="summary-item">
           <div class="summary-icon in">↓</div>
           <div>
-            <b>{{ form.threshold_in_gb || 0 }} GB</b>
-            <small>月入站阈值</small>
+            <h3>入站策略</h3>
+            <div class="summary-metrics">
+              <span><small>阈值</small><b>{{ form.threshold_in_gb || 0 }} GB</b></span>
+              <span><small>限额</small><b>{{ form.limit_in_gb || 0 }} GB</b></span>
+            </div>
           </div>
         </div>
         <div class="summary-item">
           <div class="summary-icon out">↑</div>
           <div>
-            <b>{{ form.threshold_out_gb || 0 }} GB</b>
-            <small>月出站阈值</small>
+            <h3>出站策略</h3>
+            <div class="summary-metrics">
+              <span><small>阈值</small><b>{{ form.threshold_out_gb || 0 }} GB</b></span>
+              <span><small>限额</small><b>{{ form.limit_out_gb || 0 }} GB</b></span>
+            </div>
           </div>
         </div>
         <div class="summary-item">
           <div class="summary-icon total">◔</div>
           <div>
-            <b>{{ form.limit_total_gb || 0 }} GB</b>
-            <small>总流量限额</small>
+            <h3>总量策略</h3>
+            <div class="summary-metrics">
+              <span><small>阈值</small><b>{{ form.threshold_total_gb || 0 }} GB</b></span>
+              <span><small>限额</small><b>{{ form.limit_total_gb || 0 }} GB</b></span>
+            </div>
           </div>
         </div>
         <div class="summary-item">
           <div class="summary-icon smtp">✉</div>
           <div>
+            <h3>SMTP 状态</h3>
             <b>{{ smtpReady ? '已配置' : '未配置' }}</b>
-            <small>SMTP 状态</small>
           </div>
         </div>
       </section>
@@ -83,7 +91,7 @@
             </div>
           </div>
         </div>
-        <div class="db-side">
+        <div class="db-maintain">
           <div class="db-item">
             <h4>空间碎片整理（VACUUM）</h4>
             <p>释放数据库文件空间，减少碎片</p>
@@ -332,9 +340,9 @@ async function saveRetentionDays() {
 </script>
 
 <style scoped>
-.sysset-page { display: flex; flex-direction: column; gap: 12px; }
+.sysset-page { display: flex; flex-direction: column; gap: 0; }
 .sysset-header { min-height: auto; }
-.sysset-main { display: grid; gap: 14px; padding: 0 24px 24px; }
+.sysset-main { display: grid; gap: 16px; padding: 0 24px 24px; }
 .card-surface {
   background: #fff;
   border: 1px solid #d9e4f3;
@@ -342,20 +350,25 @@ async function saveRetentionDays() {
   box-shadow: 0 8px 28px rgba(15, 23, 42, .05);
 }
 .summary-card {
-  padding: 14px 16px;
+  min-height: 150px;
+  padding: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 0;
 }
 .summary-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 8px;
+  gap: 18px;
+  padding: 28px 30px;
+  min-width: 0;
+}
+.summary-item + .summary-item {
+  border-left: 1px solid #e2e8f0;
 }
 .summary-icon {
-  width: 48px;
-  height: 48px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -366,20 +379,38 @@ async function saveRetentionDays() {
 .summary-icon.out { color: #10b981; background: #dcfce7; }
 .summary-icon.total { color: #f59e0b; background: #fef3c7; }
 .summary-icon.smtp { color: #7c3aed; background: #ede9fe; }
-.summary-item b { display: block; font-size: var(--fs-metric); color: #0f172a; line-height: 1.15; }
-.summary-item small { color: #475569; font-size: var(--fs-caption); }
+.summary-item h3 {
+  margin: 0 0 16px;
+  font-size: var(--fs-section-title);
+  line-height: 1.2;
+  font-weight: var(--fw-title);
+  color: #0f172a;
+}
+.summary-metrics {
+  display: flex;
+  gap: 28px;
+  min-width: 0;
+}
+.summary-metrics span {
+  display: grid;
+  gap: 8px;
+  min-width: 62px;
+}
+.summary-item b { display: block; font-size: var(--fs-metric); color: #0f172a; line-height: 1.15; white-space: nowrap; }
+.summary-item small { color: #64748b; font-size: var(--fs-caption); }
 
 .feature-card {
-  padding: 16px 18px;
+  min-height: 132px;
+  padding: 22px 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 24px;
 }
-.feature-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.feature-left { display: flex; align-items: center; gap: 22px; min-width: 0; }
 .feature-logo {
-  width: 52px;
-  height: 52px;
+  width: 76px;
+  height: 76px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -387,11 +418,11 @@ async function saveRetentionDays() {
   font-size: var(--fs-icon);
   background: linear-gradient(145deg, #3b82f6, #1d4ed8);
 }
-.feature-left h3 { margin: 0 0 4px; font-size: var(--fs-section-title); line-height: 1.25; font-weight: var(--fw-section); color: #0f172a; }
+.feature-left h3 { margin: 0 0 6px; font-size: var(--fs-modal-title); line-height: 1.25; font-weight: var(--fw-title); color: #0f172a; }
 .feature-left p { margin: 0; color: #64748b; font-size: var(--fs-body); }
 .feature-tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
 .feature-tags span { border: 1px solid #cfe0fb; color: #2563eb; background: #eff6ff; border-radius: 6px; font-size: var(--fs-caption); padding: 3px 8px; }
-.btn-lg { min-width: 118px; height: 36px; font-size: var(--fs-body); }
+.btn-lg { min-width: 118px; height: 40px; font-size: var(--fs-body); }
 
 .mail-right { display: flex; align-items: center; gap: 16px; }
 .mail-status { color: #16a34a; font-size: var(--fs-body); display: inline-flex; align-items: center; gap: 8px; }
@@ -399,13 +430,29 @@ async function saveRetentionDays() {
 .mail-status.off { color: #ef4444; }
 
 .db-card {
-  padding: 16px 18px;
+  min-height: 178px;
+  padding: 0;
   display: grid;
-  grid-template-columns: 1.45fr 1fr;
-  gap: 16px;
+  grid-template-columns: 1.2fr .8fr 1fr;
+  gap: 0;
+  overflow: hidden;
 }
-.db-main { border-right: 1px solid #ecf2fb; padding-right: 16px; }
-.db-side { display: grid; gap: 12px; }
+.db-main {
+  display: flex;
+  align-items: center;
+  padding: 28px 32px;
+  border-right: 1px solid #e2e8f0;
+}
+.db-maintain {
+  display: contents;
+}
+.db-item {
+  padding: 28px 32px;
+  border-right: 1px solid #e2e8f0;
+}
+.db-item:last-child {
+  border-right: 0;
+}
 .db-item h4 { margin: 0; font-size: var(--fs-section-title); font-weight: var(--fw-section); color: #0f172a; }
 .db-item p { margin: 8px 0 12px; color: #64748b; font-size: var(--fs-body); }
 .purge-row { display: flex; align-items: center; gap: 8px; color: #334155; font-size: var(--fs-body); }
@@ -417,11 +464,27 @@ async function saveRetentionDays() {
 
 @media (max-width: 1200px) {
   .summary-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summary-item:nth-child(odd) { border-left: 0; }
+  .summary-item:nth-child(n + 3) { border-top: 1px solid #e2e8f0; }
   .db-card { grid-template-columns: 1fr; }
-  .db-main { border-right: 0; border-bottom: 1px solid #ecf2fb; padding-right: 0; padding-bottom: 12px; }
+  .db-main,
+  .db-item {
+    border-right: 0;
+    border-bottom: 1px solid #ecf2fb;
+  }
+  .db-item:last-child { border-bottom: 0; }
 }
 
 @media (max-width: 860px) {
+  .sysset-main { padding: 0 12px 12px; }
+  .summary-card { grid-template-columns: 1fr; }
+  .summary-item,
+  .summary-item:nth-child(n) {
+    border-left: 0;
+    border-top: 1px solid #e2e8f0;
+    padding: 18px;
+  }
+  .summary-item:first-child { border-top: 0; }
   .feature-card { flex-direction: column; align-items: flex-start; }
   .mail-right { width: 100%; justify-content: space-between; }
   .summary-item b { font-size: var(--fs-metric); }

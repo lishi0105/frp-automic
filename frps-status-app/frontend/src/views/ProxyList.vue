@@ -339,17 +339,17 @@ onMounted(() => {
   min-width: 74px;
 }
 .header-summary b {
-  font-size: 18px;
+  font-size: var(--fs-page-title-sm);
   line-height: 1;
 }
 .header-summary span {
   color: var(--text-2);
-  font-size: 12px;
+  font-size: var(--fs-caption);
   margin-left: 3px;
 }
 .header-summary small {
   color: var(--text-3);
-  font-size: 11px;
+  font-size: var(--fs-table-head);
   white-space: nowrap;
 }
 .proxy-table-wrap, .proxy-detail {
@@ -366,12 +366,12 @@ onMounted(() => {
 }
 .proxy-table-wrap .section-title,
 .proxy-detail .section-title {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--fs-section-title);
+  font-weight: var(--fw-section);
 }
 .proxy-table-wrap .text-muted,
 .proxy-detail .text-muted {
-  font-size: 12px;
+  font-size: var(--fs-caption);
 }
 .proxy-table-tools {
   display: flex;

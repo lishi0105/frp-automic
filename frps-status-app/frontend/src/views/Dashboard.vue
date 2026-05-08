@@ -526,17 +526,16 @@ onUnmounted(() => {
 }
 .dashboard-shell :deep(.page-header) {
   min-height: auto;
-  padding: 16px 24px 14px;
 }
 .dashboard-shell :deep(.page-title) {
-  font-size: 24px;
-  line-height: 1.2;
-  font-weight: 700;
+  font-size: var(--fs-page-title);
+  line-height: var(--lh-title);
+  font-weight: var(--fw-title);
 }
 .dashboard-shell :deep(.page-sub) {
   margin-top: 4px;
   color: #64748b;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 .page-actions {
   display: flex;

@@ -291,17 +291,17 @@ onMounted(() => {
   min-width: 74px;
 }
 .header-summary b {
-  font-size: 18px;
+  font-size: var(--fs-page-title-sm);
   line-height: 1;
 }
 .header-summary span {
   color: var(--text-2);
-  font-size: 12px;
+  font-size: var(--fs-caption);
   margin-left: 3px;
 }
 .header-summary small {
   color: var(--text-3);
-  font-size: 11px;
+  font-size: var(--fs-table-head);
   white-space: nowrap;
 }
 .cert-main-custom {

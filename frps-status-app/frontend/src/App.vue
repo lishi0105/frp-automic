@@ -39,7 +39,7 @@
         <span class="sidebar-time">{{ updatedAt || '加载中…' }}</span>
       </div>
     </aside>
-    <div class="main-wrap">
+    <div class="main-wrap" :class="{ 'has-initial-banner': currentUser.is_initial_password }">
       <div class="top-tools">
         <div class="tools-right">
           <div class="warn-anchor">
@@ -245,17 +245,23 @@ onUnmounted(() => {
 <style scoped>
 /* ── warning anchor ── */
 .top-tools {
+  position: absolute;
+  top: 14px;
+  right: 24px;
+  z-index: 90;
   display: flex;
   justify-content: flex-end;
-  min-height: 64px;
-  padding: 14px 24px 10px;
-  background: #fff;
-  border-bottom: 1px solid #e2e8f0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  pointer-events: none;
 }
+.main-wrap.has-initial-banner .top-tools { top: 82px; }
 .tools-right {
   display: flex;
   align-items: center;
   gap: 12px;
+  pointer-events: auto;
 }
 .warn-anchor {
   position: relative;
@@ -642,7 +648,16 @@ onUnmounted(() => {
     gap: 8px;
   }
   .top-tools {
+    position: static;
     padding: 10px 12px 0;
+    justify-content: flex-end;
+    pointer-events: auto;
+  }
+  .main-wrap.has-initial-banner .top-tools {
+    top: auto;
+  }
+  .tools-right {
+    pointer-events: auto;
   }
   .warn-panel {
     width: min(92vw, 360px);
