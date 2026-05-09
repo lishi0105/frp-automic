@@ -183,8 +183,6 @@ def build_context(root_domain: str, email: str, previous: dict | None = None) ->
         token=config.FRPS_TOKEN or (_previous_str(previous, "token") if can_reuse else "") or random_password(32),
         dashboard_user=_previous_str(previous, "dashboard_user") if can_reuse and _previous_str(previous, "dashboard_user") else "admin",
         dashboard_password=_previous_str(previous, "dashboard_password") if can_reuse and _previous_str(previous, "dashboard_password") else random_password(16),
-        status_user=config.STATUS_APP_USER,
-        status_password=config.STATUS_APP_PASSWORD,
         suffix=_previous_str(previous, "suffix") if can_reuse and _previous_str(previous, "suffix") else random_letters(16),
     )
 

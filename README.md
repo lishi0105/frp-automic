@@ -392,21 +392,19 @@ cp .env.example .env
 | `LISTEN`                  | `0.0.0.0:8080`                   | 容器内监听地址                                        |
 | `STATUS_APP_BIND`         | `127.0.0.1`                      | 映射到宿主机的绑定地址，设为 `0.0.0.0` 才允许公网直通 |
 | `STATUS_APP_PORT`         | `28080`                          | 映射到宿主机的 HTTP 端口                              |
-| `DB_PATH`                 | `/data/frps-status.sqlite`       | SQLite 数据库路径                                     |
 | `FRPS_HOST`               | `frps`                           | frps 所在主机                                         |
 | `FRPS_BIND_PORT`          | `7000`                           | frps 服务端口                                         |
 | `FRPS_DASHBOARD_PORT`     | `7500`                           | frps Dashboard 端口                                   |
 | `FRPS_DASHBOARD_USER`     | —                                | Dashboard 用户名                                      |
 | `FRPS_DASHBOARD_PASSWORD` | —                                | Dashboard 密码                                        |
 | `STATUS_DOMAINS`          | —                                | 逗号分隔的域名，用于证书检测                          |
-| `STATUS_USER`             | —                                | 面板登录用户名，留空则不鉴权                          |
-| `STATUS_PASSWORD`         | —                                | 面板登录密码                                          |
-| `CERT_DIR`                | `/etc/letsencrypt/live`          | 证书目录                                              |
 | `POLL_SECONDS`            | `60`                             | 数据轮询间隔，单位秒                                  |
 | `HOST_PUBLIC_IP`          | —                                | 宿主机公网 IPv4，部署脚本会自动写入                   |
 | `HOST_IFACE`              | —                                | 公网 IP 对应网卡名，部署脚本会自动写入                |
 | `HOST_NET_STATS_DIR`      | `/host-net-stats`                | 容器内网卡统计目录                                    |
 | `HOST_NET_STATS_MOUNT`    | `/sys/class/net/eth0/statistics` | 宿主机网卡统计挂载路径，手动部署时需按实际网卡调整    |
+
+状态面板固定路径：数据库 `/data/frps-status.sqlite`（`./data`）、业务配置 `/config/app-settings.yml`（`./config`）、运行日志 `/logs`（`./logs`），三者同级；不由环境变量指定数据库与配置文件路径。证书在容器内固定读取 `/etc/letsencrypt/live`，`frps-status-app/docker-compose.yml` 固定将宿主机 `../frps/certbot/conf` 挂载为 `/etc/letsencrypt`（勿改，以免与证书检测逻辑不一致）。面板 Web 初始登录名密码为 `admin` / `admin123`。
 
 ---
 

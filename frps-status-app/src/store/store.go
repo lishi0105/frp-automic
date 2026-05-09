@@ -7,8 +7,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"math"
-	"strconv"
 	"strings"
 	"time"
 
@@ -65,7 +63,7 @@ func New(db *sql.DB) *Store {
 func (s *Store) InitDB() error {
 	stmts := []string{
 		`PRAGMA journal_mode=WAL`,
-		`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS proxy_counters (name TEXT NOT NULL, type TEXT NOT NULL, last_in INTEGER NOT NULL, last_out INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(name,type))`,
 		`CREATE TABLE IF NOT EXISTS daily_traffic (day TEXT NOT NULL, proxy_name TEXT NOT NULL, proxy_type TEXT NOT NULL, in_bytes INTEGER NOT NULL DEFAULT 0, out_bytes INTEGER NOT NULL DEFAULT 0, peak_conns INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(day,proxy_name,proxy_type))`,
 		`CREATE TABLE IF NOT EXISTS alert_state (month TEXT NOT NULL, direction TEXT NOT NULL, sent_at TEXT NOT NULL, PRIMARY KEY(month,direction))`,
@@ -94,70 +92,29 @@ func (s *Store) InitDB() error {
 	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN last_seen_at TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_proxy_status_events_key_at ON proxy_status_events(key, at)`)
 	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_daily_iface_traffic_day ON daily_iface_traffic(day)`)
-	defaults := map[string]string{
-		"threshold_in_gb":        "0",
-		"threshold_out_gb":       "0",
-		"threshold_total_gb":     "0",
-		"limit_in_gb":            "0",
-		"limit_out_gb":           "0",
-		"limit_total_gb":         "0",
-		"initial_in_gb":          "0",
-		"initial_out_gb":         "0",
-		"smtp_port":              "465",
-		"smtp_enabled":           "false",
-		"alert_proxy_offline":    "false",
-		"alert_cert_expiry":      "false",
-		"alert_cert_days":        "15",
-		"smtp_verified":          "false",
-		"history_retention_days":             "60",
-		"disk_free_space_alert_threshold_mb": "0",
-	}
-	for k, v := range defaults {
-		if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)`, k, v); err != nil {
-			return logStoreErr("init default setting "+k, err)
+
+	const deployKey = "deploy_date"
+	var legacyDeploy string
+	if err := s.db.QueryRow(`SELECT value FROM settings WHERE key=?`, deployKey).Scan(&legacyDeploy); err == nil && strings.TrimSpace(legacyDeploy) != "" {
+		if _, err := s.db.Exec(`INSERT OR REPLACE INTO app_meta(key,value) VALUES(?,?)`, deployKey, strings.TrimSpace(legacyDeploy)); err != nil {
+			return logStoreErr("migrate deploy_date from legacy settings", err)
 		}
 	}
-	if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES('deploy_date',?)`, time.Now().Format("2006-01-02")); err != nil {
-		return logStoreErr("init deploy date setting", err)
+	if _, err := s.db.Exec(`INSERT OR IGNORE INTO app_meta(key,value) VALUES(?,?)`, deployKey, time.Now().Format("2006-01-02")); err != nil {
+		return logStoreErr("init deploy_date", err)
 	}
+	_, _ = s.db.Exec(`DROP TABLE IF EXISTS settings`)
 	return nil
 }
 
-func (s *Store) Setting(key string) string {
+// DeployDate 返回与数据库文件绑定的部署日期（YYYY-MM-DD），仅来自 app_meta。
+func (s *Store) DeployDate() string {
 	var v string
-	_ = s.db.QueryRow(`SELECT value FROM settings WHERE key=?`, key).Scan(&v)
-	return v
-}
-
-func (s *Store) SaveSetting(key, value string) error {
-	_, err := s.db.Exec(`INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
-	return logStoreErr("save setting "+key, err)
-}
-
-func (s *Store) PublicSettings() (model.PublicSettings, error) {
-	return model.PublicSettings{
-		ThresholdInGB:        parseFloat(s.Setting("threshold_in_gb")),
-		ThresholdOutGB:       parseFloat(s.Setting("threshold_out_gb")),
-		ThresholdTotalGB:     parseFloat(s.Setting("threshold_total_gb")),
-		LimitInGB:            parseFloat(s.Setting("limit_in_gb")),
-		LimitOutGB:           parseFloat(s.Setting("limit_out_gb")),
-		LimitTotalGB:         parseFloat(s.Setting("limit_total_gb")),
-		InitialInGB:          parseFloat(s.Setting("initial_in_gb")),
-		InitialOutGB:         parseFloat(s.Setting("initial_out_gb")),
-		DeployDate:                       s.Setting("deploy_date"),
-		HistoryRetentionDays:             int(parseFloatDefault(s.Setting("history_retention_days"), 60)),
-		DiskFreeSpaceAlertThresholdMB: parseDiskAlertThresholdMB(s.Setting("disk_free_space_alert_threshold_mb")),
-		SMTPHost:                         s.Setting("smtp_host"),
-		SMTPPort:             int(parseFloatDefault(s.Setting("smtp_port"), 465)),
-		SMTPUser:             s.Setting("smtp_user"),
-		SMTPFrom:             s.Setting("smtp_from"),
-		SMTPTo:               s.Setting("smtp_to"),
-		SMTPEnabled:          strings.EqualFold(s.Setting("smtp_enabled"), "true"),
-		SMTPAuthCode:         s.Setting("smtp_auth_code"),
-		AlertProxyOffline:    strings.EqualFold(s.Setting("alert_proxy_offline"), "true"),
-		AlertCertExpiry:      strings.EqualFold(s.Setting("alert_cert_expiry"), "true"),
-		AlertCertDays:        int(parseFloatDefault(s.Setting("alert_cert_days"), 15)),
-	}, nil
+	err := s.db.QueryRow(`SELECT value FROM app_meta WHERE key=?`, "deploy_date").Scan(&v)
+	if err != nil || strings.TrimSpace(v) == "" {
+		return ""
+	}
+	return strings.TrimSpace(v)
 }
 
 func (s *Store) RecordTraffic(proxies []model.ProxyTraffic) error {
@@ -478,31 +435,6 @@ func clampZero(v int64) int64 {
 		return 0
 	}
 	return v
-}
-
-func parseFloat(v string) float64 {
-	f, _ := strconv.ParseFloat(v, 64)
-	if math.IsNaN(f) || math.IsInf(f, 0) || f < 0 {
-		return 0
-	}
-	return f
-}
-
-func parseFloatDefault(v string, fallback float64) float64 {
-	f := parseFloat(v)
-	if f == 0 {
-		return fallback
-	}
-	return f
-}
-
-// parseDiskAlertThresholdMB 解析磁盘告警阈值（MB，非负整数，四舍五入；0 表示未配置）。
-func parseDiskAlertThresholdMB(v string) uint64 {
-	f := parseFloat(v)
-	if f <= 0 || math.IsNaN(f) || math.IsInf(f, 0) {
-		return 0
-	}
-	return uint64(f + 0.5)
 }
 
 type Warning struct {

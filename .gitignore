@@ -30,8 +30,10 @@ frps-status-app/.env.local
 # 设计稿
 frps-status-app/frontend/design
 
-# 数据目录
+# 数据 / 日志目录（compose 挂载生成）
 frps-status-app/data/
+frps-status-app/config/
+frps-status-app/logs/
 
 # Go 编译产物
 frps-status-app/frps-status

@@ -5,11 +5,11 @@ import (
 	"math"
 	"net/http"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"frps-status-app.local/status/src/config"
 	"frps-status-app.local/status/src/diskmon"
 	"frps-status-app.local/status/src/logger"
 	"frps-status-app.local/status/src/mail"
@@ -52,10 +52,10 @@ type diskAlertState struct {
 }
 
 func (a *App) effectiveLogDir() string {
-	if strings.TrimSpace(a.cfg.LogDir) != "" {
-		return strings.TrimSpace(a.cfg.LogDir)
+	if s := strings.TrimSpace(a.cfg.LogDir); s != "" {
+		return s
 	}
-	return filepath.Join(filepath.Dir(a.cfg.DBPath), "logs")
+	return config.LogDirFixed
 }
 
 func (a *App) checkDiskSpaceRoutine() {
@@ -73,21 +73,14 @@ func (a *App) checkDiskSpaceRoutine() {
 	logSize := diskmon.LogDirLogFilesSize(logDir)
 	dbSize := diskmon.SQLiteBundleSize(a.cfg.DBPath)
 
-	settings, err := a.store.PublicSettings()
-	if err != nil {
-		logger.Warn("磁盘空间检测读取系统设置失败，跳过本轮 错误=%v", err)
-		return
-	}
+	settings := a.appcfg.PublicSettings()
 
 	mb := settings.DiskFreeSpaceAlertThresholdMB
 	if mb == 0 {
 		mb = computeInitialThresholdMBFromFree(free)
-		if err := a.store.SaveSetting("disk_free_space_alert_threshold_mb", strconv.FormatUint(mb, 10)); err != nil {
-			logger.Warn("磁盘告警阈值首次计算后写入数据库失败 错误=%v", err)
-		} else {
-			logger.Info("磁盘告警阈值首次初始化：按当前分区剩余 20%% 折算并写入数据库（单位 MB，1MB=1024² 字节，且不低于 1MiB）数据目录=%s 当前剩余=%s 阈值=%d MB 约合=%s",
-				dataDir, mail.HumanBytes(free), mb, mail.HumanBytes(mb*bytesPerMiB))
-		}
+		a.appcfg.SetDiskFreeSpaceAlertThresholdMB(mb)
+		logger.Info("磁盘告警阈值首次初始化：按当前分区剩余 20%% 折算并写入进程内配置（单位 MB，1MB=1024² 字节，且不低于 1MiB）数据目录=%s 当前剩余=%s 阈值=%d MB 约合=%s",
+			dataDir, mail.HumanBytes(free), mb, mail.HumanBytes(mb*bytesPerMiB))
 	}
 	thresholdBytes := thresholdBytesFromMB(mb)
 
@@ -221,12 +214,11 @@ func (a *App) maybeSendDiskCriticalEmail(settings model.PublicSettings, subject,
 		logger.Warn("磁盘空间危急：未启用邮件告警开关，已跳过发送邮件（仍已写入后台告警）")
 		return
 	}
-	if a.store.Setting("smtp_verified") != "true" {
+	if !a.appcfg.SMTPVerified() {
 		logger.Warn("磁盘空间危急：SMTP 尚未通过测试邮件验证，已跳过发送邮件（仍已写入后台告警）")
 		return
 	}
-	authCode := a.store.Setting("smtp_auth_code")
-	if authCode == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
+	if settings.SMTPAuthCode == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
 		logger.Warn("磁盘空间危急：SMTP 配置不完整，已跳过发送邮件（仍已写入后台告警）")
 		return
 	}
@@ -236,7 +228,7 @@ func (a *App) maybeSendDiskCriticalEmail(settings model.PublicSettings, subject,
 		logger.Info("磁盘空间危急告警邮件已在冷却期内发送过，本次不再重复发信")
 		return
 	}
-	if err := mail.Send(settings, authCode, subject, body); err != nil {
+	if err := mail.Send(settings, settings.SMTPAuthCode, subject, body); err != nil {
 		logger.Error("磁盘空间危急告警邮件发送失败 错误=%v", err)
 		return
 	}
@@ -302,14 +294,7 @@ func (a *App) handleStorageCleanup(w http.ResponseWriter, r *http.Request) {
 		out["log_bytes_freed"] = freed
 	}
 
-	settings, err := a.store.PublicSettings()
-	if err != nil {
-		logger.Error("手动存储清理读取保留天数失败 错误=%v", err)
-		out["ok"] = false
-		out["purge_error"] = err.Error()
-		writeJSON(w, out)
-		return
-	}
+	settings := a.appcfg.PublicSettings()
 	days := settings.HistoryRetentionDays
 	if days < 1 {
 		days = 60
@@ -384,12 +369,7 @@ func (a *App) collectStorageDiskInfo() map[string]any {
 		"usage_percent": usagePct,
 	}
 
-	settings, err := a.store.PublicSettings()
-	if err != nil {
-		out["settings_error"] = err.Error()
-		out["ok"] = true
-		return out
-	}
+	settings := a.appcfg.PublicSettings()
 	mbSaved := settings.DiskFreeSpaceAlertThresholdMB
 	var thresholdBytes uint64
 	var effMB uint64

@@ -56,8 +56,7 @@ def print_result(ctx: DeployContext) -> None:
         else:
             print(f"  http://127.0.0.1:{ctx.status_port}  （仅本机）")
         print(f"  https://{status_domain(ctx.root_domain)}")
-        print(f"  用户名 = {ctx.status_user}")
-        print(f"  密码   = {ctx.status_password}")
+        print("  状态面板登录 = 初始用户名密码：admin / admin123")
 
     tunneled_tcp_services = [item for item in tcp_services() if needs_tunnel(item)]
     if tunneled_tcp_services:

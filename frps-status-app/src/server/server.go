@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"frps-status-app.local/status/src/appsettings"
 	"frps-status-app.local/status/src/config"
 	"frps-status-app.local/status/src/frps"
 	"frps-status-app.local/status/src/logger"
@@ -34,6 +35,7 @@ import (
 type App struct {
 	cfg              config.Config
 	store            *store.Store
+	appcfg           *appsettings.Manager
 	frps             *frps.Client
 	secret           []byte
 	mu               sync.RWMutex
@@ -44,12 +46,12 @@ type App struct {
 	storageOpsMu sync.Mutex
 }
 
-func New(cfg config.Config, st *store.Store, fc *frps.Client) *App {
+func New(cfg config.Config, st *store.Store, appcfg *appsettings.Manager, fc *frps.Client) *App {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
 		secret = []byte(cfg.StatusUser + ":" + cfg.StatusPassword + ":" + cfg.Listen)
 	}
-	return &App{cfg: cfg, store: st, frps: fc, secret: secret}
+	return &App{cfg: cfg, store: st, appcfg: appcfg, frps: fc, secret: secret}
 }
 
 func (a *App) Routes() http.Handler {
@@ -111,11 +113,7 @@ func (a *App) autoPurgeHistoryIfNeeded() {
 	if alreadyDone {
 		return
 	}
-	settings, err := a.store.PublicSettings()
-	if err != nil {
-		logger.Warn("自动清理读取设置失败: %v", err)
-		return
-	}
+	settings := a.appcfg.PublicSettings()
 	days := settings.HistoryRetentionDays
 	if days < 1 {
 		days = 60
@@ -146,7 +144,7 @@ func (a *App) Refresh(ctx context.Context) error {
 		proxies[i].MonthIn = in
 		proxies[i].MonthOut = out
 	}
-	settings, _ := a.store.PublicSettings()
+	settings := a.appcfg.PublicSettings()
 	a.collectInterfaceTraffic()
 	monthIn, monthOut, _ := a.store.MonthInterfaceTotals(month)
 	monthIn, monthOut = applyInitialTrafficToMonth(settings, month, monthIn, monthOut)
@@ -372,14 +370,13 @@ func (a *App) sendAlertOnce(month, direction, directionLabel string, current uin
 		logger.Info("流量告警已发送，跳过重复发送 月份=%s 方向=%s", month, direction)
 		return nil
 	}
-	authCode := a.store.Setting("smtp_auth_code")
-	if authCode == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
+	if settings.SMTPAuthCode == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
 		logger.Warn("跳过流量告警，SMTP 配置不完整 月份=%s 方向=%s", month, direction)
 		return nil
 	}
 	subject := fmt.Sprintf("FRPS 网卡%s流量告警 %s", directionLabel, month)
 	body := fmt.Sprintf("FRPS 本月网卡%s流量为 %s，阈值为 %.2f GB。", directionLabel, mail.HumanBytes(current), thresholdGB)
-	if err := mail.Send(settings, authCode, subject, body); err != nil {
+	if err := mail.Send(settings, settings.SMTPAuthCode, subject, body); err != nil {
 		logger.Error("发送流量告警邮件失败 月份=%s 方向=%s 错误=%v", month, direction, err)
 		return err
 	}
@@ -395,8 +392,7 @@ func (a *App) checkProxyAlerts(settings model.PublicSettings, proxies []model.Pr
 	if !settings.SMTPEnabled || !settings.AlertProxyOffline {
 		return
 	}
-	authCode := a.store.Setting("smtp_auth_code")
-	if authCode == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
+	if settings.SMTPAuthCode == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
 		return
 	}
 	for _, p := range proxies {
@@ -409,7 +405,7 @@ func (a *App) checkProxyAlerts(settings model.PublicSettings, proxies []model.Pr
 			if st.Active {
 				subject := fmt.Sprintf("FRPS 代理恢复通知 - %s", p.Name)
 				body := fmt.Sprintf("代理 %s（类型：%s）已恢复在线。", p.Name, p.Type)
-				if err := mail.Send(settings, authCode, subject, body); err != nil {
+				if err := mail.Send(settings, settings.SMTPAuthCode, subject, body); err != nil {
 					logger.Error("发送代理恢复通知邮件失败: %v", err)
 					continue
 				}
@@ -426,7 +422,7 @@ func (a *App) checkProxyAlerts(settings model.PublicSettings, proxies []model.Pr
 		}
 		subject := fmt.Sprintf("FRPS 代理离线告警 - %s", p.Name)
 		body := fmt.Sprintf("代理 %s（类型：%s）连续 %d 次轮询离线，离线时长约 %d 秒，请检查客户端连接状态。", p.Name, p.Type, p.Health.ConsecutiveOffline, p.Health.OfflineSeconds)
-		if err := mail.Send(settings, authCode, subject, body); err != nil {
+		if err := mail.Send(settings, settings.SMTPAuthCode, subject, body); err != nil {
 			logger.Error("发送代理离线告警邮件失败: %v", err)
 			continue
 		}
@@ -442,8 +438,7 @@ func (a *App) checkCertAlerts(settings model.PublicSettings, certs []model.CertS
 	if !settings.SMTPEnabled || !settings.AlertCertExpiry {
 		return
 	}
-	authCode := a.store.Setting("smtp_auth_code")
-	if authCode == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
+	if settings.SMTPAuthCode == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
 		return
 	}
 	threshold := settings.AlertCertDays
@@ -478,7 +473,7 @@ func (a *App) checkCertAlerts(settings model.PublicSettings, certs []model.CertS
 			}
 			subject := fmt.Sprintf("FRPS SSL证书异常告警 - %s", c.Domain)
 			body := certAlertMessage(c, threshold)
-			if err := mail.Send(settings, authCode, subject, body); err != nil {
+			if err := mail.Send(settings, settings.SMTPAuthCode, subject, body); err != nil {
 				logger.Error("发送证书告警邮件失败: %v", err)
 				_ = a.store.SaveEventState(st)
 				continue
@@ -493,7 +488,7 @@ func (a *App) checkCertAlerts(settings model.PublicSettings, certs []model.CertS
 		if st.Active {
 			subject := fmt.Sprintf("FRPS SSL证书恢复通知 - %s", c.Domain)
 			body := fmt.Sprintf("域名 %s 的证书检测已恢复正常。公网握手正常=%t，本地证书有效期=%s。", c.Domain, c.TLSOK, c.ExpiresAt)
-			if err := mail.Send(settings, authCode, subject, body); err != nil {
+			if err := mail.Send(settings, settings.SMTPAuthCode, subject, body); err != nil {
 				logger.Error("发送证书恢复通知邮件失败: %v", err)
 				_ = a.store.SaveEventState(st)
 				continue
@@ -862,9 +857,8 @@ func (a *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "邮箱不匹配，请联系管理员"})
 		return
 	}
-	settings, _ := a.store.PublicSettings()
-	authCode := a.store.Setting("smtp_auth_code")
-	if !settings.SMTPEnabled || settings.SMTPHost == "" || authCode == "" {
+	settings := a.appcfg.PublicSettings()
+	if !settings.SMTPEnabled || settings.SMTPHost == "" || settings.SMTPAuthCode == "" {
 		logger.Warn("忘记密码被拒绝：SMTP 配置不完整 用户名=%s", u.Username)
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "SMTP 未配置，无法发送重置邮件"})
 		return
@@ -888,7 +882,7 @@ func (a *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	subject := "FRPS状态监控 - 密码重置通知"
 	body := fmt.Sprintf("您的账户凭据已重置：\n\n用户名：%s\n密　码：%s\n\n请登录后及时修改密码。", u.Username, newPass)
-	if err := mail.SendTo(settings, authCode, email, subject, body); err != nil {
+	if err := mail.SendTo(settings, settings.SMTPAuthCode, email, subject, body); err != nil {
 		logger.Error("忘记密码时发送重置邮件失败 用户名=%s 错误=%v", u.Username, err)
 		writeJSONStatus(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "邮件发送失败：" + err.Error()})
 		return
@@ -1348,7 +1342,7 @@ func (a *App) handleDailyInterface(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	settings, _ := a.store.PublicSettings()
+	settings := a.appcfg.PublicSettings()
 	data = applyInitialTrafficToDailyRows(settings, data, fromDay, toDay)
 	writeJSON(w, data)
 }
@@ -1524,7 +1518,7 @@ func readInterfaceCounters(statsDir, iface string) (uint64, uint64, error) {
 func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		settings, _ := a.store.PublicSettings()
+		settings := a.appcfg.PublicSettings()
 		logger.Info("设置数据已读取 来源=%s", r.RemoteAddr)
 		writeJSON(w, settings)
 	case http.MethodPost:
@@ -1534,28 +1528,20 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		smtpKeys := map[string]bool{"smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true}
 		allowed := map[string]bool{"threshold_in_gb": true, "threshold_out_gb": true, "threshold_total_gb": true, "limit_in_gb": true, "limit_out_gb": true, "limit_total_gb": true, "initial_in_gb": true, "initial_out_gb": true, "history_retention_days": true, "disk_free_space_alert_threshold_mb": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true, "alert_proxy_offline": true, "alert_cert_expiry": true, "alert_cert_days": true}
-		smtpChanged := false
+		filtered := make(map[string]any)
 		for key, value := range in {
 			if !allowed[key] {
 				logger.Warn("忽略未知设置项 键=%s 来源=%s", key, r.RemoteAddr)
 				continue
 			}
-			if err := a.store.SaveSetting(key, fmt.Sprint(value)); err != nil {
-				logger.Error("保存设置失败 键=%s 错误=%v", key, err)
-				http.Error(w, err.Error(), 500)
-				return
-			}
-			if smtpKeys[key] {
-				smtpChanged = true
-			}
+			filtered[key] = value
 		}
+		smtpChanged := a.appcfg.ApplyPOST(filtered)
 		if smtpChanged {
-			_ = a.store.SaveSetting("smtp_verified", "false")
 			logger.Info("SMTP 配置已变更，验证状态已重置")
 		}
-		settings, _ := a.store.PublicSettings()
+		settings := a.appcfg.PublicSettings()
 		a.syncSMTPWarnings(settings)
 		logger.Info("设置已保存 项数=%d SMTP已变更=%t", len(in), smtpChanged)
 		writeJSON(w, settings)
@@ -1571,14 +1557,14 @@ func (a *App) handleTestEmail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	settings, _ := a.store.PublicSettings()
-	authCode := a.store.Setting("smtp_auth_code")
-	if err := mail.Send(settings, authCode, "FRPS状态监控 - 测试邮件", "这是一封来自 FRPS状态监控 的测试邮件，SMTP 配置正常。"); err != nil {
+	settings := a.appcfg.PublicSettings()
+	if err := mail.Send(settings, settings.SMTPAuthCode, "FRPS状态监控 - 测试邮件", "这是一封来自 FRPS状态监控 的测试邮件，SMTP 配置正常。"); err != nil {
 		logger.Error("测试邮件发送失败: %v", err)
 		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
-	_ = a.store.SaveSetting("smtp_verified", "true")
+	a.appcfg.SetSMTPVerified(true)
+	settings = a.appcfg.PublicSettings()
 	a.syncSMTPWarnings(settings)
 	logger.Info("测试邮件已发送 收件人=%s", settings.SMTPTo)
 	writeJSON(w, map[string]any{"ok": true})
@@ -1612,11 +1598,7 @@ func (a *App) handlePurge(w http.ResponseWriter, r *http.Request) {
 	if body.Days < 1 {
 		body.Days = 60
 	}
-	if err := a.store.SaveSetting("history_retention_days", strconv.Itoa(body.Days)); err != nil {
-		logger.Error("保存历史保留天数失败 保留天数=%d 错误=%v", body.Days, err)
-		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
-		return
-	}
+	a.appcfg.SetHistoryRetentionDays(body.Days)
 	deleted, err := a.store.Purge(body.Days)
 	if err != nil {
 		logger.Error("清理流量数据失败 保留天数=%d 错误=%v", body.Days, err)
@@ -1770,16 +1752,15 @@ func validateUsername(username string) error {
 // ── warning helpers ─────────────────────────────────────────────────────────
 
 func (a *App) InitWarnings() {
-	settings, _ := a.store.PublicSettings()
+	settings := a.appcfg.PublicSettings()
 	a.syncSMTPWarnings(settings)
 	a.syncRecoveryEmailWarning()
 }
 
 func (a *App) syncSMTPWarnings(settings model.PublicSettings) {
-	authCode := a.store.Setting("smtp_auth_code")
 	configured := settings.SMTPHost != "" && settings.SMTPFrom != "" &&
-		settings.SMTPTo != "" && authCode != ""
-	verified := a.store.Setting("smtp_verified") == "true"
+		settings.SMTPTo != "" && settings.SMTPAuthCode != ""
+	verified := a.appcfg.SMTPVerified()
 	if !configured {
 		_ = a.store.SetWarning("smtp_not_configured", "SMTP 邮件未配置，将无法收到任何告警通知")
 		_ = a.store.ClearWarning("smtp_not_verified")
