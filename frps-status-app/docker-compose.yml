@@ -2,6 +2,8 @@ services:
   frps-status:
     build:
       context: .
+      tags:
+        - lishi0105/frps-status:latest
     image: lishi0105/frps-status:v0.1
     container_name: frps_status
     restart: unless-stopped
