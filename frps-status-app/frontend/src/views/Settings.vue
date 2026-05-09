@@ -92,21 +92,15 @@
             </div>
           </div>
           <div class="storage-col">
-            <div class="storage-col-icon storage-col-icon-spark" aria-hidden="true"></div>
             <h4>数据清理</h4>
-            <p class="storage-col-desc">弹窗展示存储与进程占用，可发起存储清理或 VACUUM</p>
             <button type="button" class="btn btn-dark btn-sm storage-col-btn" @click="openStorageDetailModal">存储详情</button>
           </div>
           <div class="storage-col">
-            <div class="storage-col-icon storage-col-icon-sliders" aria-hidden="true"></div>
             <h4>存储空间设置</h4>
-            <p class="storage-col-desc">查看分区与日志、库占用，配置剩余空间告警阈值（MB）</p>
             <button type="button" class="btn btn-dark btn-sm storage-col-btn" @click="openStorageSettingsModal">打开设置</button>
           </div>
           <div class="storage-col storage-col-retain">
-            <div class="storage-col-icon storage-col-icon-cal" aria-hidden="true"></div>
             <h4>历史数据保留天数</h4>
-            <p class="storage-col-desc">设置保留天数，超期数据由后端自动清理</p>
             <div class="purge-row">
               <span>保留</span>
               <input v-model.number="purgeDays" type="number" min="1" max="365" />

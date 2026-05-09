@@ -71,7 +71,7 @@
         </section>
 
         <section class="summary-card storage-card">
-          <div class="summary-title">存储空间详情</div>
+          <div class="summary-title">存储空间</div>
           <div v-if="storageLoading" class="storage-loading">加载中…</div>
           <div v-else-if="storageError" class="storage-error">{{ storageError }}</div>
           <div v-else class="storage-body">
@@ -86,13 +86,6 @@
               <div class="summary-sub">分区 {{ humanBytes(storageTotalBytes) }}</div>
               <div class="summary-sub">已用 {{ humanBytes(storageUsedBytes) }}</div>
               <div class="summary-sub">可用 {{ humanBytes(storageFreeBytes) }}</div>
-              <div class="storage-legend">
-                <span><i class="storage-dot used"></i>已用 {{ storageUsedPct }}%</span>
-                <span><i class="storage-dot free"></i>可用 {{ storageFreePct }}%</span>
-              </div>
-              <div class="summary-sub storage-app-line">
-                进程 日志 <b>{{ fmtMB(storageApp?.log_mb) }}</b> MB · 数据 <b>{{ fmtMB(storageApp?.data_mb) }}</b> MB
-              </div>
             </div>
           </div>
         </section>
@@ -225,6 +218,7 @@ const logClearing = ref(false)
 let logTimer = null
 let chart = null
 let storageChart = null
+let storageChartEl = null
 
 const storagePartition = ref(null)
 const storageApp = ref(null)
@@ -573,6 +567,7 @@ watch(() => props.status?.generated_at, () => {
 })
 
 function buildStoragePie() {
+  ensureStorageChart()
   if (!storageChart) return
   const S = storagePartition.value
   if (!S?.ok || !S.partition) {
@@ -611,6 +606,19 @@ function buildStoragePie() {
   }, { notMerge: true })
 }
 
+function ensureStorageChart() {
+  const el = storagePieEl.value
+  if (!el) return
+  if (storageChart && storageChartEl === el) return
+  if (storageChart) {
+    if (storageChartEl) ro?.unobserve(storageChartEl)
+    storageChart.dispose()
+  }
+  storageChart = echarts.init(el)
+  storageChartEl = el
+  ro?.observe(el)
+}
+
 async function loadStorageInfo() {
   storageLoading.value = true
   storageError.value = ''
@@ -618,15 +626,15 @@ async function loadStorageInfo() {
     const [disk, app] = await Promise.all([api.getStorage(), api.getStorageAppUsage()])
     storagePartition.value = disk
     storageApp.value = app
-    await nextTick()
-    buildStoragePie()
   } catch (e) {
     storagePartition.value = null
     storageApp.value = null
     storageError.value = e.message || '存储信息加载失败'
-    buildStoragePie()
   } finally {
     storageLoading.value = false
+    await nextTick()
+    buildStoragePie()
+    storageChart?.resize()
   }
 }
 
@@ -640,14 +648,11 @@ const ro = typeof ResizeObserver !== 'undefined'
 onMounted(async () => {
   await nextTick()
   chart = echarts.init(chartEl.value)
-  if (storagePieEl.value) {
-    storageChart = echarts.init(storagePieEl.value)
-  }
+  ensureStorageChart()
   loadHostNetwork()
   loadIfaceMonthSummary()
   loadStorageInfo()
   ro?.observe(chartEl.value)
-  if (storagePieEl.value) ro?.observe(storagePieEl.value)
 })
 
 onUnmounted(() => {
@@ -656,6 +661,7 @@ onUnmounted(() => {
   chart?.dispose()
   storageChart?.dispose()
   storageChart = null
+  storageChartEl = null
 })
 </script>
 

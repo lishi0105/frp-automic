@@ -4,7 +4,6 @@
       <header class="sd-head">
         <div>
           <h3 id="sd-title">存储详情</h3>
-          <p class="sd-sub">GET /api/storage · GET /api/storage/app-usage</p>
         </div>
         <button class="sd-close" type="button" aria-label="关闭" @click="$emit('close')">×</button>
       </header>
@@ -19,20 +18,6 @@
 
           <h4 class="sd-sec">当前存储空间详情</h4>
           <div class="sd-panel sd-panel-muted">
-            <div class="sd-grid-paths">
-              <div>
-                <span class="sd-label">数据目录</span>
-                <span class="sd-mono">{{ storage?.data_dir || '—' }}</span>
-              </div>
-              <div>
-                <span class="sd-label">数据库路径</span>
-                <span class="sd-mono">{{ storage?.db_path || '—' }}</span>
-              </div>
-              <div>
-                <span class="sd-label">日志目录</span>
-                <span class="sd-mono">{{ storage?.log_dir || '—' }}</span>
-              </div>
-            </div>
             <div v-if="part" class="sd-disk">
               <span class="sd-label">剩余 / 总量 / 已用</span>
               <div class="sd-disk-row">
@@ -54,15 +39,15 @@
           <div class="sd-panel">
             <div class="sd-metrics-row">
               <div>
-                <span class="sd-label">log_mb</span>
+                <span class="sd-label">日志</span>
                 <span class="sd-metric">{{ fmtMb(usage?.log_mb) }}</span>
               </div>
               <div>
-                <span class="sd-label">data_mb</span>
+                <span class="sd-label">数据</span>
                 <span class="sd-metric">{{ fmtMb(usage?.data_mb) }}</span>
               </div>
               <div>
-                <span class="sd-label">total_mb</span>
+                <span class="sd-label">总计</span>
                 <span class="sd-metric">{{ fmtMb(usage?.total_mb) }}</span>
               </div>
             </div>
@@ -70,11 +55,8 @@
 
           <h4 class="sd-sec">存储清理</h4>
           <p class="sd-desc">
-            删除非当日日志、按保留天数清理流量历史并执行 VACUUM。与定时自动清理共用 storageOpsMu，请勿并发操作。
+            删除非当日日志、按保留天数清理流量历史并执行 VACUUM。
           </p>
-          <div class="sd-tip">
-            POST /api/storage/cleanup — 执行中请耐心等待，完成后会提示结果。
-          </div>
         </template>
       </div>
 

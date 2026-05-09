@@ -4,7 +4,6 @@
       <header class="ss-head">
         <div>
           <h3 id="ss-title">存储设置</h3>
-          <p class="ss-sub">GET /api/storage · 阈值单位 MB</p>
         </div>
         <button class="ss-close" type="button" aria-label="关闭" @click="$emit('close')">×</button>
       </header>
@@ -16,20 +15,6 @@
 
           <h4 class="ss-sec">当前存储</h4>
           <div class="ss-panel ss-panel-muted">
-            <div class="ss-grid-paths">
-              <div>
-                <span class="ss-label">数据目录</span>
-                <span class="ss-mono">{{ storage?.data_dir || '—' }}</span>
-              </div>
-              <div>
-                <span class="ss-label">数据库文件</span>
-                <span class="ss-mono">{{ storage?.db_path || '—' }}</span>
-              </div>
-              <div>
-                <span class="ss-label">日志目录</span>
-                <span class="ss-mono">{{ storage?.log_dir || '—' }}</span>
-              </div>
-            </div>
             <div v-if="part" class="ss-disk">
               <div class="ss-disk-cols">
                 <div>
@@ -54,12 +39,12 @@
 
           <div class="ss-panel ss-row-metrics">
             <div>
-              <span class="ss-label">SQLite 库</span>
-              <span class="ss-metric-sm">{{ fmtMb(usage?.data_mb) }} MB</span>
+              <span class="ss-label">日志</span>
+              <span class="ss-metric-sm">{{ fmtMb(usage?.log_mb) }} MB</span>
             </div>
             <div>
-              <span class="ss-label">日志合计</span>
-              <span class="ss-metric-sm">{{ fmtMb(usage?.log_mb) }} MB</span>
+              <span class="ss-label">数据</span>
+              <span class="ss-metric-sm">{{ fmtMb(usage?.data_mb) }} MB</span>
             </div>
             <div class="ss-status">
               <span class="ss-label">监控状态</span>
@@ -69,7 +54,7 @@
 
           <h4 class="ss-sec">磁盘空闲告警阈值</h4>
           <p class="ss-desc">
-            当分区可用空间低于该阈值（MB，1 MB = 1024×1024 字节）时触发应急清理；写入值与系统配置 disk_free_space_alert_threshold_mb 一致。填 0 表示由服务端按分区剩余约 20% 自动折算并持久化。
+            当分区可用空间低于该阈值（MB，1 MB = 1024×1024 字节）时触发应急清理;填 0 表示由服务端按分区剩余约 20% 自动折算并持久化。
           </p>
           <div class="ss-input-row">
             <input
@@ -81,7 +66,6 @@
             />
             <span class="ss-unit">MB</span>
           </div>
-          <p class="ss-hint">* 与后端 PollLoop 内磁盘检测使用同一配置项。</p>
         </template>
       </div>
 
