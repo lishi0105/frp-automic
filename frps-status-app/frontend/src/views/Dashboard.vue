@@ -25,8 +25,7 @@
             <div>
               <div class="service-status"><i class="status-dot" :class="bindOk ? 'ok' : 'bad'"></i>{{ bindOk ? '在线' : '离线' }}</div>
               <div class="service-tags">
-                <span class="service-chip">连接 {{ bindLatency }}ms</span>
-                <span class="service-chip">Dashboard {{ dashOk ? dashLatency + 'ms' : '离线' }}</span>
+                <span class="service-chip">连接 {{ bindLatency }}ms.面板 {{ dashOk ? dashLatency + 'ms' : '离线' }}</span>
                 <span class="service-chip service-domain" :title="frpsDomain">{{ frpsDomain }}</span>
               </div>
               <div class="service-uptime"><small>已运行</small><b>{{ runDays }}</b><span>天</span></div>

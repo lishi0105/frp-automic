@@ -1,9 +1,9 @@
 <template>
-  <div>
+  <div class="proxy-stats-shell">
     <div class="page-header">
       <div>
         <div class="page-title">代理统计详情</div>
-        <div class="page-sub">当前代理：{{ proxyName }}</div>
+        <div class="page-sub">当前代理：{{ proxyName }} · {{ proxyType || '-' }} · {{ proxyOnline ? '在线' : '离线' }}</div>
       </div>
       <div class="flex-center">
         <button class="btn btn-outline btn-sm icon-btn" title="返回总览" aria-label="返回总览" @click="router.push('/statistics')">←</button>
@@ -13,11 +13,11 @@
       </div>
     </div>
 
-    <div class="page-body analytics-page">
+    <div class="page-body analytics-page proxy-stats-page">
       <section class="analytics-overview">
         <div>
-          <div class="section-title">{{ proxyName }}</div>
-          <div class="text-muted text-sm">{{ proxyType || '-' }} · {{ proxyOnline ? '在线' : '离线' }}</div>
+          <div class="section-title">所选时间范围</div>
+          <div class="text-muted text-sm">{{ startDate || minDay || '-' }} 至 {{ endDate || maxDay || '-' }} · {{ proxyName }}</div>
         </div>
         <div class="analytics-overview-metrics">
           <div><b>{{ humanBytes(totalTraffic) }}</b><small>总流量</small></div>
@@ -28,8 +28,14 @@
 
       <section class="analytics-filters">
         <div class="analytics-filter-grid proxy-filter-grid">
-          <input class="form-input" type="date" v-model="startDate" />
-          <input class="form-input" type="date" v-model="endDate" />
+          <label class="date-filter-field">
+            <span>开始日期</span>
+            <input class="form-input" type="date" v-model="startDate" />
+          </label>
+          <label class="date-filter-field">
+            <span>结束日期</span>
+            <input class="form-input" type="date" v-model="endDate" />
+          </label>
           <button class="btn btn-outline btn-sm" @click="quickRange(60)">最近60天</button>
           <button class="btn btn-outline btn-sm" @click="resetFilter">重置</button>
         </div>
@@ -89,6 +95,8 @@ const proxyRows = computed(() => allRows.value.filter(r => r.name === proxyName.
 const proxyInfo = computed(() => (props.status?.proxies ?? []).find(p => p.name === proxyName.value) || null)
 const proxyType = computed(() => proxyInfo.value?.type || proxyRows.value[0]?.type || '')
 const proxyOnline = computed(() => proxyInfo.value?.online ?? false)
+const minDay = computed(() => proxyRows.value.length ? [...proxyRows.value].sort((a, b) => a.day.localeCompare(b.day))[0].day : '')
+const maxDay = computed(() => proxyRows.value.length ? [...proxyRows.value].sort((a, b) => b.day.localeCompare(a.day))[0].day : '')
 
 const startDate = ref('')
 const endDate = ref('')
@@ -180,8 +188,32 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.proxy-stats-shell {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.proxy-stats-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
 .proxy-filter-grid { grid-template-columns: repeat(4, minmax(0, auto)); }
+.date-filter-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.date-filter-field span {
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+}
 .proxy-main {
+  flex: 1;
   grid-template-columns: 3fr 2fr;
   grid-template-rows: 1fr;
   min-height: 0;
@@ -239,6 +271,11 @@ onUnmounted(() => {
   padding-top: 10px;
 }
 @media (max-width: 1200px) {
+  .proxy-stats-page {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+  }
   .proxy-main {
     grid-template-columns: 1fr;
     overflow: visible;
