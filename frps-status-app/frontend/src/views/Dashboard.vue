@@ -3,7 +3,10 @@
     <div class="page-header">
       <div>
         <div class="page-title">数据看板</div>
-        <div class="page-sub">{{ updatedAt ? '最后更新：' + updatedAt : '加载中…' }}</div>
+        <div class="page-sub">
+          <span>公网IP {{ hostPublicIP || '-' }} · 网卡 {{ hostIface || '-' }}</span>
+          <span>{{ updatedAt ? '最后更新：' + updatedAt : '加载中…' }}</span>
+        </div>
       </div>
       <div class="page-actions">
         <button class="btn btn-outline btn-sm icon-btn" title="日志" aria-label="日志" @click="openLogModal"><span class="btn-doc-icon" aria-hidden="true"></span></button>
@@ -22,10 +25,12 @@
             <div class="summary-icon server-icon" aria-hidden="true"><span></span><span></span><span></span></div>
             <div>
               <div class="service-status"><i class="status-dot" :class="bindOk ? 'ok' : 'bad'"></i>{{ bindOk ? '在线' : '离线' }}</div>
-              <div class="summary-sub">{{ bindLatency }}ms · Dashboard {{ dashOk ? dashLatency + 'ms' : '离线' }}</div>
-              <div class="summary-sub">域名 {{ frpsDomain }}</div>
-              <div class="summary-sub">已运行 {{ runDays }} 天</div>
-              <div class="summary-sub">公网IP {{ hostPublicIP || '-' }} · 网卡 {{ hostIface || '-' }}</div>
+              <div class="service-metrics">
+                <span><small>连接</small><b>{{ bindLatency }}ms</b></span>
+                <span><small>Dashboard</small><b>{{ dashOk ? dashLatency + 'ms' : '离线' }}</b></span>
+              </div>
+              <div class="service-domain" :title="frpsDomain">{{ frpsDomain }}</div>
+              <div class="service-uptime"><small>已运行</small><b>{{ runDays }}</b><span>天</span></div>
             </div>
           </div>
         </section>
@@ -33,15 +38,15 @@
         <section class="summary-card throughput-card">
           <div class="summary-title">本月流量吞吐</div>
           <div class="traffic-bars">
-            <div class="traffic-line">
+            <div class="traffic-line traffic-half">
               <div class="traffic-label"><span>入站</span><b>{{ humanBytesKB(ifaceMonthInKB) }} ({{ inPctText }})</b></div>
               <div class="thin-progress"><div class="blue" :style="{ width: inPct + '%' }"></div></div>
             </div>
-            <div class="traffic-line">
+            <div class="traffic-line traffic-half">
               <div class="traffic-label"><span>出站</span><b>{{ humanBytesKB(ifaceMonthOutKB) }} ({{ outPctText }})</b></div>
               <div class="thin-progress"><div class="green" :style="{ width: outPct + '%' }"></div></div>
             </div>
-            <div class="traffic-line">
+            <div class="traffic-line traffic-total">
               <div class="traffic-label"><span>总量</span><b>{{ humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }} ({{ totalPctText }})</b></div>
               <div class="thin-progress"><div class="green" :style="{ width: totalPct + '%' }"></div></div>
             </div>
@@ -690,6 +695,10 @@ onUnmounted(() => {
   font-weight: var(--fw-title);
 }
 .dashboard-shell :deep(.page-sub) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  align-items: center;
   margin-top: 4px;
   color: #64748b;
   font-size: var(--fs-body);
@@ -873,6 +882,9 @@ onUnmounted(() => {
   gap: 14px;
   margin-top: 12px;
 }
+.service-body > div:last-child {
+  min-width: 0;
+}
 .server-icon {
   display: grid;
   place-content: center;
@@ -900,10 +912,73 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   font-size: 14px;
   font-weight: 800;
   color: #0f172a;
+}
+.service-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 7px;
+}
+.service-metrics span {
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid #dbeafe;
+  border-radius: 7px;
+  background: #f8fbff;
+}
+.service-metrics small,
+.service-uptime small {
+  display: block;
+  margin-bottom: 2px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 650;
+}
+.service-metrics b {
+  display: block;
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.service-domain {
+  max-width: 100%;
+  width: fit-content;
+  margin-bottom: 7px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: #eef2f7;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.service-uptime {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  color: #475569;
+  font-size: 11px;
+}
+.service-uptime small {
+  display: inline;
+  margin: 0;
+}
+.service-uptime b {
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 850;
+  line-height: 1;
 }
 .status-dot {
   width: 10px;
@@ -915,6 +990,7 @@ onUnmounted(() => {
 .status-dot.bad { background: #ef4444; }
 .traffic-bars {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 10px;
 }
@@ -936,16 +1012,23 @@ onUnmounted(() => {
 .traffic-line {
   display: grid;
   gap: 8px;
+  min-width: 0;
+}
+.traffic-total {
+  grid-column: 1 / -1;
 }
 .traffic-label {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
+  gap: 4px 8px;
+  justify-content: space-between;
   color: #0f172a;
   font-size: 12px;
 }
 .traffic-label b {
   font-weight: 500;
+  white-space: nowrap;
 }
 .thin-progress,
 .wide-progress {
