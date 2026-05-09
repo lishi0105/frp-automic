@@ -18,7 +18,7 @@ import (
 var defaultAppSettingsYAML []byte
 
 // AppSettingsYAMLPath 为应用层可调参数的唯一配置文件路径（固定，不由环境变量指定）。
-const AppSettingsYAMLPath = "/config/app-settings.yml"
+const AppSettingsYAMLPath = "/config/app-settings.yaml"
 
 // LoadAppSettings 从 AppSettingsYAMLPath 读取 YAML 并合并到 Manager。
 //

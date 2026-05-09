@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from frps_deploy import config
-from frps_deploy.console import print
+from frps_deploy.console import COLOR_YELLOW, print
 from frps_deploy.constants import (
     BASE_DIR, COMPOSE_FILE, FRPC_BASE_DIR, FRPC_COMPOSE_FILE, FRPC_TOML_FILE,
     FRPS_TOML_FILE, GENERATED_INFO_FILE, NGINX_CONF_DIR,
@@ -42,7 +42,8 @@ def print_result(ctx: DeployContext) -> None:
         else:
             print(f"  http://127.0.0.1:{ctx.status_port}  （仅本机）")
         print(f"  https://{status_domain(ctx.root_domain)}")
-        print("  状态面板登录 = 初始用户名密码：admin / admin123")
+        print(f"  初始用户名 = admin", color=COLOR_YELLOW)
+        print(f"  初始密码   = admin123", color=COLOR_YELLOW)
 
     tunneled_tcp_services = [item for item in tcp_services() if needs_tunnel(item)]
     if tunneled_tcp_services:
@@ -59,8 +60,8 @@ def print_result(ctx: DeployContext) -> None:
     else:
         print(f"  仅 VPS 本机访问：http://127.0.0.1:{ctx.dashboard_port}")
     print(f"  https://{dashboard_domain(ctx.root_domain)}")
-    print(f"  用户名 = {ctx.dashboard_user}")
-    print(f"  密码   = {ctx.dashboard_password}")
+    print(f"  用户名 = {ctx.dashboard_user}", color=COLOR_YELLOW)
+    print(f"  密码   = {ctx.dashboard_password}", color=COLOR_YELLOW)
     print("\n常用命令（终端中需原样输入，含英文子命令）：")
     print(f"  cd {BASE_DIR}")
     print("  docker compose ps")
@@ -68,8 +69,6 @@ def print_result(ctx: DeployContext) -> None:
     print("  docker compose logs -f nginx")
     print("  docker compose logs -f certbot")
     print("  docker compose restart nginx")
-    print(f"  cd {FRPC_BASE_DIR}")
-    print("  docker compose up -d")
     if config.STATUS_APP_ENABLED:
         print("  docker compose logs -f frps-status")
     print_frpc_config(ctx)

@@ -404,7 +404,7 @@ cp .env.example .env
 | `HOST_NET_STATS_DIR`      | `/host-net-stats`                | 容器内网卡统计目录                                    |
 | `HOST_NET_STATS_MOUNT`    | `/sys/class/net/eth0/statistics` | 宿主机网卡统计挂载路径，手动部署时需按实际网卡调整    |
 
-状态面板固定路径：数据库 `/data/frps-status.sqlite`（`./data`）、业务配置 `/config/app-settings.yml`（`./config`）、运行日志 `/logs`（`./logs`），三者同级；不由环境变量指定数据库与配置文件路径。证书在容器内固定读取 `/etc/letsencrypt/live`，`frps-status-app/docker-compose.yml` 固定将宿主机 `../frps/certbot/conf` 挂载为 `/etc/letsencrypt`（勿改，以免与证书检测逻辑不一致）。面板 Web 初始登录名密码为 `admin` / `admin123`。
+状态面板固定路径：数据库 `/data/frps-status.sqlite`（`./data`）、业务配置 `/config/app-settings.yaml`（`./config`）、运行日志 `/logs`（`./logs`），三者同级；不由环境变量指定数据库与配置文件路径。证书在容器内固定读取 `/etc/letsencrypt/live`，`frps-status-app/docker-compose.yml` 固定将宿主机 `../frps/certbot/conf` 挂载为 `/etc/letsencrypt`（勿改，以免与证书检测逻辑不一致）。面板 Web 初始登录名密码为 `admin` / `admin123`。
 
 ---
 
