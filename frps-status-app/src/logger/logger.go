@@ -109,7 +109,7 @@ func (c *core) Write(entry zapcore.Entry, fields []zap.Field) error {
 	allFields = append(allFields, fields...)
 
 	line := fmt.Sprintf("[%s %s:%d] %s %s%s\n",
-		entry.Time.Format("2006-01-02 15:04::05"),
+		entry.Time.Format("2006-01-02 15:04:05"),
 		filepath.Base(entry.Caller.File),
 		entry.Caller.Line,
 		levelLabel(entry.Level),
