@@ -813,7 +813,7 @@ onUnmounted(() => {
   flex: 1;
   min-width: 0;
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 .storage-meta .summary-sub {
   font-size: 11px;
@@ -822,50 +822,49 @@ onUnmounted(() => {
 .storage-stat {
   display: flex;
   min-width: 0;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-  padding: 5px 8px;
-  border: 1px solid #e2e8f0;
-  border-radius: 7px;
-  background: #f8fafc;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   line-height: 1.2;
 }
 .storage-stat span {
   flex: 0 0 auto;
   color: #64748b;
   font-size: 10px;
-  font-weight: 750;
+  font-weight: 500;
 }
 .storage-stat b {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
   color: #0f172a;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .storage-stat.total {
-  border-color: #cbd5e1;
-  background: #f1f5f9;
+  border-color: transparent;
+  background: transparent;
 }
 .storage-stat.used {
-  border-color: #bfdbfe;
-  background: #eff6ff;
+  border-color: transparent;
+  background: transparent;
 }
 .storage-stat.used span,
 .storage-stat.used b {
-  color: #1d4ed8;
+  color: #2563eb;
 }
 .storage-stat.free {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
+  border-color: transparent;
+  background: transparent;
 }
 .storage-stat.free span,
 .storage-stat.free b {
-  color: #15803d;
+  color: #16a34a;
 }
 .storage-legend {
   display: flex;
