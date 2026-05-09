@@ -25,8 +25,8 @@
             <div>
               <div class="service-status"><i class="status-dot" :class="bindOk ? 'ok' : 'bad'"></i>{{ bindOk ? '在线' : '离线' }}</div>
               <div class="service-tags">
-                <span class="service-chip">连接 {{ bindLatency }}ms.面板 {{ dashOk ? dashLatency + 'ms' : '离线' }}</span>
-                <span class="service-chip service-domain" :title="frpsDomain">{{ frpsDomain }}</span>
+                <span class="service-chip service-health">连接 {{ bindLatency }}ms.面板 {{ dashOk ? dashLatency + 'ms' : '离线' }}</span>
+                <span class="service-chip service-domain" :title="rootDomain">{{ rootDomain }}</span>
               </div>
               <div class="service-uptime"><small>已运行</small><b>{{ runDays }}</b><span>天</span></div>
             </div>
@@ -86,9 +86,9 @@
               </div>
             </div>
             <div class="storage-meta">
-              <div class="summary-sub">分区 {{ humanBytes(storageTotalBytes) }}</div>
-              <div class="summary-sub">已用 {{ humanBytes(storageUsedBytes) }}</div>
-              <div class="summary-sub">可用 {{ humanBytes(storageFreeBytes) }}</div>
+              <div class="storage-stat total"><span>分区</span><b>{{ humanBytes(storageTotalBytes) }}</b></div>
+              <div class="storage-stat used"><span>已用</span><b>{{ humanBytes(storageUsedBytes) }}</b></div>
+              <div class="storage-stat free"><span>可用</span><b>{{ humanBytes(storageFreeBytes) }}</b></div>
             </div>
           </div>
         </section>
@@ -450,6 +450,12 @@ const frpsDomain = computed(() => {
   return hit?.domain || '-'
 })
 
+const rootDomain = computed(() => {
+  const domain = frpsDomain.value
+  if (!domain || domain === '-') return '-'
+  return domain.replace(/^frps\./i, '')
+})
+
 const certSummary = computed(() => props.status?.dashboard?.certificate || {
   total: certs.value.length,
   ok: certs.value.filter(c => c.ok && (c.days_left == null || c.days_left >= 15)).length,
@@ -806,13 +812,59 @@ onUnmounted(() => {
 .storage-meta {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  display: grid;
+  gap: 6px;
 }
 .storage-meta .summary-sub {
   font-size: 11px;
   line-height: 1.35;
+}
+.storage-stat {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: #f8fafc;
+  line-height: 1.2;
+}
+.storage-stat span {
+  flex: 0 0 auto;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 750;
+}
+.storage-stat b {
+  min-width: 0;
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.storage-stat.total {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+.storage-stat.used {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+.storage-stat.used span,
+.storage-stat.used b {
+  color: #1d4ed8;
+}
+.storage-stat.free {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+.storage-stat.free span,
+.storage-stat.free b {
+  color: #15803d;
 }
 .storage-legend {
   display: flex;
@@ -942,14 +994,20 @@ onUnmounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.service-health {
+  border-color: #bbf7d0;
+  background: #ecfdf3;
+  color: #15803d;
+}
 .service-uptime small {
   color: #64748b;
   font-size: 10px;
   font-weight: 650;
 }
 .service-domain {
-  border-color: transparent;
-  background: #eaf0f7;
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
 }
 .service-uptime {
   display: inline-flex;
