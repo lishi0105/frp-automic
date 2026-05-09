@@ -48,7 +48,7 @@
         </section>
         <section class="card proxy-table-card">
           <div class="section-head">
-            <div class="section-title">当前代理每日明细</div>
+            <div class="section-title">代理每日明细</div>
             <span class="text-muted text-sm">{{ filteredRows.length }} 条记录</span>
           </div>
           <div class="table-wrap proxy-table-scroll">
@@ -119,6 +119,11 @@ const pagedRows = computed(() => {
   return filteredRows.value.slice(s, s + PAGE_SIZE)
 })
 watch(filteredRows, () => { page.value = 1 })
+watch([proxyName, minDay, maxDay], ([currentName, min, max], [oldName] = []) => {
+  const proxyChanged = oldName !== undefined && currentName !== oldName
+  if (proxyChanged || !startDate.value) startDate.value = min || ''
+  if (proxyChanged || !endDate.value) endDate.value = max || ''
+}, { immediate: true })
 
 function quickRange(days) {
   const end = new Date()
@@ -127,8 +132,8 @@ function quickRange(days) {
   startDate.value = start.toISOString().slice(0, 10)
 }
 function resetFilter() {
-  startDate.value = ''
-  endDate.value = ''
+  startDate.value = minDay.value || ''
+  endDate.value = maxDay.value || ''
 }
 
 const chartEl = ref(null)

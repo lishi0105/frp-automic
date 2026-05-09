@@ -25,8 +25,8 @@
             <div>
               <div class="service-status"><i class="status-dot" :class="bindOk ? 'ok' : 'bad'"></i>{{ bindOk ? '在线' : '离线' }}</div>
               <div class="service-tags">
-                <span class="service-chip service-health">连接 {{ bindLatency }}ms.面板 {{ dashOk ? dashLatency + 'ms' : '离线' }}</span>
                 <span class="service-chip service-domain" :title="rootDomain">{{ rootDomain }}</span>
+                <span class="service-chip service-health">连接 {{ bindLatency }}ms.面板 {{ dashOk ? dashLatency + 'ms' : '离线' }}</span>
               </div>
               <div class="service-uptime"><small>已运行</small><b>{{ runDays }}</b><span>天</span></div>
             </div>
@@ -822,9 +822,9 @@ onUnmounted(() => {
 .storage-stat {
   display: flex;
   min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
   padding: 5px 8px;
   border: 1px solid #e2e8f0;
   border-radius: 7px;
@@ -839,6 +839,7 @@ onUnmounted(() => {
 }
 .storage-stat b {
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   color: #0f172a;
   font-size: 12px;

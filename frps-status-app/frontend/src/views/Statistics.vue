@@ -46,7 +46,7 @@
 
         <section class="card stats-table-card">
           <div class="section-head">
-            <div class="section-title">{{ selectedProxyName ? '当前代理每日明细' : '每日明细（网卡聚合）' }}</div>
+            <div class="section-title">{{ selectedProxyName ? '代理每日明细' : '每日明细（网卡聚合）' }}</div>
             <span class="text-muted text-sm">{{ filteredRows.length }} 条</span>
           </div>
           <div class="table-wrap stats-table-scroll">
