@@ -109,7 +109,6 @@
             </div>
           </div>
         </div>
-        <div v-if="retentionMsg" class="storage-banner" :class="retentionMsg.ok ? 'ok' : 'err'">{{ retentionMsg.text }}</div>
       </section>
     </div>
 
@@ -195,7 +194,6 @@ const testingEmail = ref(false)
 const purging = ref(false)
 const purgeDays = ref(60)
 
-const retentionMsg = ref(null)
 const savedSettings = ref(null)
 const formInitialized = ref(false)
 
@@ -250,11 +248,6 @@ function setModalQuery(modal) {
   if (modal) query.modal = modal
   else delete query.modal
   router.replace({ path: route.path, query })
-}
-
-function flash(msgRef, ok, text, ms = 4000) {
-  msgRef.value = { ok, text }
-  setTimeout(() => { msgRef.value = null }, ms)
 }
 
 function toast(ok, message) {
@@ -389,7 +382,6 @@ async function saveRetentionDays() {
   }
   purgeDays.value = Math.min(365, Math.max(1, Math.floor(purgeDays.value)))
   purging.value = true
-  retentionMsg.value = null
   try {
     const saved = await api.saveSettings({
       history_retention_days: purgeDays.value
@@ -397,9 +389,9 @@ async function saveRetentionDays() {
     savedSettings.value = saved
     fillForm(saved)
     formInitialized.value = true
-    flash(retentionMsg, true, `历史数据保留天数已更新为 ${purgeDays.value} 天`)
+    toast(true, `历史数据保留天数已更新为 ${purgeDays.value} 天`)
   } catch (e) {
-    flash(retentionMsg, false, '保存失败：' + e.message)
+    toast(false, '保存失败：' + e.message)
   } finally {
     purging.value = false
   }
@@ -674,20 +666,6 @@ async function saveRetentionDays() {
   font-size: 15px;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
-.storage-banner {
-  padding: 10px 16px;
-  font-size: 13px;
-  border-top: 1px solid #e2e8f0;
-}
-.storage-banner.ok {
-  background: #ecfdf5;
-  color: #047857;
-}
-.storage-banner.err {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
 .btn-dark { border-color: #2563eb; background: #2563eb; color: #fff; }
 .btn-dark:hover { background: #1d4ed8; border-color: #1d4ed8; }
 
