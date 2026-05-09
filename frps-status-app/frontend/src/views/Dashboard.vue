@@ -69,6 +69,33 @@
             </div>
           </div>
         </section>
+
+        <section class="summary-card storage-card">
+          <div class="summary-title">存储空间详情</div>
+          <div v-if="storageLoading" class="storage-loading">加载中…</div>
+          <div v-else-if="storageError" class="storage-error">{{ storageError }}</div>
+          <div v-else class="storage-body">
+            <div class="storage-donut-wrap">
+              <div ref="storagePieEl" class="storage-donut"></div>
+              <div v-if="storagePieCenterShow" class="storage-donut-center">
+                <span class="storage-donut-pct">{{ storageFreePct }}%</span>
+                <span class="storage-donut-lbl">可用</span>
+              </div>
+            </div>
+            <div class="storage-meta">
+              <div class="summary-sub">分区 {{ humanBytes(storageTotalBytes) }}</div>
+              <div class="summary-sub">已用 {{ humanBytes(storageUsedBytes) }}</div>
+              <div class="summary-sub">可用 {{ humanBytes(storageFreeBytes) }}</div>
+              <div class="storage-legend">
+                <span><i class="storage-dot used"></i>已用 {{ storageUsedPct }}%</span>
+                <span><i class="storage-dot free"></i>可用 {{ storageFreePct }}%</span>
+              </div>
+              <div class="summary-sub storage-app-line">
+                进程 日志 <b>{{ fmtMB(storageApp?.log_mb) }}</b> MB · 数据 <b>{{ fmtMB(storageApp?.data_mb) }}</b> MB
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
 
       <div class="dashboard-main">
@@ -184,6 +211,7 @@ const props = defineProps({ status: Object, daily: Array, loading: Boolean })
 defineEmits(['refresh'])
 
 const chartEl = ref(null)
+const storagePieEl = ref(null)
 const logOpen = ref(false)
 const logLoading = ref(false)
 const logContent = ref('')
@@ -196,6 +224,46 @@ const logLevelFilter = ref('all')
 const logClearing = ref(false)
 let logTimer = null
 let chart = null
+let storageChart = null
+
+const storagePartition = ref(null)
+const storageApp = ref(null)
+const storageLoading = ref(false)
+const storageError = ref('')
+
+const storageTotalBytes = computed(() => {
+  const p = storagePartition.value?.partition
+  if (!p) return 0
+  return Number(p.total_bytes) || 0
+})
+const storageUsedBytes = computed(() => {
+  const p = storagePartition.value?.partition
+  if (!p) return 0
+  return Number(p.used_bytes) || 0
+})
+const storageFreeBytes = computed(() => {
+  const p = storagePartition.value?.partition
+  if (!p) return 0
+  return Number(p.free_bytes) || 0
+})
+const storageUsedPct = computed(() => {
+  const t = storageTotalBytes.value
+  if (!t) return 0
+  return Math.round((storageUsedBytes.value / t) * 100)
+})
+const storageFreePct = computed(() => {
+  const t = storageTotalBytes.value
+  if (!t) return 0
+  return Math.max(0, Math.min(100, 100 - storageUsedPct.value))
+})
+const storagePieCenterShow = computed(() => {
+  return storagePartition.value?.ok && storageTotalBytes.value > 0
+})
+
+function fmtMB(v) {
+  if (v == null || Number.isNaN(Number(v))) return '-'
+  return Number(v).toFixed(2)
+}
 
 const updatedAt = computed(() => props.status
   ? new Date(props.status.generated_at).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
@@ -501,21 +569,93 @@ async function loadHostNetwork() {
 watch(() => props.status?.generated_at, () => {
   loadHostNetwork()
   loadIfaceMonthSummary()
+  loadStorageInfo()
 })
-const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => chart?.resize()) : null
+
+function buildStoragePie() {
+  if (!storageChart) return
+  const S = storagePartition.value
+  if (!S?.ok || !S.partition) {
+    storageChart.clear()
+    return
+  }
+  const used = Number(S.partition.used_bytes) || 0
+  const free = Number(S.partition.free_bytes) || 0
+  const total = used + free
+  if (total <= 0) {
+    storageChart.clear()
+    return
+  }
+  storageChart.setOption({
+    backgroundColor: 'transparent',
+    animation: true,
+    tooltip: {
+      trigger: 'item',
+      formatter: (p) => `${p.marker}${p.name}<br/><b>${humanBytes(p.value)}</b>（${p.percent}%）`
+    },
+    series: [
+      {
+        type: 'pie',
+        radius: ['52%', '82%'],
+        center: ['50%', '50%'],
+        avoidLabelOverlap: false,
+        itemStyle: { borderRadius: 3, borderColor: '#fff', borderWidth: 2 },
+        label: { show: false },
+        emphasis: { disabled: true },
+        data: [
+          { name: '已用', value: used, itemStyle: { color: '#2563eb' } },
+          { name: '可用', value: free, itemStyle: { color: '#cbd5e1' } }
+        ]
+      }
+    ]
+  }, { notMerge: true })
+}
+
+async function loadStorageInfo() {
+  storageLoading.value = true
+  storageError.value = ''
+  try {
+    const [disk, app] = await Promise.all([api.getStorage(), api.getStorageAppUsage()])
+    storagePartition.value = disk
+    storageApp.value = app
+    await nextTick()
+    buildStoragePie()
+  } catch (e) {
+    storagePartition.value = null
+    storageApp.value = null
+    storageError.value = e.message || '存储信息加载失败'
+    buildStoragePie()
+  } finally {
+    storageLoading.value = false
+  }
+}
+
+const ro = typeof ResizeObserver !== 'undefined'
+  ? new ResizeObserver(() => {
+      chart?.resize()
+      storageChart?.resize()
+    })
+  : null
 
 onMounted(async () => {
   await nextTick()
   chart = echarts.init(chartEl.value)
+  if (storagePieEl.value) {
+    storageChart = echarts.init(storagePieEl.value)
+  }
   loadHostNetwork()
   loadIfaceMonthSummary()
+  loadStorageInfo()
   ro?.observe(chartEl.value)
+  if (storagePieEl.value) ro?.observe(storagePieEl.value)
 })
 
 onUnmounted(() => {
   stopLogAutoRefresh()
   ro?.disconnect()
   chart?.dispose()
+  storageChart?.dispose()
+  storageChart = null
 })
 </script>
 
@@ -593,8 +733,103 @@ onUnmounted(() => {
 }
 .dashboard-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
+}
+.storage-card .summary-title {
+  padding-right: 4px;
+}
+.storage-loading,
+.storage-error {
+  margin-top: 14px;
+  font-size: 12px;
+  color: #64748b;
+}
+.storage-error {
+  color: #b91c1c;
+}
+.storage-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  min-height: 118px;
+}
+.storage-donut-wrap {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  flex: 0 0 auto;
+}
+.storage-donut {
+  width: 112px;
+  height: 112px;
+}
+.storage-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  line-height: 1.1;
+}
+.storage-donut-pct {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+.storage-donut-lbl {
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 650;
+  color: #64748b;
+}
+.storage-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.storage-meta .summary-sub {
+  font-size: 11px;
+  line-height: 1.35;
+}
+.storage-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #64748b;
+}
+.storage-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.storage-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.storage-dot.used {
+  background: #2563eb;
+}
+.storage-dot.free {
+  background: #cbd5e1;
+}
+.storage-app-line {
+  margin-top: 4px;
+  font-size: 10px !important;
+  color: #64748b !important;
+}
+.storage-app-line b {
+  color: #0f172a;
+  font-weight: 650;
 }
 .summary-card {
   position: relative;
@@ -1147,6 +1382,11 @@ onUnmounted(() => {
 .log-modal-fade-enter-from,
 .log-modal-fade-leave-to {
   opacity: 0;
+}
+@media (max-width: 1480px) {
+  .dashboard-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 @media (max-width: 1200px) {
   .dashboard-page { height: auto; grid-template-rows: auto auto; overflow: visible; padding-bottom: 0; }

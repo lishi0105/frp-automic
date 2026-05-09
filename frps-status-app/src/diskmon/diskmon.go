@@ -10,7 +10,12 @@ import (
 
 // FreeAndTotalBytes 对 path 所在分区执行 statfs，返回可用字节数与总容量字节数。
 func FreeAndTotalBytes(path string) (free uint64, total uint64, err error) {
-	dir := filepath.Dir(path)
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		abs = path
+	}
+	dir := filepath.Dir(abs)
+	var st syscall.Statfs_t
 	if err = syscall.Statfs(dir, &st); err != nil {
 		return 0, 0, err
 	}
@@ -18,8 +23,6 @@ func FreeAndTotalBytes(path string) (free uint64, total uint64, err error) {
 	total = uint64(st.Blocks) * uint64(st.Bsize)
 	return free, total, nil
 }
-
-var st syscall.Statfs_t
 
 // SQLiteBundleSize 估算主库文件及常见附属文件（-wal、-shm、-journal）占用字节之和。
 func SQLiteBundleSize(dbPath string) int64 {

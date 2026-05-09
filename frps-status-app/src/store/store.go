@@ -109,7 +109,8 @@ func (s *Store) InitDB() error {
 		"alert_cert_expiry":      "false",
 		"alert_cert_days":        "15",
 		"smtp_verified":          "false",
-		"history_retention_days": "60",
+		"history_retention_days":             "60",
+		"disk_free_space_alert_threshold_mb": "0",
 	}
 	for k, v := range defaults {
 		if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)`, k, v); err != nil {
@@ -143,9 +144,10 @@ func (s *Store) PublicSettings() (model.PublicSettings, error) {
 		LimitTotalGB:         parseFloat(s.Setting("limit_total_gb")),
 		InitialInGB:          parseFloat(s.Setting("initial_in_gb")),
 		InitialOutGB:         parseFloat(s.Setting("initial_out_gb")),
-		DeployDate:           s.Setting("deploy_date"),
-		HistoryRetentionDays: int(parseFloatDefault(s.Setting("history_retention_days"), 60)),
-		SMTPHost:             s.Setting("smtp_host"),
+		DeployDate:                       s.Setting("deploy_date"),
+		HistoryRetentionDays:             int(parseFloatDefault(s.Setting("history_retention_days"), 60)),
+		DiskFreeSpaceAlertThresholdMB: parseDiskAlertThresholdMB(s.Setting("disk_free_space_alert_threshold_mb")),
+		SMTPHost:                         s.Setting("smtp_host"),
 		SMTPPort:             int(parseFloatDefault(s.Setting("smtp_port"), 465)),
 		SMTPUser:             s.Setting("smtp_user"),
 		SMTPFrom:             s.Setting("smtp_from"),
@@ -161,7 +163,6 @@ func (s *Store) PublicSettings() (model.PublicSettings, error) {
 func (s *Store) RecordTraffic(proxies []model.ProxyTraffic) error {
 	now := time.Now()
 	day := now.Format("2006-01-02")
-	cutoff := now.AddDate(0, 0, -30).Format("2006-01-02")
 	tx, err := s.db.Begin()
 	if err != nil {
 		return logStoreErr("begin record traffic transaction", err)
@@ -190,9 +191,6 @@ ON CONFLICT(day,proxy_name,proxy_type) DO UPDATE SET in_bytes=in_bytes+excluded.
 		if err != nil {
 			return logStoreErr("update proxy counter "+p.Type+"/"+p.Name, err)
 		}
-	}
-	if _, err := tx.Exec(`DELETE FROM daily_traffic WHERE day < ?`, cutoff); err != nil {
-		return logStoreErr("delete expired daily traffic", err)
 	}
 	return logStoreErr("commit record traffic transaction", tx.Commit())
 }
@@ -329,7 +327,6 @@ func (s *Store) DailyTraffic() ([]map[string]any, error) {
 
 func (s *Store) RecordInterfaceTraffic(iface, publicIP string, rxBytes, txBytes uint64, now time.Time) error {
 	day := now.Format("2006-01-02")
-	cutoff := now.AddDate(0, 0, -90).Format("2006-01-02")
 	tx, err := s.db.Begin()
 	if err != nil {
 		return logStoreErr("begin record iface traffic transaction", err)
@@ -368,10 +365,60 @@ ON CONFLICT(day,iface,public_ip) DO UPDATE SET rx_kb=rx_kb+excluded.rx_kb,tx_kb=
 	if err != nil {
 		return logStoreErr("update iface counter "+iface+"/"+publicIP, err)
 	}
-	if _, err := tx.Exec(`DELETE FROM daily_iface_traffic WHERE day < ?`, cutoff); err != nil {
-		return logStoreErr("delete expired daily iface traffic", err)
-	}
 	return logStoreErr("commit record iface traffic transaction", tx.Commit())
+}
+
+// PurgeTrafficDayBefore 删除 day 早于 cutoffDay 的流量日表与网卡日表行（cutoff 当日及之后保留）。
+func (s *Store) PurgeTrafficDayBefore(cutoffDay string) (int64, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, logStoreErr("begin purge traffic before day transaction", err)
+	}
+	defer tx.Rollback()
+	res1, err := tx.Exec(`DELETE FROM daily_traffic WHERE day < ?`, cutoffDay)
+	if err != nil {
+		return 0, logStoreErr("purge daily traffic before day", err)
+	}
+	res2, err := tx.Exec(`DELETE FROM daily_iface_traffic WHERE day < ?`, cutoffDay)
+	if err != nil {
+		return 0, logStoreErr("purge daily iface traffic before day", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, logStoreErr("commit purge traffic before day", err)
+	}
+	n1, _ := res1.RowsAffected()
+	n2, _ := res2.RowsAffected()
+	return n1 + n2, nil
+}
+
+// TrafficDistinctDayCount 返回日流量与网卡日流量并集中不同日期的个数。
+func (s *Store) TrafficDistinctDayCount() (int, error) {
+	var n int
+	err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM (
+			SELECT DISTINCT day FROM daily_traffic
+			UNION
+			SELECT DISTINCT day FROM daily_iface_traffic
+		)`).Scan(&n)
+	return n, logStoreErr("count distinct traffic days", err)
+}
+
+// OldestTrafficDay 返回所有日流量相关表中的最早日期；若无数据则返回空字符串。
+func (s *Store) OldestTrafficDay() (string, error) {
+	var min sql.NullString
+	err := s.db.QueryRow(`
+		SELECT MIN(day) FROM (
+			SELECT day FROM daily_traffic
+			UNION ALL
+			SELECT day FROM daily_iface_traffic
+		)`).Scan(&min)
+	if err != nil {
+		return "", logStoreErr("query oldest traffic day", err)
+	}
+	if !min.Valid {
+		return "", nil
+	}
+	return min.String, nil
 }
 
 func (s *Store) DailyInterfaceTraffic(fromDay, toDay string) ([]map[string]any, error) {
@@ -447,6 +494,15 @@ func parseFloatDefault(v string, fallback float64) float64 {
 		return fallback
 	}
 	return f
+}
+
+// parseDiskAlertThresholdMB 解析磁盘告警阈值（MB，非负整数，四舍五入；0 表示未配置）。
+func parseDiskAlertThresholdMB(v string) uint64 {
+	f := parseFloat(v)
+	if f <= 0 || math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0
+	}
+	return uint64(f + 0.5)
 }
 
 type Warning struct {

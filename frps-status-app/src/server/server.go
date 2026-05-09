@@ -39,6 +39,9 @@ type App struct {
 	mu               sync.RWMutex
 	latest           model.Snapshot
 	lastAutoPurgeDay string
+	diskAlert        diskAlertState
+	// storageOpsMu 串行「自动历史清理 + 磁盘空间检测/应急」与「手动存储清理」，避免 Purge/VACUUM/删日志并发冲突。
+	storageOpsMu sync.Mutex
 }
 
 func New(cfg config.Config, st *store.Store, fc *frps.Client) *App {
@@ -61,6 +64,9 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/api/warnings", a.withAuth(a.handleWarnings))
 	mux.HandleFunc("/api/status", a.withAuth(a.handleStatus))
 	mux.HandleFunc("/api/host-network", a.withAuth(a.handleHostNetwork))
+	mux.HandleFunc("/api/storage", a.withAuth(a.handleStorage))
+	mux.HandleFunc("/api/storage/app-usage", a.withAuth(a.handleStorageAppUsage))
+	mux.HandleFunc("/api/storage/cleanup", a.withAuth(a.handleStorageCleanup))
 	mux.HandleFunc("/api/proxies", a.withAuth(a.handleProxies))
 	mux.HandleFunc("/api/certificates", a.withAuth(a.handleCertificates))
 	mux.HandleFunc("/api/daily", a.withAuth(a.handleDaily))
@@ -83,7 +89,12 @@ func (a *App) PollLoop() {
 		if err := a.Refresh(context.Background()); err != nil {
 			logger.Warn("定时刷新失败: %v", err)
 		}
-		a.autoPurgeHistoryIfNeeded()
+		func() {
+			a.storageOpsMu.Lock()
+			defer a.storageOpsMu.Unlock()
+			a.autoPurgeHistoryIfNeeded()
+			a.checkDiskSpaceRoutine()
+		}()
 	}
 }
 
@@ -1524,7 +1535,7 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		smtpKeys := map[string]bool{"smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true}
-		allowed := map[string]bool{"threshold_in_gb": true, "threshold_out_gb": true, "threshold_total_gb": true, "limit_in_gb": true, "limit_out_gb": true, "limit_total_gb": true, "initial_in_gb": true, "initial_out_gb": true, "history_retention_days": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true, "alert_proxy_offline": true, "alert_cert_expiry": true, "alert_cert_days": true}
+		allowed := map[string]bool{"threshold_in_gb": true, "threshold_out_gb": true, "threshold_total_gb": true, "limit_in_gb": true, "limit_out_gb": true, "limit_total_gb": true, "initial_in_gb": true, "initial_out_gb": true, "history_retention_days": true, "disk_free_space_alert_threshold_mb": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true, "alert_proxy_offline": true, "alert_cert_expiry": true, "alert_cert_days": true}
 		smtpChanged := false
 		for key, value := range in {
 			if !allowed[key] {

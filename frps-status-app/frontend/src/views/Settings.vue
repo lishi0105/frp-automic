@@ -59,7 +59,6 @@
                 <span>流量阈值</span>
                 <span>总量限额</span>
                 <span>事件告警</span>
-                <span>通知策略</span>
               </div>
             </div>
           </div>
@@ -83,38 +82,40 @@
         </div>
       </section>
 
-      <section class="db-card card-surface">
-        <div class="db-main">
-          <div class="feature-left">
-            <div class="feature-logo">◍</div>
-            <div>
-              <h3>数据库维护</h3>
-              <p>优化数据库性能，清理冗余数据，释放存储空间</p>
+      <section class="storage-card card-surface">
+        <div class="storage-top">
+          <div class="storage-intro">
+            <div class="storage-intro-icon">◉</div>
+            <div class="storage-intro-text">
+              <h3>存储空间维护</h3>
+              <p>优化数据库、管理磁盘告警阈值与历史数据，释放存储空间</p>
             </div>
           </div>
-        </div>
-        <div class="db-maintain">
-          <div class="db-item">
-            <h4>空间碎片整理（VACUUM）</h4>
-            <p>释放数据库文件空间，减少碎片</p>
-            <button class="btn btn-outline btn-sm" :disabled="vacuuming" @click="doVacuum">{{ vacuuming ? '执行中…' : '立即执行' }}</button>
+          <div class="storage-col">
+            <div class="storage-col-icon storage-col-icon-spark" aria-hidden="true"></div>
+            <h4>数据清理</h4>
+            <p class="storage-col-desc">弹窗展示存储与进程占用，可发起存储清理或 VACUUM</p>
+            <button type="button" class="btn btn-dark btn-sm storage-col-btn" @click="openStorageDetailModal">存储详情</button>
           </div>
-          <div class="db-item">
+          <div class="storage-col">
+            <div class="storage-col-icon storage-col-icon-sliders" aria-hidden="true"></div>
+            <h4>存储空间设置</h4>
+            <p class="storage-col-desc">查看分区与日志、库占用，配置剩余空间告警阈值（MB）</p>
+            <button type="button" class="btn btn-dark btn-sm storage-col-btn" @click="openStorageSettingsModal">打开设置</button>
+          </div>
+          <div class="storage-col storage-col-retain">
+            <div class="storage-col-icon storage-col-icon-cal" aria-hidden="true"></div>
             <h4>历史数据保留天数</h4>
-            <p>设置历史数据保留天数，超期数据由后端自动清理</p>
+            <p class="storage-col-desc">设置保留天数，超期数据由后端自动清理</p>
             <div class="purge-row">
-              <span>保留近</span>
+              <span>保留</span>
               <input v-model.number="purgeDays" type="number" min="1" max="365" />
               <span>天</span>
-              <span>历史记录</span>
               <button class="btn btn-dark btn-sm" :disabled="purging" @click="saveRetentionDays">{{ purging ? '保存中…' : '保存' }}</button>
             </div>
           </div>
         </div>
-        <div class="db-messages">
-          <div v-if="vacuumMsg" class="alert" :class="vacuumMsg.ok ? 'alert-success' : 'alert-error'">{{ vacuumMsg.text }}</div>
-          <div v-if="retentionMsg" class="alert" :class="retentionMsg.ok ? 'alert-success' : 'alert-error'">{{ retentionMsg.text }}</div>
-        </div>
+        <div v-if="retentionMsg" class="storage-banner" :class="retentionMsg.ok ? 'ok' : 'err'">{{ retentionMsg.text }}</div>
       </section>
     </div>
 
@@ -135,6 +136,21 @@
       @save="saveSMTP"
       @test="testEmail"
     />
+
+    <StorageDetailModal
+      :open="storageDetailModalOpen"
+      @close="closeStorageDetailModal"
+      @toast="forwardToast"
+      @refresh="$emit('refresh')"
+    />
+
+    <StorageSettingsModal
+      :open="storageSettingsModalOpen"
+      :threshold-mb="diskThresholdMb"
+      @close="closeStorageSettingsModal"
+      @toast="forwardToast"
+      @saved="onStorageSettingsSaved"
+    />
   </div>
 </template>
 
@@ -143,6 +159,8 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/index.js'
 import SMTPConfigModal from '../components/SMTPConfigModal.vue'
+import StorageDetailModal from '../components/StorageDetailModal.vue'
+import StorageSettingsModal from '../components/StorageSettingsModal.vue'
 import TrafficPolicyModal from '../components/TrafficPolicyModal.vue'
 
 const props = defineProps({ status: Object })
@@ -169,19 +187,20 @@ const form = reactive({
   deploy_date: '',
   alert_proxy_offline: 'false',
   alert_cert_expiry: 'false',
-  alert_cert_days: 15
+  alert_cert_days: 15,
+  disk_free_space_alert_threshold_mb: 0
 })
 
 const smtpModalOpen = ref(false)
 const policyModalOpen = ref(false)
+const storageDetailModalOpen = ref(false)
+const storageSettingsModalOpen = ref(false)
 const savingSMTP = ref(false)
 const savingPolicy = ref(false)
 const testingEmail = ref(false)
-const vacuuming = ref(false)
 const purging = ref(false)
 const purgeDays = ref(60)
 
-const vacuumMsg = ref(null)
 const retentionMsg = ref(null)
 const savedSettings = ref(null)
 const formInitialized = ref(false)
@@ -189,6 +208,8 @@ const formInitialized = ref(false)
 const smtpReady = computed(() =>
   Boolean(form.smtp_host && form.smtp_from && form.smtp_to && form.smtp_auth_code)
 )
+
+const diskThresholdMb = computed(() => Math.max(0, Math.floor(Number(form.disk_free_space_alert_threshold_mb) || 0)))
 
 function fillForm(s) {
   if (!s) return
@@ -211,12 +232,13 @@ function fillForm(s) {
   form.alert_cert_expiry = s.alert_cert_expiry ? 'true' : 'false'
   form.alert_cert_days = s.alert_cert_days || 15
   form.smtp_auth_code = s.smtp_auth_code || ''
+  form.disk_free_space_alert_threshold_mb = Number(s.disk_free_space_alert_threshold_mb) || 0
   purgeDays.value = Number(s.history_retention_days) > 0 ? Number(s.history_retention_days) : 60
 }
 
 watch(() => props.status?.settings, (settings) => {
   savedSettings.value = settings || savedSettings.value
-  if (formInitialized.value && (smtpModalOpen.value || policyModalOpen.value)) return
+  if (formInitialized.value && (smtpModalOpen.value || policyModalOpen.value || storageDetailModalOpen.value || storageSettingsModalOpen.value)) return
   if (formInitialized.value) return
   fillForm(settings)
   if (settings) formInitialized.value = true
@@ -225,6 +247,8 @@ watch(() => props.status?.settings, (settings) => {
 watch(() => route.query.modal, (modal) => {
   policyModalOpen.value = modal === 'policy'
   smtpModalOpen.value = modal === 'smtp'
+  storageDetailModalOpen.value = modal === 'storage'
+  storageSettingsModalOpen.value = modal === 'storage-settings'
 }, { immediate: true })
 
 function setModalQuery(modal) {
@@ -241,6 +265,12 @@ function flash(msgRef, ok, text, ms = 4000) {
 
 function toast(ok, message) {
   emit('toast', { type: ok ? 'success' : 'error', message })
+}
+
+function forwardToast(payload) {
+  if (payload && typeof payload === 'object' && payload.message) {
+    emit('toast', payload)
+  }
 }
 
 function openSMTPModal() {
@@ -265,6 +295,35 @@ function closePolicyModal() {
   policyModalOpen.value = false
   fillForm(savedSettings.value || props.status?.settings)
   setModalQuery(null)
+}
+
+function openStorageDetailModal() {
+  storageDetailModalOpen.value = true
+  setModalQuery('storage')
+}
+
+function closeStorageDetailModal() {
+  storageDetailModalOpen.value = false
+  setModalQuery(null)
+}
+
+function openStorageSettingsModal() {
+  fillForm(savedSettings.value || props.status?.settings)
+  storageSettingsModalOpen.value = true
+  setModalQuery('storage-settings')
+}
+
+function closeStorageSettingsModal() {
+  storageSettingsModalOpen.value = false
+  fillForm(savedSettings.value || props.status?.settings)
+  setModalQuery(null)
+}
+
+function onStorageSettingsSaved(mb) {
+  form.disk_free_space_alert_threshold_mb = mb
+  const base = savedSettings.value || props.status?.settings || {}
+  savedSettings.value = { ...base, disk_free_space_alert_threshold_mb: mb }
+  emit('refresh')
 }
 
 async function saveSMTP() {
@@ -330,19 +389,6 @@ async function savePolicy() {
   }
 }
 
-async function doVacuum() {
-  vacuuming.value = true
-  vacuumMsg.value = null
-  try {
-    await api.vacuum()
-    flash(vacuumMsg, true, '数据库压缩完成')
-  } catch (e) {
-    flash(vacuumMsg, false, '压缩失败：' + e.message)
-  } finally {
-    vacuuming.value = false
-  }
-}
-
 async function saveRetentionDays() {
   if (!Number.isFinite(purgeDays.value) || purgeDays.value < 1) {
     purgeDays.value = 60
@@ -377,7 +423,7 @@ async function saveRetentionDays() {
   box-shadow: 0 8px 28px rgba(15, 23, 42, .05);
 }
 .summary-card {
-  min-height: 94px;
+  min-height: 150px;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -386,28 +432,29 @@ async function saveRetentionDays() {
 .summary-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 14px;
+  padding: 14px 18px;
   min-width: 0;
 }
 .summary-item + .summary-item {
   border-left: 1px solid #e2e8f0;
 }
 .summary-icon {
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: var(--fw-strong);
+  flex-shrink: 0;
 }
 .summary-icon.in { color: #2563eb; background: #dbeafe; }
 .summary-icon.out { color: #10b981; background: #dcfce7; }
 .summary-icon.total { color: #f59e0b; background: #fef3c7; }
 .summary-icon.smtp { color: #7c3aed; background: #ede9fe; }
 .summary-item h3 {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   font-size: var(--fs-card-title);
   line-height: 1.2;
   font-weight: var(--fw-title);
@@ -428,22 +475,23 @@ async function saveRetentionDays() {
 
 .feature-card {
   min-height: 88px;
-  padding: 10px 16px;
+  padding: 12px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
 }
-.feature-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.feature-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .feature-logo {
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   color: #fff;
   font-size: var(--fs-icon-sm);
   background: linear-gradient(145deg, #3b82f6, #1d4ed8);
+  flex-shrink: 0;
 }
 .feature-left h3 { margin: 0 0 4px; font-size: var(--fs-section-title); line-height: 1.25; font-weight: var(--fw-section); color: #0f172a; }
 .feature-left p { margin: 0; color: #64748b; font-size: var(--fs-caption); }
@@ -457,35 +505,194 @@ async function saveRetentionDays() {
 .mail-status i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .mail-status.off { color: #ef4444; }
 
-.db-card {
-  min-height: 104px;
+/* 存储空间维护：左介绍 + 三列 */
+.storage-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 178px;
   padding: 0;
-  display: grid;
-  grid-template-columns: 1.2fr .8fr 1fr;
-  gap: 0;
   overflow: hidden;
 }
-.db-main {
+.storage-top {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.15fr) repeat(3, minmax(0, 1fr));
+  gap: 0;
+  flex: 1;
+}
+.storage-intro {
   display: flex;
-  align-items: center;
-  padding: 10px 16px;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px 20px 22px 22px;
   border-right: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #fbfdff 0%, #fff 100%);
 }
-.db-maintain {
-  display: contents;
+.storage-intro-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 20px;
+  background: linear-gradient(145deg, #3b82f6, #1d4ed8);
+  flex-shrink: 0;
 }
-.db-item {
-  padding: 10px 16px;
+.storage-intro-text h3 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.storage-intro-text p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+  max-width: 36ch;
+}
+.storage-col {
+  padding: 18px 18px 20px;
   border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
 }
-.db-item:last-child {
+.storage-top .storage-col:last-of-type {
   border-right: 0;
 }
-.db-item h4 { margin: 0; font-size: var(--fs-card-title); font-weight: var(--fw-section); color: #0f172a; }
-.db-item p { margin: 4px 0 8px; color: #64748b; font-size: var(--fs-caption); }
-.purge-row { display: flex; align-items: center; gap: 6px; color: #334155; font-size: var(--fs-caption); }
-.purge-row input { width: 54px; height: 30px; border: 1px solid #d5e2f6; border-radius: 6px; text-align: center; font-size: var(--fs-caption); }
-.db-messages { grid-column: 1 / -1; display: grid; gap: 8px; }
+.storage-col-icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 6px;
+  border-radius: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  position: relative;
+}
+.storage-col-icon-spark {
+  background: radial-gradient(circle at 30% 30%, #dbeafe, #eff6ff);
+}
+.storage-col-icon-spark::before,
+.storage-col-icon-spark::after {
+  content: '';
+  position: absolute;
+  background: #2563eb;
+  border-radius: 1px;
+}
+.storage-col-icon-spark::before {
+  width: 2px;
+  height: 18px;
+  left: 50%;
+  top: 8px;
+  transform: translateX(-50%) rotate(35deg);
+}
+.storage-col-icon-spark::after {
+  width: 18px;
+  height: 2px;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%) rotate(35deg);
+}
+.storage-col-icon-sliders::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 12px;
+  height: 6px;
+  border: 2px solid #2563eb;
+  border-radius: 4px;
+  border-bottom: 0;
+}
+.storage-col-icon-sliders::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 10px;
+  height: 10px;
+  border-left: 2px solid #2563eb;
+  border-right: 2px solid #2563eb;
+  border-bottom: 2px solid #2563eb;
+  border-radius: 0 0 4px 4px;
+}
+.storage-col-icon-cal {
+  border-radius: 8px;
+}
+.storage-col-icon-cal::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 14px;
+  height: 2px;
+  background: #2563eb;
+  border-radius: 1px;
+}
+.storage-col-icon-cal::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 8px;
+  height: 6px;
+  border: 2px solid #2563eb;
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+}
+.storage-col h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.storage-col-desc {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.45;
+  flex: 1;
+}
+.storage-col-btn {
+  min-width: 96px;
+  height: 34px;
+  margin-top: auto;
+}
+.storage-col-retain .purge-row {
+  margin-top: auto;
+}
+.purge-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+  font-size: 13px;
+}
+.purge-row input {
+  width: 64px;
+  height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 15px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.storage-banner {
+  padding: 10px 16px;
+  font-size: 13px;
+  border-top: 1px solid #e2e8f0;
+}
+.storage-banner.ok {
+  background: #ecfdf5;
+  color: #047857;
+}
+.storage-banner.err {
+  background: #fef2f2;
+  color: #b91c1c;
+}
 
 .btn-dark { border-color: #2563eb; background: #2563eb; color: #fff; }
 .btn-dark:hover { background: #1d4ed8; border-color: #1d4ed8; }
@@ -494,13 +701,20 @@ async function saveRetentionDays() {
   .summary-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .summary-item:nth-child(odd) { border-left: 0; }
   .summary-item:nth-child(n + 3) { border-top: 1px solid #e2e8f0; }
-  .db-card { grid-template-columns: 1fr; }
-  .db-main,
-  .db-item {
-    border-right: 0;
-    border-bottom: 1px solid #ecf2fb;
+  .storage-top {
+    grid-template-columns: 1fr;
   }
-  .db-item:last-child { border-bottom: 0; }
+  .storage-intro {
+    border-right: 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .storage-top .storage-col {
+    border-right: 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .storage-top .storage-col:last-of-type {
+    border-bottom: 0;
+  }
 }
 
 @media (max-width: 860px) {
@@ -518,7 +732,5 @@ async function saveRetentionDays() {
   .summary-item b { font-size: var(--fs-page-title-sm); }
   .feature-left h3 { font-size: var(--fs-section-title); }
   .feature-left p { font-size: var(--fs-body); }
-  .db-item h4 { font-size: var(--fs-section-title); }
-  .db-item p { font-size: var(--fs-body); }
 }
 </style>
