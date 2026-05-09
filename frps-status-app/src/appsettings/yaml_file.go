@@ -2,7 +2,6 @@ package appsettings
 
 import (
 	"bytes"
-	_ "embed"
 	"errors"
 	"fmt"
 	"os"
@@ -14,8 +13,49 @@ import (
 	"frps-status-app.local/status/src/logger"
 )
 
-//go:embed default_app_settings.yaml
-var defaultAppSettingsYAML []byte
+const defaultAppSettingsYAML = `# =============================================================================
+# FRPS 状态面板 — 应用层可调参数（唯一来源）
+# =============================================================================
+# 本文件须位于容器内固定路径：/config/app-settings.yaml（由宿主机目录挂载到 ./config）。
+# - 若文件不存在或为空：首次启动将自动写入本模板（含注释）再加载。
+# - 部署日期 deploy_date 仅保存在 SQLite（/data/frps-status.sqlite 的 app_meta），勿在本文件填写。
+# =============================================================================
+
+# --- 月度流量告警阈值（GB）；0 表示该项不参与告警 ---
+threshold_in_gb: 0
+threshold_out_gb: 0
+threshold_total_gb: 0
+
+# --- 月度用量上限/展示用「封顶」（GB）；0 表示不限制 ---
+limit_in_gb: 0
+limit_out_gb: 0
+limit_total_gb: 0
+
+# --- 用量基数修正（GB），用于抵消历史偏移等；一般保持 0 ---
+initial_in_gb: 0
+initial_out_gb: 0
+
+# --- 历史流量与代理状态等数据的保留天数（1～365，默认 60）---
+history_retention_days: 60
+
+# --- 磁盘剩余空间告警阈值（MB）；0 表示关闭该项告警 ---
+disk_free_space_alert_threshold_mb: 0
+
+# --- SMTP（告警邮件、忘记密码等）---
+smtp_enabled: false
+smtp_host: ""
+smtp_port: 465
+smtp_user: ""
+smtp_auth_code: ""
+smtp_from: ""
+smtp_to: ""
+
+# --- 事件类告警 ---
+alert_proxy_offline: false
+alert_cert_expiry: false
+# 证书剩余天数低于该值时纳入「将到期」预警（1～90）
+alert_cert_days: 15
+`
 
 // AppSettingsYAMLPath 为应用层可调参数的唯一配置文件路径（固定，不由环境变量指定）。
 const AppSettingsYAMLPath = "/config/app-settings.yaml"
@@ -39,21 +79,21 @@ func LoadAppSettings(m *Manager) error {
 			if err := writeDefaultAppSettingsFile(path); err != nil {
 				return err
 			}
-			b = defaultAppSettingsYAML
+			b = []byte(defaultAppSettingsYAML)
 			regeneratedFromRead = true
 		} else {
 			logger.Warn("读取应用配置失败，将尝试写入默认配置: 路径=%q 错误=%v", path, readErr)
 			if err := writeDefaultAppSettingsFile(path); err != nil {
 				return fmt.Errorf("读取应用配置 %q: %w; 写入默认配置失败: %w", path, readErr, err)
 			}
-			b = defaultAppSettingsYAML
+			b = []byte(defaultAppSettingsYAML)
 			regeneratedFromRead = true
 		}
 	} else if len(bytes.TrimSpace(b)) == 0 {
 		if err := writeDefaultAppSettingsFile(path); err != nil {
 			return err
 		}
-		b = defaultAppSettingsYAML
+		b = []byte(defaultAppSettingsYAML)
 		regeneratedFromRead = true
 	}
 
@@ -71,7 +111,7 @@ func LoadAppSettings(m *Manager) error {
 		if werr := writeDefaultAppSettingsFile(path); werr != nil {
 			return fmt.Errorf("解析应用配置 %q: %w; 写入默认配置失败: %w", path, err, werr)
 		}
-		raw, err = unmarshalAppSettingsMap(defaultAppSettingsYAML)
+		raw, err = unmarshalAppSettingsMap([]byte(defaultAppSettingsYAML))
 		if err != nil {
 			return fmt.Errorf("内置默认应用配置 YAML 无效: %w", err)
 		}
@@ -99,7 +139,7 @@ func writeDefaultAppSettingsFile(path string) error {
 			return fmt.Errorf("创建应用配置目录 %q: %w", dir, err)
 		}
 	}
-	if err := os.WriteFile(path, defaultAppSettingsYAML, 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(defaultAppSettingsYAML), 0o600); err != nil {
 		return fmt.Errorf("写入默认应用配置 %q: %w", path, err)
 	}
 	logger.Info("已生成默认应用 YAML 配置（含中文注释）: %s", path)
