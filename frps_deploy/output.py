@@ -10,31 +10,17 @@ from frps_deploy.constants import (
 from frps_deploy.models import DeployContext
 from frps_deploy.services import (
     dashboard_domain, http_services, local_ip, local_port, remote_port,
-    needs_tunnel, status_domain, tcp_services, tunneled_services,
+    needs_tunnel, status_domain, tcp_services,
 )
-from frps_deploy.utils import toml_str
 
 
 def print_frpc_config(ctx: DeployContext) -> None:
-    print("\n================ frpc.toml 示例 ================")
-    print("# 下列键名为 frp 客户端要求的英文配置项，请原样复制到 frpc.toml")
-    print(f"serverAddr = {toml_str(ctx.vps_public_ip)}")
-    print(f"serverPort = {ctx.bind_port}")
+    print("\n================ frpc 客户端文件 ================")
+    print(f"frpc.toml 路径：{FRPC_TOML_FILE}")
+    print(f"docker-compose.yml 路径：{FRPC_COMPOSE_FILE}")
     print("")
-    print('auth.method = "token"')
-    print(f"auth.token = {toml_str(ctx.token)}")
-    print("")
-    print("[transport.tls]")
-    print("enable = true")
-    for item in tunneled_services():
-        print("")
-        print(f"# {item.get('comment', item['alias'])}")
-        print("[[proxies]]")
-        print(f"name = {toml_str(str(item['alias']))}")
-        print('type = "tcp"')
-        print(f"localIP = {toml_str(local_ip(item))}")
-        print(f"localPort = {local_port(item)}")
-        print(f"remotePort = {remote_port(item)}")
+    print("请将上面的 frpc.toml 和 docker-compose.yml 拷贝到客户机同一目录后执行：")
+    print("  docker compose up -d")
     print("================================================")
 
 
