@@ -1,6 +1,7 @@
 <template>
-  <div v-if="open" class="smtp-mask" @click.self="$emit('close')">
-    <div class="smtp-modal">
+  <Transition name="modal-pop">
+    <div v-if="open" class="smtp-mask" @click.self="$emit('close')">
+      <div class="smtp-modal">
       <div class="smtp-modal-head">
         <h3>配置邮件服务</h3>
         <button class="smtp-close" type="button" @click="$emit('close')">×</button>
@@ -79,8 +80,9 @@
           </button>
         </div>
       </div>
+      </div>
     </div>
-  </div>
+  </Transition>
 </template>
 
 <script setup>

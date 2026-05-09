@@ -7,8 +7,7 @@
       <div class="flex-center">
         <a class="btn btn-outline btn-sm icon-btn" title="导出 CSV" aria-label="导出 CSV" :href="exportUrl">⇩</a>
         <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loading || ifaceLoading" @click="refreshPage">
-          <span v-if="loading" class="spinner"></span>
-          <span v-else>↻</span>
+          <span class="refresh-glyph" :class="{ 'is-spinning': loading || ifaceLoading }" aria-hidden="true">↻</span>
         </button>
       </div>
     </div>

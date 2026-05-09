@@ -22,8 +22,7 @@
         </div>
         <div class="flex-center">
           <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loading || localLoading" @click="$emit('refresh')">
-            <span v-if="loading || localLoading" class="spinner"></span>
-            <span v-else>↻</span>
+            <span class="refresh-glyph" :class="{ 'is-spinning': loading || localLoading }" aria-hidden="true">↻</span>
           </button>
         </div>
       </div>

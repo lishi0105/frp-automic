@@ -1337,6 +1337,14 @@ func (a *App) handleDailyInterface(w http.ResponseWriter, r *http.Request) {
 	}
 	fromDay := strings.TrimSpace(r.URL.Query().Get("from"))
 	toDay := strings.TrimSpace(r.URL.Query().Get("to"))
+	sortKey := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("sort")))
+	if sortKey == "" {
+		sortKey = "day"
+	}
+	order := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("order")))
+	if order != "asc" {
+		order = "desc"
+	}
 	data, err := a.store.DailyInterfaceTraffic(fromDay, toDay)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -1344,7 +1352,51 @@ func (a *App) handleDailyInterface(w http.ResponseWriter, r *http.Request) {
 	}
 	settings := a.appcfg.PublicSettings()
 	data = applyInitialTrafficToDailyRows(settings, data, fromDay, toDay)
+	sortDailyInterfaceRows(data, sortKey, order)
 	writeJSON(w, data)
+}
+
+func sortDailyInterfaceRows(rows []map[string]any, sortKey, order string) {
+	sort.Slice(rows, func(i, j int) bool {
+		ri, rj := rows[i], rows[j]
+		cmp := 0
+		switch sortKey {
+		case "in", "rx", "rx_kb":
+			cmp = compareUint64(numericAnyToUint64(ri["rx_kb"]), numericAnyToUint64(rj["rx_kb"]))
+		case "out", "tx", "tx_kb":
+			cmp = compareUint64(numericAnyToUint64(ri["tx_kb"]), numericAnyToUint64(rj["tx_kb"]))
+		case "total":
+			ti := numericAnyToUint64(ri["rx_kb"]) + numericAnyToUint64(ri["tx_kb"])
+			tj := numericAnyToUint64(rj["rx_kb"]) + numericAnyToUint64(rj["tx_kb"])
+			cmp = compareUint64(ti, tj)
+		default:
+			cmp = strings.Compare(fmt.Sprint(ri["day"]), fmt.Sprint(rj["day"]))
+		}
+		if cmp == 0 {
+			cmp = strings.Compare(fmt.Sprint(ri["day"]), fmt.Sprint(rj["day"]))
+		}
+		if cmp == 0 {
+			cmp = strings.Compare(fmt.Sprint(ri["iface"]), fmt.Sprint(rj["iface"]))
+		}
+		if cmp == 0 {
+			cmp = strings.Compare(fmt.Sprint(ri["public_ip"]), fmt.Sprint(rj["public_ip"]))
+		}
+		if order == "asc" {
+			return cmp < 0
+		}
+		return cmp > 0
+	})
+}
+
+func compareUint64(a, b uint64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func applyInitialTrafficToMonth(settings model.PublicSettings, month string, inBytes, outBytes uint64) (uint64, uint64) {

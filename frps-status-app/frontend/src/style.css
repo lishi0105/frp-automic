@@ -64,6 +64,33 @@ html, body, #app { height: 100%; }
 body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: var(--fs-base); line-height: var(--lh-body); }
 a { color: var(--primary); text-decoration: none; }
 
+.modal-pop-enter-active,
+.modal-pop-leave-active {
+  transition: opacity .18s ease;
+}
+.modal-pop-enter-active > *,
+.modal-pop-leave-active > * {
+  transition: opacity .18s ease, transform .18s ease;
+}
+.modal-pop-enter-from,
+.modal-pop-leave-to {
+  opacity: 0;
+}
+.modal-pop-enter-from > *,
+.modal-pop-leave-to > * {
+  opacity: 0;
+  transform: translateY(10px) scale(.985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-pop-enter-active,
+  .modal-pop-leave-active,
+  .modal-pop-enter-active > *,
+  .modal-pop-leave-active > * {
+    transition: none;
+  }
+}
+
 /* ── Layout ── */
 .layout { display: flex; height: 100vh; overflow: hidden; }
 
@@ -514,6 +541,18 @@ a { color: var(--primary); text-decoration: none; }
   padding: 0;
   justify-content: center;
   font-size: 16px;
+}
+.refresh-glyph {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transform-origin: 50% 50%;
+}
+.refresh-glyph.is-spinning {
+  animation: spin .7s linear infinite;
 }
 
 .page-body { padding: 16px 24px 24px; flex: 1; }

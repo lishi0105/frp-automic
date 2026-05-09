@@ -1,6 +1,7 @@
 <template>
-  <div v-if="open" class="sd-mask" @click.self="$emit('close')">
-    <section class="sd-modal" role="dialog" aria-modal="true" aria-labelledby="sd-title">
+  <Transition name="modal-pop">
+    <div v-if="open" class="sd-mask" @click.self="$emit('close')">
+      <section class="sd-modal" role="dialog" aria-modal="true" aria-labelledby="sd-title">
       <header class="sd-head">
         <div>
           <h3 id="sd-title">存储详情</h3>
@@ -71,8 +72,9 @@
           {{ cleaning ? '执行中…' : '存储清理' }}
         </button>
       </footer>
-    </section>
-  </div>
+      </section>
+    </div>
+  </Transition>
 </template>
 
 <script setup>

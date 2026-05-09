@@ -11,8 +11,7 @@
       <div class="page-actions">
         <button class="btn btn-outline btn-sm icon-btn" title="日志" aria-label="日志" @click="openLogModal"><span class="btn-doc-icon" aria-hidden="true"></span></button>
         <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loading" @click="$emit('refresh')">
-          <span v-if="loading" class="spinner"></span>
-          <span v-else class="btn-refresh-icon" aria-hidden="true">↻</span>
+          <span class="refresh-glyph" :class="{ 'is-spinning': loading }" aria-hidden="true">↻</span>
         </button>
       </div>
     </div>
@@ -25,11 +24,11 @@
             <div class="summary-icon server-icon" aria-hidden="true"><span></span><span></span><span></span></div>
             <div>
               <div class="service-status"><i class="status-dot" :class="bindOk ? 'ok' : 'bad'"></i>{{ bindOk ? '在线' : '离线' }}</div>
-              <div class="service-metrics">
-                <span><small>连接</small><b>{{ bindLatency }}ms</b></span>
-                <span><small>Dashboard</small><b>{{ dashOk ? dashLatency + 'ms' : '离线' }}</b></span>
+              <div class="service-tags">
+                <span class="service-chip">连接 {{ bindLatency }}ms</span>
+                <span class="service-chip">Dashboard {{ dashOk ? dashLatency + 'ms' : '离线' }}</span>
+                <span class="service-chip service-domain" :title="frpsDomain">{{ frpsDomain }}</span>
               </div>
-              <div class="service-domain" :title="frpsDomain">{{ frpsDomain }}</div>
               <div class="service-uptime"><small>已运行</small><b>{{ runDays }}</b><span>天</span></div>
             </div>
           </div>
@@ -77,9 +76,9 @@
 
         <section class="summary-card storage-card">
           <div class="summary-title">存储空间</div>
-          <div v-if="storageLoading" class="storage-loading">加载中…</div>
-          <div v-else-if="storageError" class="storage-error">{{ storageError }}</div>
-          <div v-else class="storage-body">
+          <div v-if="storageLoading && !storageHasData" class="storage-loading">加载中…</div>
+          <div v-else-if="storageError && !storageHasData" class="storage-error">{{ storageError }}</div>
+          <div v-else class="storage-body" :class="{ refreshing: storageLoading }">
             <div class="storage-donut-wrap">
               <div ref="storagePieEl" class="storage-donut"></div>
               <div v-if="storagePieCenterShow" class="storage-donut-center">
@@ -142,8 +141,7 @@
                   {{ logClearing ? '清空中...' : '清空' }}
                 </button>
                 <button class="btn btn-outline btn-sm" :disabled="logLoading" @click="loadLog">
-                  <span v-if="logLoading" class="spinner"></span>
-                  <span v-else>↻</span> 刷新
+                  <span class="refresh-glyph" :class="{ 'is-spinning': logLoading }" aria-hidden="true">↻</span> 刷新
                 </button>
                 <button class="log-close" type="button" aria-label="关闭" @click="logOpen = false">×</button>
               </div>
@@ -257,6 +255,9 @@ const storageFreePct = computed(() => {
 })
 const storagePieCenterShow = computed(() => {
   return storagePartition.value?.ok && storageTotalBytes.value > 0
+})
+const storageHasData = computed(() => {
+  return Boolean(storagePartition.value?.partition && storageTotalBytes.value > 0)
 })
 
 function fmtMB(v) {
@@ -625,6 +626,7 @@ function ensureStorageChart() {
 }
 
 async function loadStorageInfo() {
+  const hadData = storageHasData.value
   storageLoading.value = true
   storageError.value = ''
   try {
@@ -632,9 +634,11 @@ async function loadStorageInfo() {
     storagePartition.value = disk
     storageApp.value = app
   } catch (e) {
-    storagePartition.value = null
-    storageApp.value = null
     storageError.value = e.message || '存储信息加载失败'
+    if (!hadData) {
+      storagePartition.value = null
+      storageApp.value = null
+    }
   } finally {
     storageLoading.value = false
     await nextTick()
@@ -741,11 +745,6 @@ onUnmounted(() => {
 }
 .btn-doc-icon::before { top: 4px; }
 .btn-doc-icon::after { top: 9px; }
-.btn-refresh-icon {
-  display: inline-block;
-  font-size: 14px;
-  line-height: 1;
-}
 .dashboard-summary {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -769,6 +768,10 @@ onUnmounted(() => {
   gap: 10px;
   margin-top: 6px;
   min-height: 118px;
+  transition: opacity .16s ease;
+}
+.storage-body.refreshing {
+  opacity: .72;
 }
 .storage-donut-wrap {
   position: relative;
@@ -917,51 +920,37 @@ onUnmounted(() => {
   font-weight: 800;
   color: #0f172a;
 }
-.service-metrics {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.service-tags {
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 7px;
 }
-.service-metrics span {
-  min-width: 0;
-  padding: 6px 8px;
-  border: 1px solid #dbeafe;
-  border-radius: 7px;
-  background: #f8fbff;
-}
-.service-metrics small,
-.service-uptime small {
-  display: block;
-  margin-bottom: 2px;
-  color: #64748b;
-  font-size: 10px;
-  font-weight: 650;
-}
-.service-metrics b {
-  display: block;
-  overflow: hidden;
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.service-domain {
+.service-chip {
+  display: inline-flex;
   max-width: 100%;
-  width: fit-content;
-  margin-bottom: 7px;
+  min-width: 0;
   padding: 4px 8px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
   border-radius: 7px;
   background: #eef2f7;
   color: #334155;
   font-size: 11px;
   font-weight: 650;
   line-height: 1.2;
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.service-uptime small {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 650;
+}
+.service-domain {
+  border-color: transparent;
+  background: #eaf0f7;
 }
 .service-uptime {
   display: inline-flex;

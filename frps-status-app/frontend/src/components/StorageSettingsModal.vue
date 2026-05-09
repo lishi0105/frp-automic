@@ -1,6 +1,7 @@
 <template>
-  <div v-if="open" class="ss-mask" @click.self="$emit('close')">
-    <section class="ss-modal" role="dialog" aria-modal="true" aria-labelledby="ss-title">
+  <Transition name="modal-pop">
+    <div v-if="open" class="ss-mask" @click.self="$emit('close')">
+      <section class="ss-modal" role="dialog" aria-modal="true" aria-labelledby="ss-title">
       <header class="ss-head">
         <div>
           <h3 id="ss-title">存储设置</h3>
@@ -75,8 +76,9 @@
           {{ saving ? '保存中…' : '保存' }}
         </button>
       </footer>
-    </section>
-  </div>
+      </section>
+    </div>
+  </Transition>
 </template>
 
 <script setup>

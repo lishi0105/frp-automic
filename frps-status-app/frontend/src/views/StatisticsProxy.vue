@@ -8,8 +8,7 @@
       <div class="flex-center">
         <button class="btn btn-outline btn-sm icon-btn" title="返回总览" aria-label="返回总览" @click="router.push('/statistics')">←</button>
         <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loading" @click="$emit('refresh')">
-          <span v-if="loading" class="spinner"></span>
-          <span v-else>↻</span>
+          <span class="refresh-glyph" :class="{ 'is-spinning': loading }" aria-hidden="true">↻</span>
         </button>
       </div>
     </div>
@@ -19,7 +18,6 @@
         <div>
           <div class="section-title">{{ proxyName }}</div>
           <div class="text-muted text-sm">{{ proxyType || '-' }} · {{ proxyOnline ? '在线' : '离线' }}</div>
-          <div class="analytics-overview-bar"><div class="analytics-overview-bar-inner proxy-overview-fill"></div></div>
         </div>
         <div class="analytics-overview-metrics">
           <div><b>{{ humanBytes(totalTraffic) }}</b><small>总流量</small></div>
@@ -37,49 +35,39 @@
         </div>
       </section>
 
-      <div class="analytics-main-2col">
-        <section class="card">
+      <div class="analytics-main-2col proxy-main">
+        <section class="card proxy-chart-card">
           <div class="section-head"><div class="section-title">代理流量趋势</div></div>
           <div ref="chartEl" class="analytics-trend-chart"></div>
         </section>
-        <section class="card analytics-side-kv">
-          <div class="section-head"><div class="section-title">代理详情</div></div>
-          <div class="kv"><span>当前连接</span><b>{{ proxyCurConns }}</b></div>   
-          <div class="kv"><span>日峰值连接</span><b>{{ peakConns }}</b></div>
-          <div class="kv"><span>入站占比</span><b>{{ ratioIn }}%</b></div>
-          <div class="kv"><span>出站占比</span><b>{{ ratioOut }}%</b></div>
-          <div class="kv"><span>关联证书</span><b>{{ certDomain || '-' }}</b></div>
-          <div class="kv"><span>证书剩余</span><b :style="{ color: certColor(certDaysLeft) }">{{ certDaysLeft != null ? certDaysLeft + ' 天' : '-' }}</b></div>
-        </section>
-      </div>
-
-      <section class="card">
-        <div class="section-head">
-          <div class="section-title">当前代理每日明细</div>
-          <span class="text-muted text-sm">{{ filteredRows.length }} 条记录</span>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>日期</th><th>类型</th><th>连接峰值</th><th>入站</th><th>出站</th><th>合计</th></tr></thead>
-            <tbody>
-              <tr v-if="!pagedRows.length"><td colspan="6" class="empty">暂无数据</td></tr>
-              <tr v-for="r in pagedRows" :key="r.day + r.type">
-                <td>{{ r.day }}</td>
-                <td><span class="badge badge-ok">{{ r.type }}</span></td>
-                <td>{{ r.peak_conns || 0 }}</td>
-                <td>{{ humanBytes(r.in) }}</td>
-                <td>{{ humanBytes(r.out) }}</td>
-                <td><b>{{ humanBytes(r.in + r.out) }}</b></td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-if="totalPages > 1" class="analytics-pager">
+        <section class="card proxy-table-card">
+          <div class="section-head">
+            <div class="section-title">当前代理每日明细</div>
+            <span class="text-muted text-sm">{{ filteredRows.length }} 条记录</span>
+          </div>
+          <div class="table-wrap proxy-table-scroll">
+            <table class="proxy-detail-table">
+              <thead><tr><th class="col-date">日期</th><th>类型</th><th class="col-num">连接峰值</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num">合计</th></tr></thead>
+              <tbody>
+                <tr v-if="!pagedRows.length"><td colspan="6" class="empty">暂无数据</td></tr>
+                <tr v-for="r in pagedRows" :key="r.day + r.type">
+                  <td class="col-date">{{ r.day }}</td>
+                  <td><span class="badge badge-ok">{{ r.type }}</span></td>
+                  <td class="col-num">{{ r.peak_conns || 0 }}</td>
+                  <td class="col-num">{{ humanBytes(r.in) }}</td>
+                  <td class="col-num">{{ humanBytes(r.out) }}</td>
+                  <td class="col-num"><b>{{ humanBytes(r.in + r.out) }}</b></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-if="totalPages > 1" class="analytics-pager proxy-pager">
             <button class="btn btn-outline btn-sm" :disabled="page <= 1" @click="page--">上一页</button>
             <span class="text-muted text-sm">{{ page }} / {{ totalPages }}</span>
             <button class="btn btn-outline btn-sm" :disabled="page >= totalPages" @click="page++">下一页</button>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   </div>
 </template>
@@ -101,19 +89,6 @@ const proxyRows = computed(() => allRows.value.filter(r => r.name === proxyName.
 const proxyInfo = computed(() => (props.status?.proxies ?? []).find(p => p.name === proxyName.value) || null)
 const proxyType = computed(() => proxyInfo.value?.type || proxyRows.value[0]?.type || '')
 const proxyOnline = computed(() => proxyInfo.value?.online ?? false)
-const proxyCurConns = computed(() => proxyInfo.value?.cur_conns ?? 0)
-
-const certByDomain = computed(() => {
-  const certs = props.status?.certificates ?? []
-  const domains = (proxyInfo.value?.domains ?? []).filter(Boolean)
-  if (domains.length) {
-    const exact = certs.find(c => domains.includes(c.domain))
-    if (exact) return exact
-  }
-  return certs.find(c => c.domain === proxyName.value || c.domain?.includes(proxyName.value)) || null
-})
-const certDomain = computed(() => certByDomain.value?.domain || '')
-const certDaysLeft = computed(() => certByDomain.value?.days_left ?? null)
 
 const startDate = ref('')
 const endDate = ref('')
@@ -129,9 +104,6 @@ const filteredRows = computed(() => proxyRows.value.filter(r => {
 const totalIn = computed(() => filteredRows.value.reduce((s, r) => s + Number(r.in || 0), 0))
 const totalOut = computed(() => filteredRows.value.reduce((s, r) => s + Number(r.out || 0), 0))
 const totalTraffic = computed(() => totalIn.value + totalOut.value)
-const peakConns = computed(() => filteredRows.value.reduce((m, r) => Math.max(m, Number(r.peak_conns || 0)), 0))
-const ratioIn = computed(() => totalTraffic.value ? ((totalIn.value / totalTraffic.value) * 100).toFixed(1) : '0.0')
-const ratioOut = computed(() => totalTraffic.value ? ((totalOut.value / totalTraffic.value) * 100).toFixed(1) : '0.0')
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredRows.value.length / PAGE_SIZE)))
 const pagedRows = computed(() => {
@@ -139,13 +111,6 @@ const pagedRows = computed(() => {
   return filteredRows.value.slice(s, s + PAGE_SIZE)
 })
 watch(filteredRows, () => { page.value = 1 })
-
-function certColor(days) {
-  if (days == null) return 'var(--text-2)'
-  if (days < 7) return 'var(--danger)'
-  if (days < 15) return 'var(--warning)'
-  return 'var(--success)'
-}
 
 function quickRange(days) {
   const end = new Date()
@@ -167,20 +132,35 @@ function buildChart() {
     chart.clear()
     return
   }
-  const isDark = true
   chart.setOption({
     backgroundColor: 'transparent',
-    tooltip: { trigger: 'axis', formatter: params => {
-      const d = params[0]?.axisValue || ''
-      return `${d}<br/>${params.map(p => `${p.marker}${p.seriesName}: <b>${humanBytes(p.value)}</b>`).join('<br/>')}`
-    }},
-    legend: { data: ['入站', '出站'], top: 0, textStyle: { color: isDark ? '#94a3b8' : '#475569' } },
-    grid: { left: 56, right: 20, top: 38, bottom: 38 },
-    xAxis: { type: 'category', data: days.map(d => d.day), axisLabel: { color: isDark ? '#94a3b8' : '#475569', fontSize: 11 } },
-    yAxis: { type: 'value', axisLabel: { color: isDark ? '#94a3b8' : '#475569', fontSize: 11, formatter: v => humanBytes(v) }, splitLine: { lineStyle: { color: isDark ? '#1e293b' : '#f1f5f9' } } },
+    tooltip: {
+      trigger: 'axis',
+      formatter: params => {
+        const d = params[0]?.axisValue || ''
+        return `${d}<br/>${params.map(p => `${p.marker}${p.seriesName}: <b>${humanBytes(p.value)}</b>`).join('<br/>')}`
+      }
+    },
+    legend: { data: ['入站', '出站'], top: 0, left: 'center', textStyle: { color: '#334155', fontSize: 13 }, itemWidth: 22, itemHeight: 10 },
+    grid: { left: 74, right: 22, top: 48, bottom: 42 },
+    xAxis: {
+      type: 'category',
+      data: days.map(d => d.day),
+      boundaryGap: false,
+      axisLabel: { color: '#64748b', fontSize: 12 },
+      axisLine: { lineStyle: { color: '#475569' } },
+      axisTick: { show: false }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#64748b', fontSize: 12, formatter: v => humanBytes(v) },
+      splitLine: { lineStyle: { color: '#dbe3ee', type: 'dashed' } },
+      axisLine: { show: false },
+      axisTick: { show: false }
+    },
     series: [
-      { name: '入站', type: 'line', smooth: true, data: days.map(d => Number(d.in || 0)), itemStyle: { color: '#3b82f6' }, areaStyle: { color: 'rgba(59,130,246,.1)' } },
-      { name: '出站', type: 'line', smooth: true, data: days.map(d => Number(d.out || 0)), itemStyle: { color: '#10b981' }, areaStyle: { color: 'rgba(16,185,129,.1)' } }
+      { name: '入站', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => Number(d.in || 0)), itemStyle: { color: '#1f7ae0' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(31,122,224,.08)' } },
+      { name: '出站', type: 'line', smooth: false, symbolSize: 8, data: days.map(d => Number(d.out || 0)), itemStyle: { color: '#12b76a' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(18,183,106,.15)' } }
     ]
   })
 }
@@ -189,7 +169,7 @@ watch(filteredRows, buildChart)
 const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => chart?.resize()) : null
 onMounted(async () => {
   await nextTick()
-  chart = echarts.init(chartEl.value, 'dark')
+  chart = echarts.init(chartEl.value)
   buildChart()
   ro?.observe(chartEl.value)
 })
@@ -200,9 +180,76 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.proxy-overview-fill { width: 70%; }
 .proxy-filter-grid { grid-template-columns: repeat(4, minmax(0, auto)); }
+.proxy-main {
+  grid-template-columns: 3fr 2fr;
+  grid-template-rows: 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+.proxy-chart-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.proxy-chart-card .analytics-trend-chart {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.proxy-table-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+}
+.proxy-table-scroll {
+  min-height: 0;
+  overflow: auto;
+}
+.proxy-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.proxy-detail-table th,
+.proxy-detail-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+}
+.proxy-detail-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+.proxy-detail-table .col-date {
+  width: 92px;
+}
+.proxy-detail-table .col-num {
+  width: 78px;
+  text-align: right;
+}
+.proxy-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+}
 @media (max-width: 1200px) {
+  .proxy-main {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+  .proxy-chart-card .analytics-trend-chart {
+    flex: none;
+    height: 300px;
+  }
+  .proxy-table-scroll {
+    max-height: 480px;
+  }
   .proxy-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>

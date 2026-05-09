@@ -495,7 +495,7 @@ async function saveRetentionDays() {
 .storage-card {
   display: flex;
   flex-direction: column;
-  min-height: 178px;
+  min-height: 132px;
   padding: 0;
   overflow: hidden;
 }
@@ -507,9 +507,9 @@ async function saveRetentionDays() {
 }
 .storage-intro {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 14px;
-  padding: 22px 20px 22px 22px;
+  padding: 16px 20px 16px 22px;
   border-right: 1px solid #e2e8f0;
   background: linear-gradient(180deg, #fbfdff 0%, #fff 100%);
 }
@@ -538,10 +538,11 @@ async function saveRetentionDays() {
   max-width: 36ch;
 }
 .storage-col {
-  padding: 18px 18px 20px;
+  padding: 18px;
   border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   align-items: flex-start;
   min-width: 0;
 }
@@ -644,10 +645,10 @@ async function saveRetentionDays() {
 .storage-col-btn {
   min-width: 96px;
   height: 34px;
-  margin-top: auto;
+  margin-top: 12px;
 }
 .storage-col-retain .purge-row {
-  margin-top: auto;
+  margin-top: 12px;
 }
 .purge-row {
   display: flex;
