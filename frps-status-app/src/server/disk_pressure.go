@@ -6,20 +6,17 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"frps-status-app.local/status/src/config"
 	"frps-status-app.local/status/src/diskmon"
 	"frps-status-app.local/status/src/logger"
 	"frps-status-app.local/status/src/mail"
-	"frps-status-app.local/status/src/model"
 )
 
 const (
-	diskAlertEmailCooldown = 24 * time.Hour
-	minDiskThresholdFloor  = uint64(1024 * 1024) // 1 MiB，阈值折算后的字节下限
-	bytesPerMiB            = uint64(1024 * 1024)
+	minDiskThresholdFloor = uint64(1024 * 1024) // 1 MiB，阈值折算后的字节下限
+	bytesPerMiB           = uint64(1024 * 1024)
 )
 
 func computeInitialThresholdMBFromFree(free uint64) uint64 {
@@ -43,12 +40,6 @@ func thresholdBytesFromMB(mb uint64) uint64 {
 		return minDiskThresholdFloor
 	}
 	return b
-}
-
-// diskAlertState 磁盘危急邮件冷却（与快照锁分离，避免与 Refresh 争用）。
-type diskAlertState struct {
-	mu          sync.Mutex
-	lastEmailAt time.Time
 }
 
 func (a *App) effectiveLogDir() string {
@@ -88,7 +79,7 @@ func (a *App) checkDiskSpaceRoutine() {
 		dataDir, mail.HumanBytes(total), mail.HumanBytes(free), logDir, u64Human(logSize), u64Human(dbSize), mb, mail.HumanBytes(thresholdBytes))
 
 	if free >= thresholdBytes {
-		_ = a.store.ClearWarning("disk_space_critical")
+		a.alerts.ResolveDiskCritical(settings)
 		logger.Info("磁盘空间定期检测结论：剩余空间不低于告警阈值，无需应急清理")
 		return
 	}
@@ -104,7 +95,7 @@ func (a *App) checkDiskSpaceRoutine() {
 	free, _, _ = diskmon.FreeAndTotalBytes(a.cfg.DBPath)
 	if free >= thresholdBytes {
 		logger.Info("删除旧日志文件后，磁盘剩余空间已恢复至阈值以上 剩余=%s", mail.HumanBytes(free))
-		_ = a.store.ClearWarning("disk_space_critical")
+		a.alerts.ResolveDiskCritical(settings)
 		return
 	}
 	logger.Warn("删除旧日志文件后，剩余空间仍低于阈值 剩余=%s 阈值=%d MB(约合 %s)", mail.HumanBytes(free), mb, mail.HumanBytes(thresholdBytes))
@@ -123,7 +114,7 @@ func (a *App) checkDiskSpaceRoutine() {
 	free, _, _ = diskmon.FreeAndTotalBytes(a.cfg.DBPath)
 	if free >= thresholdBytes {
 		logger.Info("日志轮转与二次清理后，磁盘剩余空间已不低于阈值 剩余=%s", mail.HumanBytes(free))
-		_ = a.store.ClearWarning("disk_space_critical")
+		a.alerts.ResolveDiskCritical(settings)
 		return
 	}
 	logger.Warn("日志轮转与二次清理后，剩余空间仍低于阈值 剩余=%s 阈值=%d MB(约合 %s)", mail.HumanBytes(free), mb, mail.HumanBytes(thresholdBytes))
@@ -144,7 +135,7 @@ func (a *App) checkDiskSpaceRoutine() {
 	free, _, _ = diskmon.FreeAndTotalBytes(a.cfg.DBPath)
 	if free >= thresholdBytes {
 		logger.Info("数据库精简后，磁盘剩余空间已不低于阈值 剩余=%s", mail.HumanBytes(free))
-		_ = a.store.ClearWarning("disk_space_critical")
+		a.alerts.ResolveDiskCritical(settings)
 		return
 	}
 	logger.Warn("数据库精简后，剩余空间仍低于阈值 剩余=%s 阈值=%d MB(约合 %s)", mail.HumanBytes(free), mb, mail.HumanBytes(thresholdBytes))
@@ -189,51 +180,21 @@ func (a *App) checkDiskSpaceRoutine() {
 		logger.Info("磁盘应急步骤「按十日轮回删除流量历史」后轮询分区剩余=%s", mail.HumanBytes(free))
 		if free >= thresholdBytes {
 			logger.Info("按日删除流量历史后，磁盘剩余空间已不低于阈值")
-			_ = a.store.ClearWarning("disk_space_critical")
+			a.alerts.ResolveDiskCritical(settings)
 			return
 		}
 	}
 
 	free, _, _ = diskmon.FreeAndTotalBytes(a.cfg.DBPath)
 	if free >= thresholdBytes {
-		_ = a.store.ClearWarning("disk_space_critical")
+		a.alerts.ResolveDiskCritical(settings)
 		logger.Info("磁盘应急清理结束：剩余空间已恢复至阈值以上 剩余=%s", mail.HumanBytes(free))
 		return
 	}
 
 	msg := fmt.Sprintf("数据目录所在分区在依次清理旧日志、轮转当日日志、执行 VACUUM、并尽量按十日删除流量历史后，剩余空间 %s 仍低于配置阈值 %d MB（约合 %s），请尽快扩容或迁移数据。", mail.HumanBytes(free), mb, mail.HumanBytes(thresholdBytes))
 	logger.Error("磁盘空间严重不足：%s", msg)
-	_ = a.store.SetWarning("disk_space_critical", msg)
-	subject := "FRPS 状态监控 - 磁盘空间严重不足告警"
-	body := msg + "\n\n（本邮件在 24 小时内最多发送一次。）"
-	a.maybeSendDiskCriticalEmail(settings, subject, body)
-}
-
-func (a *App) maybeSendDiskCriticalEmail(settings model.PublicSettings, subject, body string) {
-	if !settings.SMTPEnabled {
-		logger.Warn("磁盘空间危急：未启用邮件告警开关，已跳过发送邮件（仍已写入后台告警）")
-		return
-	}
-	if !a.appcfg.SMTPVerified() {
-		logger.Warn("磁盘空间危急：SMTP 尚未通过测试邮件验证，已跳过发送邮件（仍已写入后台告警）")
-		return
-	}
-	if settings.SMTPAuthCode == "" || settings.SMTPHost == "" || settings.SMTPFrom == "" || settings.SMTPTo == "" {
-		logger.Warn("磁盘空间危急：SMTP 配置不完整，已跳过发送邮件（仍已写入后台告警）")
-		return
-	}
-	a.diskAlert.mu.Lock()
-	defer a.diskAlert.mu.Unlock()
-	if !a.diskAlert.lastEmailAt.IsZero() && time.Since(a.diskAlert.lastEmailAt) < diskAlertEmailCooldown {
-		logger.Info("磁盘空间危急告警邮件已在冷却期内发送过，本次不再重复发信")
-		return
-	}
-	if err := mail.Send(settings, settings.SMTPAuthCode, subject, body); err != nil {
-		logger.Error("磁盘空间危急告警邮件发送失败 错误=%v", err)
-		return
-	}
-	a.diskAlert.lastEmailAt = time.Now()
-	logger.Info("磁盘空间危急告警邮件发送成功 主题=%s", subject)
+	a.alerts.FireDiskCritical(settings, msg)
 }
 
 func u64Human(v int64) string {
@@ -336,10 +297,10 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 func (a *App) collectStorageDiskInfo() map[string]any {
 	logDir := a.effectiveLogDir()
 	out := map[string]any{
-		"generated_at": time.Now().UTC().Format(time.RFC3339),
-		"ok":           false,
-		"db_path":      a.cfg.DBPath,
-		"log_dir":      logDir,
+		"generated_at":    time.Now().UTC().Format(time.RFC3339),
+		"ok":              false,
+		"db_path":         a.cfg.DBPath,
+		"log_dir":         logDir,
 		"log_files_bytes": diskmon.LogDirLogFilesSize(logDir),
 		"database_bytes":  diskmon.SQLiteBundleSize(a.cfg.DBPath),
 	}

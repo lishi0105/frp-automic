@@ -10,6 +10,8 @@ import (
 type Config struct {
 	Listen            string
 	DBPath            string
+	// ProcRoot 为空时使用 /proc；可设为挂载的宿主机 proc（如 /host/proc），便于容器内读取 loadavg/meminfo。
+	ProcRoot          string
 	FRPSHost          string
 	FRPSBindPort      int
 	FRPSDashboardPort int
@@ -45,6 +47,7 @@ func Load() Config {
 	return Config{
 		Listen:            env("LISTEN", "127.0.0.1:28080"),
 		DBPath:            DBPathFixed,
+		ProcRoot:          env("STATUS_PROC_ROOT", ""),
 		FRPSHost:          env("FRPS_HOST", "127.0.0.1"),
 		FRPSBindPort:      envInt("FRPS_BIND_PORT", 7000),
 		FRPSDashboardPort: envInt("FRPS_DASHBOARD_PORT", 7500),

@@ -28,6 +28,7 @@ frps-status-app/.env
 frps-status-app/.env.local
 
 # 设计稿
+frps-status-app/design
 frps-status-app/frontend/design
 
 # 数据 / 日志目录（compose 挂载生成）

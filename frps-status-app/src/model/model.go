@@ -33,6 +33,8 @@ type ProxyHealth struct {
 	LastOfflineAt      string `json:"last_offline_at,omitempty"`
 	LastRecoveryAt     string `json:"last_recovery_at,omitempty"`
 	OfflineSeconds     int64  `json:"offline_seconds,omitempty"`
+	// RecoveryConfirmed 为 true 时允许发代理恢复类邮件（连续在线 ≥3 或稳定 ≥5 分钟，见设计 11.2）
+	RecoveryConfirmed bool `json:"recovery_confirmed"`
 }
 
 type ProxyTraffic struct {

@@ -35,13 +35,16 @@
 
 在部署前，你需要准备好：
 
-1. **一台 VPS**  
-   建议使用 Ubuntu / Debian / CentOS 等常见 Linux 系统，并已安装 Docker Engine 和 Docker Compose 插件。
+1. **一台内网设备**
+ 建议使用 Ubuntu / Debian / CentOS 等常见 Linux 系统，或厂家定制类Linux系统，如群晖，飞牛系统，并已安装 Docker Engine 和 Docker Compose 插件，登录用户具备Docker用户组权限，可访问设备通过docker compose version查看版本信息。
 
-2. **一个域名**  
+2. **一台 VPS**  
+   建议使用 Ubuntu / Debian / CentOS 等常见 Linux 系统，并已安装 Docker Engine 和 Docker Compose 插件，登录用户具备Docker用户组权限，可在vps下通过docker compose version查看版本信息；
+
+3. **一个域名**  
    域名需要提前解析到 VPS 公网 IPv4 地址。
 
-3. **通配符解析**  
+4. **通配符解析**  
    建议添加：
 
    ```text
@@ -56,7 +59,7 @@
 
    解析到 VPS 公网 IP。
 
-4. **开放端口**  
+5. **开放端口**  
    VPS 安全组或防火墙至少需要开放：
 
    - `80/tcp`：申请 HTTPS 证书使用；
