@@ -36,17 +36,26 @@
         <section class="summary-card throughput-card">
           <div class="summary-title">本月流量吞吐</div>
           <div class="traffic-bars">
-            <div class="traffic-line traffic-half">
-              <div class="traffic-label"><span>入站</span><b>{{ humanBytesKB(ifaceMonthInKB) }} ({{ inPctText }})</b></div>
-              <div class="thin-progress"><div class="blue" :style="{ width: inPct + '%' }"></div></div>
+            <div class="traffic-line traffic-half traffic-in-row">
+              <div class="traffic-label">
+                <span class="traffic-lbl">入站</span>
+                <b><span class="traffic-bytes">{{ humanBytesKB(ifaceMonthInKB) }}</span><span class="traffic-ratio" :class="inRatioTierClass"> ({{ inPctText }})</span></b>
+              </div>
+              <div class="thin-progress"><div class="thin-progress-fill" :class="inRatioTierClass" :style="{ width: inPct + '%' }"></div></div>
             </div>
-            <div class="traffic-line traffic-half">
-              <div class="traffic-label"><span>出站</span><b>{{ humanBytesKB(ifaceMonthOutKB) }} ({{ outPctText }})</b></div>
-              <div class="thin-progress"><div class="green" :style="{ width: outPct + '%' }"></div></div>
+            <div class="traffic-line traffic-half traffic-out-row">
+              <div class="traffic-label">
+                <span class="traffic-lbl">出站</span>
+                <b><span class="traffic-bytes">{{ humanBytesKB(ifaceMonthOutKB) }}</span><span class="traffic-ratio" :class="outRatioTierClass"> ({{ outPctText }})</span></b>
+              </div>
+              <div class="thin-progress"><div class="thin-progress-fill" :class="outRatioTierClass" :style="{ width: outPct + '%' }"></div></div>
             </div>
-            <div class="traffic-line traffic-total">
-              <div class="traffic-label"><span>总量</span><b>{{ humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }} ({{ totalPctText }})</b></div>
-              <div class="thin-progress"><div class="green" :style="{ width: totalPct + '%' }"></div></div>
+            <div class="traffic-line traffic-total traffic-total-row">
+              <div class="traffic-label">
+                <span class="traffic-lbl">总量</span>
+                <b><span class="traffic-bytes">{{ humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }}</span><span class="traffic-ratio" :class="totalRatioTierClass"> ({{ totalPctText }})</span></b>
+              </div>
+              <div class="thin-progress"><div class="thin-progress-fill" :class="totalRatioTierClass" :style="{ width: totalPct + '%' }"></div></div>
             </div>
           </div>
         </section>
@@ -282,6 +291,17 @@ const totalPct = computed(() => percent((ifaceMonthInKB.value + ifaceMonthOutKB.
 const inPctText = computed(() => (limitInGB.value > 0 ? `${inPct.value}%` : '不限'))
 const outPctText = computed(() => (limitOutGB.value > 0 ? `${outPct.value}%` : '不限'))
 const totalPctText = computed(() => (limitTotalGB.value > 0 ? `${totalPct.value}%` : '不限'))
+
+/** 相对「月度限额」的占用比例括号颜色：<50% / 50%~90% / ≥90%（无限额时为 neutral） */
+function trafficRatioTierClass(pct, hasLimit) {
+  if (!hasLimit) return 'traffic-ratio-tier-none'
+  if (pct < 50) return 'traffic-ratio-tier-low'
+  if (pct < 90) return 'traffic-ratio-tier-mid'
+  return 'traffic-ratio-tier-high'
+}
+const inRatioTierClass = computed(() => trafficRatioTierClass(inPct.value, limitInGB.value > 0))
+const outRatioTierClass = computed(() => trafficRatioTierClass(outPct.value, limitOutGB.value > 0))
+const totalRatioTierClass = computed(() => trafficRatioTierClass(totalPct.value, limitTotalGB.value > 0))
 const runDays = computed(() => {
   const raw = props.status?.settings?.deploy_date
   if (!raw) return '-'
@@ -1069,12 +1089,62 @@ onUnmounted(() => {
   align-items: baseline;
   gap: 4px 8px;
   justify-content: space-between;
-  color: #0f172a;
   font-size: 12px;
 }
 .traffic-label b {
   font-weight: 500;
   white-space: nowrap;
+}
+/* 本月流量吞吐：仅字体颜色层级，不改布局尺寸 */
+.throughput-card .traffic-lbl {
+  color: #64748b;
+  font-weight: 650;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+.throughput-card .traffic-in-row .traffic-bytes {
+  color: #1d4ed8;
+  font-weight: 650;
+}
+.throughput-card .traffic-out-row .traffic-bytes {
+  color: #047857;
+  font-weight: 650;
+}
+.throughput-card .traffic-total-row .traffic-bytes {
+  color: #0f172a;
+  font-weight: 700;
+}
+.throughput-card .traffic-ratio {
+  font-weight: 500;
+}
+.throughput-card .traffic-ratio.traffic-ratio-tier-none {
+  color: #94a3b8;
+}
+.throughput-card .traffic-ratio.traffic-ratio-tier-low {
+  color: #15803d;
+}
+.throughput-card .traffic-ratio.traffic-ratio-tier-mid {
+  color: #b45309;
+}
+.throughput-card .traffic-ratio.traffic-ratio-tier-high {
+  color: #b91c1c;
+  font-weight: 650;
+}
+/* 吞吐进度条：与括号比例同一档位配色 */
+.throughput-card .thin-progress .thin-progress-fill {
+  min-width: 0;
+}
+.throughput-card .thin-progress .thin-progress-fill.traffic-ratio-tier-none {
+  background: linear-gradient(90deg, #94a3b8, #cbd5e1);
+}
+.throughput-card .thin-progress .thin-progress-fill.traffic-ratio-tier-low {
+  background: linear-gradient(90deg, #15803d, #22c55e);
+}
+.throughput-card .thin-progress .thin-progress-fill.traffic-ratio-tier-mid {
+  background: linear-gradient(90deg, #d97706, #ea580c);
+}
+.throughput-card .thin-progress .thin-progress-fill.traffic-ratio-tier-high {
+  background: linear-gradient(90deg, #dc2626, #ef4444);
 }
 .thin-progress,
 .wide-progress {
@@ -1088,9 +1158,9 @@ onUnmounted(() => {
   height: 100%;
   border-radius: inherit;
 }
-.thin-progress .blue { background: linear-gradient(90deg, #1f7ae0, #248af0); }
-.thin-progress .green,
-.wide-progress div { background: linear-gradient(90deg, #12b76a, #16a34a); }
+.wide-progress div {
+  background: linear-gradient(90deg, #12b76a, #16a34a);
+}
 .online-head {
   display: flex;
   justify-content: space-between;
