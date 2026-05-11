@@ -3,13 +3,15 @@
     <div class="page-header">
       <div>
         <div class="page-title">数据看板</div>
-        <div class="page-sub">{{ updatedAt ? '最后更新：' + updatedAt : '加载中…' }}</div>
+        <div class="page-sub">
+          <span>公网IP {{ hostPublicIP || '-' }} · 网卡 {{ hostIface || '-' }}</span>
+          <span>{{ updatedAt ? '最后更新：' + updatedAt : '加载中…' }}</span>
+        </div>
       </div>
       <div class="page-actions">
         <button class="btn btn-outline btn-sm icon-btn" title="日志" aria-label="日志" @click="openLogModal"><span class="btn-doc-icon" aria-hidden="true"></span></button>
         <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loading" @click="$emit('refresh')">
-          <span v-if="loading" class="spinner"></span>
-          <span v-else class="btn-refresh-icon" aria-hidden="true">↻</span>
+          <span class="refresh-glyph" :class="{ 'is-spinning': loading }" aria-hidden="true">↻</span>
         </button>
       </div>
     </div>
@@ -22,10 +24,11 @@
             <div class="summary-icon server-icon" aria-hidden="true"><span></span><span></span><span></span></div>
             <div>
               <div class="service-status"><i class="status-dot" :class="bindOk ? 'ok' : 'bad'"></i>{{ bindOk ? '在线' : '离线' }}</div>
-              <div class="summary-sub">{{ bindLatency }}ms · Dashboard {{ dashOk ? dashLatency + 'ms' : '离线' }}</div>
-              <div class="summary-sub">域名 {{ frpsDomain }}</div>
-              <div class="summary-sub">已运行 {{ runDays }} 天</div>
-              <div class="summary-sub">公网IP {{ hostPublicIP || '-' }} · 网卡 {{ hostIface || '-' }}</div>
+              <div class="service-tags">
+                <span class="service-chip service-domain" :title="rootDomain">{{ rootDomain }}</span>
+                <span class="service-chip service-health">连接 {{ bindLatency }}ms.面板 {{ dashOk ? dashLatency + 'ms' : '离线' }}</span>
+              </div>
+              <div class="service-uptime"><small>已运行</small><b>{{ runDays }}</b><span>天</span></div>
             </div>
           </div>
         </section>
@@ -33,17 +36,26 @@
         <section class="summary-card throughput-card">
           <div class="summary-title">本月流量吞吐</div>
           <div class="traffic-bars">
-            <div class="traffic-line">
-              <div class="traffic-label"><span>入站</span><b>{{ humanBytesKB(ifaceMonthInKB) }} ({{ inPctText }})</b></div>
-              <div class="thin-progress"><div class="blue" :style="{ width: inPct + '%' }"></div></div>
+            <div class="traffic-line traffic-half traffic-in-row">
+              <div class="traffic-label">
+                <span class="traffic-lbl">入站</span>
+                <b><span class="traffic-bytes">{{ humanBytesKB(ifaceMonthInKB) }}</span><span class="traffic-ratio" :class="inRatioTierClass"> ({{ inPctText }})</span></b>
+              </div>
+              <div class="thin-progress"><div class="thin-progress-fill" :class="inRatioTierClass" :style="{ width: inPct + '%' }"></div></div>
             </div>
-            <div class="traffic-line">
-              <div class="traffic-label"><span>出站</span><b>{{ humanBytesKB(ifaceMonthOutKB) }} ({{ outPctText }})</b></div>
-              <div class="thin-progress"><div class="green" :style="{ width: outPct + '%' }"></div></div>
+            <div class="traffic-line traffic-half traffic-out-row">
+              <div class="traffic-label">
+                <span class="traffic-lbl">出站</span>
+                <b><span class="traffic-bytes">{{ humanBytesKB(ifaceMonthOutKB) }}</span><span class="traffic-ratio" :class="outRatioTierClass"> ({{ outPctText }})</span></b>
+              </div>
+              <div class="thin-progress"><div class="thin-progress-fill" :class="outRatioTierClass" :style="{ width: outPct + '%' }"></div></div>
             </div>
-            <div class="traffic-line">
-              <div class="traffic-label"><span>总量</span><b>{{ humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }} ({{ totalPctText }})</b></div>
-              <div class="thin-progress"><div class="green" :style="{ width: totalPct + '%' }"></div></div>
+            <div class="traffic-line traffic-total traffic-total-row">
+              <div class="traffic-label">
+                <span class="traffic-lbl">总量</span>
+                <b><span class="traffic-bytes">{{ humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }}</span><span class="traffic-ratio" :class="totalRatioTierClass"> ({{ totalPctText }})</span></b>
+              </div>
+              <div class="thin-progress"><div class="thin-progress-fill" :class="totalRatioTierClass" :style="{ width: totalPct + '%' }"></div></div>
             </div>
           </div>
         </section>
@@ -66,6 +78,26 @@
             <div>
               <div class="cert-days"><b>{{ certSummary.min_days_left ?? '-' }}</b><span>天</span></div>
               <div class="summary-sub">WARN {{ certSummary.warn || 0 }} · FAIL {{ certSummary.fail || 0 }}</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="summary-card storage-card">
+          <div class="summary-title">存储空间</div>
+          <div v-if="storageLoading && !storageHasData" class="storage-loading">加载中…</div>
+          <div v-else-if="storageError && !storageHasData" class="storage-error">{{ storageError }}</div>
+          <div v-else class="storage-body" :class="{ refreshing: storageLoading }">
+            <div class="storage-donut-wrap">
+              <div ref="storagePieEl" class="storage-donut"></div>
+              <div v-if="storagePieCenterShow" class="storage-donut-center">
+                <span class="storage-donut-pct">{{ storageFreePct }}%</span>
+                <span class="storage-donut-lbl">可用</span>
+              </div>
+            </div>
+            <div class="storage-meta">
+              <div class="storage-stat total"><span>分区</span><b>{{ humanBytes(storageTotalBytes) }}</b></div>
+              <div class="storage-stat used"><span>已用</span><b>{{ humanBytes(storageUsedBytes) }}</b></div>
+              <div class="storage-stat free"><span>可用</span><b>{{ humanBytes(storageFreeBytes) }}</b></div>
             </div>
           </div>
         </section>
@@ -117,8 +149,7 @@
                   {{ logClearing ? '清空中...' : '清空' }}
                 </button>
                 <button class="btn btn-outline btn-sm" :disabled="logLoading" @click="loadLog">
-                  <span v-if="logLoading" class="spinner"></span>
-                  <span v-else>↻</span> 刷新
+                  <span class="refresh-glyph" :class="{ 'is-spinning': logLoading }" aria-hidden="true">↻</span> 刷新
                 </button>
                 <button class="log-close" type="button" aria-label="关闭" @click="logOpen = false">×</button>
               </div>
@@ -184,6 +215,7 @@ const props = defineProps({ status: Object, daily: Array, loading: Boolean })
 defineEmits(['refresh'])
 
 const chartEl = ref(null)
+const storagePieEl = ref(null)
 const logOpen = ref(false)
 const logLoading = ref(false)
 const logContent = ref('')
@@ -196,6 +228,50 @@ const logLevelFilter = ref('all')
 const logClearing = ref(false)
 let logTimer = null
 let chart = null
+let storageChart = null
+let storageChartEl = null
+
+const storagePartition = ref(null)
+const storageApp = ref(null)
+const storageLoading = ref(false)
+const storageError = ref('')
+
+const storageTotalBytes = computed(() => {
+  const p = storagePartition.value?.partition
+  if (!p) return 0
+  return Number(p.total_bytes) || 0
+})
+const storageUsedBytes = computed(() => {
+  const p = storagePartition.value?.partition
+  if (!p) return 0
+  return Number(p.used_bytes) || 0
+})
+const storageFreeBytes = computed(() => {
+  const p = storagePartition.value?.partition
+  if (!p) return 0
+  return Number(p.free_bytes) || 0
+})
+const storageUsedPct = computed(() => {
+  const t = storageTotalBytes.value
+  if (!t) return 0
+  return Math.round((storageUsedBytes.value / t) * 100)
+})
+const storageFreePct = computed(() => {
+  const t = storageTotalBytes.value
+  if (!t) return 0
+  return Math.max(0, Math.min(100, 100 - storageUsedPct.value))
+})
+const storagePieCenterShow = computed(() => {
+  return storagePartition.value?.ok && storageTotalBytes.value > 0
+})
+const storageHasData = computed(() => {
+  return Boolean(storagePartition.value?.partition && storageTotalBytes.value > 0)
+})
+
+function fmtMB(v) {
+  if (v == null || Number.isNaN(Number(v))) return '-'
+  return Number(v).toFixed(2)
+}
 
 const updatedAt = computed(() => props.status
   ? new Date(props.status.generated_at).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
@@ -215,6 +291,17 @@ const totalPct = computed(() => percent((ifaceMonthInKB.value + ifaceMonthOutKB.
 const inPctText = computed(() => (limitInGB.value > 0 ? `${inPct.value}%` : '不限'))
 const outPctText = computed(() => (limitOutGB.value > 0 ? `${outPct.value}%` : '不限'))
 const totalPctText = computed(() => (limitTotalGB.value > 0 ? `${totalPct.value}%` : '不限'))
+
+/** 相对「月度限额」的占用比例括号颜色：<50% / 50%~90% / ≥90%（无限额时为 neutral） */
+function trafficRatioTierClass(pct, hasLimit) {
+  if (!hasLimit) return 'traffic-ratio-tier-none'
+  if (pct < 50) return 'traffic-ratio-tier-low'
+  if (pct < 90) return 'traffic-ratio-tier-mid'
+  return 'traffic-ratio-tier-high'
+}
+const inRatioTierClass = computed(() => trafficRatioTierClass(inPct.value, limitInGB.value > 0))
+const outRatioTierClass = computed(() => trafficRatioTierClass(outPct.value, limitOutGB.value > 0))
+const totalRatioTierClass = computed(() => trafficRatioTierClass(totalPct.value, limitTotalGB.value > 0))
 const runDays = computed(() => {
   const raw = props.status?.settings?.deploy_date
   if (!raw) return '-'
@@ -383,6 +470,12 @@ const frpsDomain = computed(() => {
   return hit?.domain || '-'
 })
 
+const rootDomain = computed(() => {
+  const domain = frpsDomain.value
+  if (!domain || domain === '-') return '-'
+  return domain.replace(/^frps\./i, '')
+})
+
 const certSummary = computed(() => props.status?.dashboard?.certificate || {
   total: certs.value.length,
   ok: certs.value.filter(c => c.ok && (c.days_left == null || c.days_left >= 15)).length,
@@ -501,14 +594,98 @@ async function loadHostNetwork() {
 watch(() => props.status?.generated_at, () => {
   loadHostNetwork()
   loadIfaceMonthSummary()
+  loadStorageInfo()
 })
-const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => chart?.resize()) : null
+
+function buildStoragePie() {
+  ensureStorageChart()
+  if (!storageChart) return
+  const S = storagePartition.value
+  if (!S?.ok || !S.partition) {
+    storageChart.clear()
+    return
+  }
+  const used = Number(S.partition.used_bytes) || 0
+  const free = Number(S.partition.free_bytes) || 0
+  const total = used + free
+  if (total <= 0) {
+    storageChart.clear()
+    return
+  }
+  storageChart.setOption({
+    backgroundColor: 'transparent',
+    animation: true,
+    tooltip: {
+      trigger: 'item',
+      formatter: (p) => `${p.marker}${p.name}<br/><b>${humanBytes(p.value)}</b>（${p.percent}%）`
+    },
+    series: [
+      {
+        type: 'pie',
+        radius: ['52%', '82%'],
+        center: ['50%', '50%'],
+        avoidLabelOverlap: false,
+        itemStyle: { borderRadius: 3, borderColor: '#fff', borderWidth: 2 },
+        label: { show: false },
+        emphasis: { disabled: true },
+        data: [
+          { name: '已用', value: used, itemStyle: { color: '#2563eb' } },
+          { name: '可用', value: free, itemStyle: { color: '#cbd5e1' } }
+        ]
+      }
+    ]
+  }, { notMerge: true })
+}
+
+function ensureStorageChart() {
+  const el = storagePieEl.value
+  if (!el) return
+  if (storageChart && storageChartEl === el) return
+  if (storageChart) {
+    if (storageChartEl) ro?.unobserve(storageChartEl)
+    storageChart.dispose()
+  }
+  storageChart = echarts.init(el)
+  storageChartEl = el
+  ro?.observe(el)
+}
+
+async function loadStorageInfo() {
+  const hadData = storageHasData.value
+  storageLoading.value = true
+  storageError.value = ''
+  try {
+    const [disk, app] = await Promise.all([api.getStorage(), api.getStorageAppUsage()])
+    storagePartition.value = disk
+    storageApp.value = app
+  } catch (e) {
+    storageError.value = e.message || '存储信息加载失败'
+    if (!hadData) {
+      storagePartition.value = null
+      storageApp.value = null
+    }
+  } finally {
+    storageLoading.value = false
+    await nextTick()
+    buildStoragePie()
+    storageChart?.resize()
+  }
+}
+
+const ro = typeof ResizeObserver !== 'undefined'
+  ? new ResizeObserver(() => {
+      chart?.resize()
+      storageChart?.resize()
+    })
+  : null
 
 onMounted(async () => {
   await nextTick()
   chart = echarts.init(chartEl.value)
+  ensureStorageChart()
   loadHostNetwork()
   loadIfaceMonthSummary()
+  loadStorageInfo()
   ro?.observe(chartEl.value)
 })
 
@@ -516,6 +693,9 @@ onUnmounted(() => {
   stopLogAutoRefresh()
   ro?.disconnect()
   chart?.dispose()
+  storageChart?.dispose()
+  storageChart = null
+  storageChartEl = null
 })
 </script>
 
@@ -544,6 +724,10 @@ onUnmounted(() => {
   font-weight: var(--fw-title);
 }
 .dashboard-shell :deep(.page-sub) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  align-items: center;
   margin-top: 4px;
   color: #64748b;
   font-size: var(--fs-body);
@@ -586,15 +770,155 @@ onUnmounted(() => {
 }
 .btn-doc-icon::before { top: 4px; }
 .btn-doc-icon::after { top: 9px; }
-.btn-refresh-icon {
-  display: inline-block;
-  font-size: 14px;
-  line-height: 1;
-}
 .dashboard-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
+}
+.storage-card .summary-title {
+  padding-right: 4px;
+}
+.storage-loading,
+.storage-error {
+  margin-top: 14px;
+  font-size: 12px;
+  color: #64748b;
+}
+.storage-error {
+  color: #b91c1c;
+}
+.storage-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  min-height: 118px;
+  transition: opacity .16s ease;
+}
+.storage-body.refreshing {
+  opacity: .72;
+}
+.storage-donut-wrap {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  flex: 0 0 auto;
+}
+.storage-donut {
+  width: 112px;
+  height: 112px;
+}
+.storage-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  line-height: 1.1;
+}
+.storage-donut-pct {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+.storage-donut-lbl {
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 650;
+  color: #64748b;
+}
+.storage-meta {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.storage-meta .summary-sub {
+  font-size: 11px;
+  line-height: 1.35;
+}
+.storage-stat {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  line-height: 1.2;
+}
+.storage-stat span {
+  flex: 0 0 auto;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 500;
+}
+.storage-stat b {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.storage-stat.total {
+  border-color: transparent;
+  background: transparent;
+}
+.storage-stat.used {
+  border-color: transparent;
+  background: transparent;
+}
+.storage-stat.used span,
+.storage-stat.used b {
+  color: #2563eb;
+}
+.storage-stat.free {
+  border-color: transparent;
+  background: transparent;
+}
+.storage-stat.free span,
+.storage-stat.free b {
+  color: #16a34a;
+}
+.storage-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #64748b;
+}
+.storage-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.storage-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.storage-dot.used {
+  background: #2563eb;
+}
+.storage-dot.free {
+  background: #cbd5e1;
+}
+.storage-app-line {
+  margin-top: 4px;
+  font-size: 10px !important;
+  color: #64748b !important;
+}
+.storage-app-line b {
+  color: #0f172a;
+  font-weight: 650;
 }
 .summary-card {
   position: relative;
@@ -632,6 +956,9 @@ onUnmounted(() => {
   gap: 14px;
   margin-top: 12px;
 }
+.service-body > div:last-child {
+  min-width: 0;
+}
 .server-icon {
   display: grid;
   place-content: center;
@@ -659,10 +986,65 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   font-size: 14px;
   font-weight: 800;
   color: #0f172a;
+}
+.service-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+.service-chip {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  padding: 4px 8px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: #eef2f7;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.service-health {
+  border-color: #bbf7d0;
+  background: #ecfdf3;
+  color: #15803d;
+}
+.service-uptime small {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 650;
+}
+.service-domain {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+.service-uptime {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  color: #475569;
+  font-size: 11px;
+}
+.service-uptime small {
+  display: inline;
+  margin: 0;
+}
+.service-uptime b {
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 850;
+  line-height: 1;
 }
 .status-dot {
   width: 10px;
@@ -674,6 +1056,7 @@ onUnmounted(() => {
 .status-dot.bad { background: #ef4444; }
 .traffic-bars {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 10px;
 }
@@ -695,16 +1078,73 @@ onUnmounted(() => {
 .traffic-line {
   display: grid;
   gap: 8px;
+  min-width: 0;
+}
+.traffic-total {
+  grid-column: 1 / -1;
 }
 .traffic-label {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
-  color: #0f172a;
+  gap: 4px 8px;
+  justify-content: space-between;
   font-size: 12px;
 }
 .traffic-label b {
   font-weight: 500;
+  white-space: nowrap;
+}
+/* 本月流量吞吐：仅字体颜色层级，不改布局尺寸 */
+.throughput-card .traffic-lbl {
+  color: #64748b;
+  font-weight: 650;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+.throughput-card .traffic-in-row .traffic-bytes {
+  color: #1d4ed8;
+  font-weight: 650;
+}
+.throughput-card .traffic-out-row .traffic-bytes {
+  color: #047857;
+  font-weight: 650;
+}
+.throughput-card .traffic-total-row .traffic-bytes {
+  color: #0f172a;
+  font-weight: 700;
+}
+.throughput-card .traffic-ratio {
+  font-weight: 500;
+}
+.throughput-card .traffic-ratio.traffic-ratio-tier-none {
+  color: #94a3b8;
+}
+.throughput-card .traffic-ratio.traffic-ratio-tier-low {
+  color: #15803d;
+}
+.throughput-card .traffic-ratio.traffic-ratio-tier-mid {
+  color: #b45309;
+}
+.throughput-card .traffic-ratio.traffic-ratio-tier-high {
+  color: #b91c1c;
+  font-weight: 650;
+}
+/* 吞吐进度条：与括号比例同一档位配色 */
+.throughput-card .thin-progress .thin-progress-fill {
+  min-width: 0;
+}
+.throughput-card .thin-progress .thin-progress-fill.traffic-ratio-tier-none {
+  background: linear-gradient(90deg, #94a3b8, #cbd5e1);
+}
+.throughput-card .thin-progress .thin-progress-fill.traffic-ratio-tier-low {
+  background: linear-gradient(90deg, #15803d, #22c55e);
+}
+.throughput-card .thin-progress .thin-progress-fill.traffic-ratio-tier-mid {
+  background: linear-gradient(90deg, #d97706, #ea580c);
+}
+.throughput-card .thin-progress .thin-progress-fill.traffic-ratio-tier-high {
+  background: linear-gradient(90deg, #dc2626, #ef4444);
 }
 .thin-progress,
 .wide-progress {
@@ -718,9 +1158,9 @@ onUnmounted(() => {
   height: 100%;
   border-radius: inherit;
 }
-.thin-progress .blue { background: linear-gradient(90deg, #1f7ae0, #248af0); }
-.thin-progress .green,
-.wide-progress div { background: linear-gradient(90deg, #12b76a, #16a34a); }
+.wide-progress div {
+  background: linear-gradient(90deg, #12b76a, #16a34a);
+}
 .online-head {
   display: flex;
   justify-content: space-between;
@@ -1147,6 +1587,11 @@ onUnmounted(() => {
 .log-modal-fade-enter-from,
 .log-modal-fade-leave-to {
   opacity: 0;
+}
+@media (max-width: 1480px) {
+  .dashboard-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 @media (max-width: 1200px) {
   .dashboard-page { height: auto; grid-template-rows: auto auto; overflow: visible; padding-bottom: 0; }

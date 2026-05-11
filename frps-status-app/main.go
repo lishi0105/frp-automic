@@ -10,6 +10,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"frps-status-app.local/status/src/appsettings"
 	"frps-status-app.local/status/src/config"
 	"frps-status-app.local/status/src/frps"
 	"frps-status-app.local/status/src/logger"
@@ -22,11 +23,7 @@ func main() {
 	if err := os.MkdirAll(filepath.Dir(cfg.DBPath), 0o755); err != nil {
 		fatal(err)
 	}
-	logDir := cfg.LogDir
-	if logDir == "" {
-		logDir = filepath.Join(filepath.Dir(cfg.DBPath), "logs")
-	}
-	if err := logger.Init(logDir); err != nil {
+	if err := logger.Init(cfg.LogDir); err != nil {
 		fatal(err)
 	}
 	defer logger.Close()
@@ -39,19 +36,15 @@ func main() {
 	if err := st.InitDB(); err != nil {
 		fatal(err)
 	}
-	username := cfg.StatusUser
-	if username == "" {
-		username = "admin"
+	appcfg := appsettings.New(st)
+	if err := appsettings.LoadAppSettings(appcfg); err != nil {
+		fatal(err)
 	}
-	password := cfg.StatusPassword
-	if password == "" {
-		password = "admin123"
-	}
-	if err := st.SeedUser(username, password); err != nil {
+	if err := st.SeedUser(cfg.StatusUser, cfg.StatusPassword); err != nil {
 		fatal(err)
 	}
 	fc := frps.NewClient(cfg.FRPSHost, cfg.FRPSDashboardPort, cfg.FRPSDashboardUser, cfg.FRPSDashboardPass, &http.Client{Timeout: 8 * time.Second})
-	app := server.New(cfg, st, fc)
+	app := server.New(cfg, st, appcfg, fc)
 	app.InitWarnings()
 	if err := app.Refresh(context.Background()); err != nil {
 		logger.Warn("初始刷新失败: %v", err)

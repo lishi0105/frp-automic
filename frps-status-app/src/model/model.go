@@ -33,6 +33,8 @@ type ProxyHealth struct {
 	LastOfflineAt      string `json:"last_offline_at,omitempty"`
 	LastRecoveryAt     string `json:"last_recovery_at,omitempty"`
 	OfflineSeconds     int64  `json:"offline_seconds,omitempty"`
+	// RecoveryConfirmed 为 true 时允许发代理恢复类邮件（连续在线 ≥3 或稳定 ≥5 分钟，见设计 11.2）
+	RecoveryConfirmed bool `json:"recovery_confirmed"`
 }
 
 type ProxyTraffic struct {
@@ -49,26 +51,27 @@ type ProxyTraffic struct {
 }
 
 type PublicSettings struct {
-	ThresholdInGB        float64 `json:"threshold_in_gb"`
-	ThresholdOutGB       float64 `json:"threshold_out_gb"`
-	ThresholdTotalGB     float64 `json:"threshold_total_gb"`
-	LimitInGB            float64 `json:"limit_in_gb"`
-	LimitOutGB           float64 `json:"limit_out_gb"`
-	LimitTotalGB         float64 `json:"limit_total_gb"`
-	InitialInGB          float64 `json:"initial_in_gb"`
-	InitialOutGB         float64 `json:"initial_out_gb"`
-	DeployDate           string  `json:"deploy_date"`
-	HistoryRetentionDays int     `json:"history_retention_days"`
-	SMTPHost             string  `json:"smtp_host"`
-	SMTPPort             int     `json:"smtp_port"`
-	SMTPUser             string  `json:"smtp_user"`
-	SMTPFrom             string  `json:"smtp_from"`
-	SMTPTo               string  `json:"smtp_to"`
-	SMTPEnabled          bool    `json:"smtp_enabled"`
-	SMTPAuthCode         string  `json:"smtp_auth_code"`
-	AlertProxyOffline    bool    `json:"alert_proxy_offline"`
-	AlertCertExpiry      bool    `json:"alert_cert_expiry"`
-	AlertCertDays        int     `json:"alert_cert_days"`
+	ThresholdInGB                 float64 `json:"threshold_in_gb"`
+	ThresholdOutGB                float64 `json:"threshold_out_gb"`
+	ThresholdTotalGB              float64 `json:"threshold_total_gb"`
+	LimitInGB                     float64 `json:"limit_in_gb"`
+	LimitOutGB                    float64 `json:"limit_out_gb"`
+	LimitTotalGB                  float64 `json:"limit_total_gb"`
+	InitialInGB                   float64 `json:"initial_in_gb"`
+	InitialOutGB                  float64 `json:"initial_out_gb"`
+	DeployDate                    string  `json:"deploy_date"`
+	HistoryRetentionDays          int     `json:"history_retention_days"`
+	DiskFreeSpaceAlertThresholdMB uint64  `json:"disk_free_space_alert_threshold_mb"`
+	SMTPHost                      string  `json:"smtp_host"`
+	SMTPPort                      int     `json:"smtp_port"`
+	SMTPUser                      string  `json:"smtp_user"`
+	SMTPFrom                      string  `json:"smtp_from"`
+	SMTPTo                        string  `json:"smtp_to"`
+	SMTPEnabled                   bool    `json:"smtp_enabled"`
+	SMTPAuthCode                  string  `json:"smtp_auth_code"`
+	AlertProxyOffline             bool    `json:"alert_proxy_offline"`
+	AlertCertExpiry               bool    `json:"alert_cert_expiry"`
+	AlertCertDays                 int     `json:"alert_cert_days"`
 }
 
 type Snapshot struct {

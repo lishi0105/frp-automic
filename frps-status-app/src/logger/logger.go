@@ -67,6 +67,16 @@ func ClearCurrentLog() error {
 	return activeWriter.ClearCurrentLog()
 }
 
+// DiskPressureRemoveNonCurrentLogs 删除日志目录中除当前正在写入的日期日志外的所有 .log 文件（应急释放磁盘）。
+func DiskPressureRemoveNonCurrentLogs() (removed int, freed int64, err error) {
+	return activeWriter.removeNonCurrentLogFiles(time.Now())
+}
+
+// DiskPressureRotateCurrentLog 关闭并清空当日日志文件后重新打开，并再次按策略清理旧日志。
+func DiskPressureRotateCurrentLog() error {
+	return activeWriter.rotateCurrentLogForDiskPressure(time.Now())
+}
+
 type core struct {
 	writer *dailyWriter
 	level  zapcore.LevelEnabler
@@ -109,7 +119,7 @@ func (c *core) Write(entry zapcore.Entry, fields []zap.Field) error {
 	allFields = append(allFields, fields...)
 
 	line := fmt.Sprintf("[%s %s:%d] %s %s%s\n",
-		entry.Time.Format("2006-01-02 15:04::05"),
+		entry.Time.Format("2006-01-02 15:04:05"),
 		filepath.Base(entry.Caller.File),
 		entry.Caller.Line,
 		levelLabel(entry.Level),
@@ -364,4 +374,53 @@ func (w *dailyWriter) listLogFilesLocked() []logFile {
 		return files[i].day.Before(files[j].day)
 	})
 	return files
+}
+
+func (w *dailyWriter) removeNonCurrentLogFiles(now time.Time) (removed int, freed int64, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.dir == "" {
+		return 0, 0, nil
+	}
+	if err := w.ensureFile(now); err != nil {
+		return 0, 0, err
+	}
+	currentName := w.day + ".log"
+	for _, lf := range w.listLogFilesLocked() {
+		if filepath.Base(lf.path) == currentName {
+			continue
+		}
+		sz := lf.size
+		if rmErr := os.Remove(lf.path); rmErr != nil {
+			continue
+		}
+		removed++
+		freed += sz
+	}
+	return removed, freed, nil
+}
+
+func (w *dailyWriter) rotateCurrentLogForDiskPressure(now time.Time) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.dir == "" {
+		return nil
+	}
+	if err := w.ensureFile(now); err != nil {
+		return err
+	}
+	if w.file != nil {
+		_ = w.file.Sync()
+		_ = w.file.Close()
+		w.file = nil
+	}
+	path := filepath.Join(w.dir, w.day+".log")
+	_ = os.Remove(path)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return err
+	}
+	w.file = f
+	w.cleanupLocked(now)
+	return nil
 }

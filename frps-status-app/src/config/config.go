@@ -10,6 +10,8 @@ import (
 type Config struct {
 	Listen            string
 	DBPath            string
+	// ProcRoot 为空时使用 /proc；可设为挂载的宿主机 proc（如 /host/proc），便于容器内读取 loadavg/meminfo。
+	ProcRoot          string
 	FRPSHost          string
 	FRPSBindPort      int
 	FRPSDashboardPort int
@@ -26,25 +28,39 @@ type Config struct {
 	PollInterval      time.Duration
 }
 
+// 数据库路径固定（不由环境变量配置）。
+const DBPathFixed = "/data/frps-status.sqlite"
+
+// 日志目录固定为与数据、配置同级的 /logs；可通过 LOG_DIR 覆盖（一般留空即可）。
+const LogDirFixed = "/logs"
+
+// 容器内证书 live 目录固定（与 compose 将宿主机 certbot conf 挂载到 /etc/letsencrypt 的布局一致）。
+const CertDirFixed = "/etc/letsencrypt/live"
+
+// 状态面板 Web 登录固定（不由环境变量配置）；首次启动会写入 SQLite 用户表。
+const StatusUserFixed = "admin"
+const StatusPasswordFixed = "admin123"
+
 func Load() Config {
 	frpsUser := env("FRPS_DASHBOARD_USER", "")
 	frpsPass := env("FRPS_DASHBOARD_PASSWORD", "")
 	return Config{
 		Listen:            env("LISTEN", "127.0.0.1:28080"),
-		DBPath:            env("DB_PATH", "/data/frps-status.sqlite"),
+		DBPath:            DBPathFixed,
+		ProcRoot:          env("STATUS_PROC_ROOT", ""),
 		FRPSHost:          env("FRPS_HOST", "127.0.0.1"),
 		FRPSBindPort:      envInt("FRPS_BIND_PORT", 7000),
 		FRPSDashboardPort: envInt("FRPS_DASHBOARD_PORT", 7500),
 		FRPSDashboardUser: frpsUser,
 		FRPSDashboardPass: frpsPass,
-		CertDir:           env("CERT_DIR", "/etc/letsencrypt/live"),
+		CertDir:           CertDirFixed,
 		HostPublicIP:      env("HOST_PUBLIC_IP", ""),
 		HostIface:         env("HOST_IFACE", ""),
 		HostNetStatsDir:   env("HOST_NET_STATS_DIR", "/host-net-stats"),
 		Domains:           SplitCSV(os.Getenv("STATUS_DOMAINS")),
-		StatusUser:        env("STATUS_USER", frpsUser),
-		StatusPassword:    env("STATUS_PASSWORD", frpsPass),
-		LogDir:            env("LOG_DIR", ""),
+		StatusUser:        StatusUserFixed,
+		StatusPassword:    StatusPasswordFixed,
+		LogDir:            env("LOG_DIR", LogDirFixed),
 		PollInterval:      time.Duration(envInt("POLL_SECONDS", 60)) * time.Second,
 	}
 }

@@ -6,7 +6,9 @@
         <div class="page-sub">公网IP：{{ currentPublicIP || '-' }} · 网卡：{{ currentIface || '-' }}</div>
       </div>
       <div class="flex-center">
-        <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loadingData" @click="fetchRows">↻</button>
+        <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loadingData" @click="fetchRows">
+          <span class="refresh-glyph" :class="{ 'is-spinning': loadingData }" aria-hidden="true">↻</span>
+        </button>
       </div>
     </div>
 
@@ -14,7 +16,7 @@
       <section class="analytics-overview">
         <div>
           <div class="section-title">所选时间范围</div>
-          <div class="text-muted text-sm">{{ startDate }} 至 {{ endDate }} · {{ currentPublicIP || '-' }} / {{ currentIface || '-' }}</div>
+          <div class="text-muted text-sm">{{ startDate }} 至 {{ endDate }}</div>
         </div>
         <div class="analytics-overview-metrics">
           <div><b>{{ humanBytesKB(totalRxKB) }}</b><small>入站</small></div>
@@ -48,14 +50,17 @@
           <div class="table-wrap stats-table-scroll">
             <table class="stats-detail-table">
               <thead>
-                <tr><th class="col-date">日期</th><th>公网IP</th><th>网卡</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num">总流量</th></tr>
+                <tr>
+                  <th class="col-date">日期</th>
+                  <th class="col-num sortable" @click="toggleSort('in')">入站 <span :class="sortClass('in')">↕</span></th>
+                  <th class="col-num sortable" @click="toggleSort('out')">出站 <span :class="sortClass('out')">↕</span></th>
+                  <th class="col-num sortable" @click="toggleSort('total')">总流量 <span :class="sortClass('total')">↕</span></th>
+                </tr>
               </thead>
               <tbody>
-                <tr v-if="!pagedRows.length"><td colspan="6" class="empty">暂无数据</td></tr>
+                <tr v-if="!pagedRows.length"><td colspan="4" class="empty">暂无数据</td></tr>
                 <tr v-for="r in pagedRows" :key="`${r.day}:${r.public_ip}:${r.iface}`">
                   <td class="col-date">{{ r.day }}</td>
-                  <td>{{ r.public_ip }}</td>
-                  <td><span class="badge badge-ok">{{ r.iface }}</span></td>
                   <td class="col-num">{{ humanBytesKB(r.rx_kb) }}</td>
                   <td class="col-num">{{ humanBytesKB(r.tx_kb) }}</td>
                   <td class="col-num"><b>{{ humanBytesKB(r.rx_kb + r.tx_kb) }}</b></td>
@@ -90,6 +95,8 @@ const page = ref(1)
 const PAGE_SIZE = 15
 const hostPublicIP = ref('')
 const hostIface = ref('')
+const sortKey = ref('day')
+const sortDir = ref('desc')
 
 const startDate = ref('')
 const endDate = ref('')
@@ -123,7 +130,12 @@ function humanBytesKB(kb) {
 async function fetchRows() {
   loadingData.value = true
   try {
-    rows.value = await api.getDailyInterface({ from: startDate.value, to: endDate.value })
+    rows.value = await api.getDailyInterface({
+      from: startDate.value,
+      to: endDate.value,
+      sort: sortKey.value,
+      order: sortDir.value
+    })
     page.value = 1
   } finally {
     loadingData.value = false
@@ -143,10 +155,7 @@ async function fetchHostNetwork() {
 
 const currentPublicIP = computed(() => hostPublicIP.value || rows.value[0]?.public_ip || '')
 const currentIface = computed(() => hostIface.value || rows.value[0]?.iface || '')
-const filteredRows = computed(() =>
-  rows.value
-    .slice()
-    .sort((a, b) => (a.day === b.day ? String(a.iface).localeCompare(String(b.iface)) : b.day.localeCompare(a.day))))
+const filteredRows = computed(() => rows.value.slice())
 
 const totalRxKB = computed(() => filteredRows.value.reduce((s, r) => s + Number(r.rx_kb || 0), 0))
 const totalTxKB = computed(() => filteredRows.value.reduce((s, r) => s + Number(r.tx_kb || 0), 0))
@@ -162,6 +171,21 @@ const pageNumbers = computed(() => {
   if (p >= t - 2) return [t - 4, t - 3, t - 2, t - 1, t]
   return [p - 2, p - 1, p, p + 1, p + 2]
 })
+
+function toggleSort(key) {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = key
+    sortDir.value = 'desc'
+  }
+  fetchRows()
+}
+
+function sortClass(key) {
+  if (sortKey.value !== key) return 'sort-idle'
+  return sortDir.value === 'asc' ? 'sort-asc' : 'sort-desc'
+}
 
 const trendRows = computed(() => {
   const m = new Map()
@@ -280,6 +304,27 @@ onUnmounted(() => {
 }
 .stats-detail-table .col-date { width: 92px; }
 .stats-detail-table .col-num { width: 90px; text-align: right; }
+.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.sort-idle {
+  color: var(--text-2);
+}
+.sort-asc,
+.sort-desc {
+  font-size: 0;
+  font-weight: 700;
+}
+.sort-asc::before {
+  content: '↑';
+  font-size: 12px;
+}
+.sort-desc::before {
+  content: '↓';
+  font-size: 12px;
+}
 .analytics-pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .page-num-list { display: flex; gap: 6px; }
 .page-num { min-width: 34px; padding: 0 8px; }

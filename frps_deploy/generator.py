@@ -5,7 +5,8 @@ from frps_deploy import config
 from frps_deploy.constants import (
     CERTBOT_CONF_DIR, CERTBOT_WWW_DIR, COMPOSE_FILE, FRPC_BASE_DIR,
     FRPC_COMPOSE_FILE, FRPC_TOML_FILE, FRPS_TOML_FILE, GENERATED_INFO_FILE,
-    NGINX_CONF_DIR, STATUS_APP_DATA_DIR, STATUS_APP_DIR, STATUS_APP_ENV_FILE,
+    NGINX_CONF_DIR, STATUS_APP_CONFIG_DIR, STATUS_APP_DATA_DIR, STATUS_APP_DIR,
+    STATUS_APP_ENV_FILE,
 )
 from frps_deploy.models import DeployContext
 from frps_deploy.services import (
@@ -32,6 +33,7 @@ def ensure_dirs() -> None:
     CERTBOT_WWW_DIR.mkdir(parents=True, exist_ok=True)
     if config.STATUS_APP_ENABLED:
         STATUS_APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        STATUS_APP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     FRPC_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -142,22 +144,20 @@ def generate_frps_compose(ctx: DeployContext) -> None:
       - "{status_bind}:{ctx.status_port}:8080"
     environment:
       LISTEN: "0.0.0.0:8080"
-      DB_PATH: "/data/frps-status.sqlite"
       FRPS_HOST: "frps"
       FRPS_BIND_PORT: "{ctx.bind_port}"
       FRPS_DASHBOARD_PORT: "{ctx.dashboard_port}"
       FRPS_DASHBOARD_USER: "{ctx.dashboard_user}"
       FRPS_DASHBOARD_PASSWORD: "{ctx.dashboard_password}"
       STATUS_DOMAINS: "{domains_str}"
-      STATUS_USER: "{ctx.status_user}"
-      STATUS_PASSWORD: "{ctx.status_password}"
-      CERT_DIR: "/etc/letsencrypt/live"
       POLL_SECONDS: "60"
       HOST_PUBLIC_IP: "{ctx.vps_public_ip}"
       HOST_IFACE: "{ctx.host_iface}"
       HOST_NET_STATS_DIR: "/host-net-stats"
     volumes:
       - ./frps-status/data:/data
+      - ./frps-status/config:/config
+      - ./frps-status/logs:/logs
       - ./certbot/conf:/etc/letsencrypt:ro
       - /sys/class/net/{ctx.host_iface}/statistics:/host-net-stats:ro
 """
@@ -451,26 +451,22 @@ def write_status_app_env(ctx: DeployContext) -> None:
         return
     STATUS_APP_DIR.mkdir(parents=True, exist_ok=True)
     STATUS_APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    STATUS_APP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     lines = [
         "LISTEN=0.0.0.0:8080",
         f"STATUS_APP_BIND={'0.0.0.0' if config.STATUS_APP_HTTP else '127.0.0.1'}",
         f"STATUS_APP_PORT={ctx.status_port}",
-        "DB_PATH=/data/frps-status.sqlite",
         "FRPS_HOST=frps",
         f"FRPS_BIND_PORT={ctx.bind_port}",
         f"FRPS_DASHBOARD_PORT={ctx.dashboard_port}",
         f"FRPS_DASHBOARD_USER={ctx.dashboard_user}",
         f"FRPS_DASHBOARD_PASSWORD={ctx.dashboard_password}",
         f"STATUS_DOMAINS={','.join(managed_domains(ctx.root_domain))}",
-        f"STATUS_USER={ctx.dashboard_user}",
-        f"STATUS_PASSWORD={ctx.dashboard_password}",
-        "CERT_DIR=/etc/letsencrypt/live",
         "POLL_SECONDS=60",
         f"HOST_PUBLIC_IP={ctx.vps_public_ip}",
         f"HOST_IFACE={ctx.host_iface}",
         "HOST_NET_STATS_DIR=/host-net-stats",
         f"HOST_NET_STATS_MOUNT=/sys/class/net/{ctx.host_iface}/statistics",
-        f"FRPS_CERTBOT_CONF_DIR={CERTBOT_CONF_DIR}",
         "",
     ]
     STATUS_APP_ENV_FILE.write_text("\n".join(lines), encoding="utf-8")

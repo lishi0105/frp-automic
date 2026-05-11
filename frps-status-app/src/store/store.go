@@ -7,8 +7,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"math"
-	"strconv"
 	"strings"
 	"time"
 
@@ -56,6 +54,73 @@ type EventState struct {
 	LastRecoveryAt string
 	FirstFailAt    string
 	LastSeenAt     string
+	// 恢复确认（设计 11.2）：连续在线轮次、自本轮稳定在线起算时间（RFC3339）
+	RecoverStreak int
+	RecoverSince  string
+}
+
+// RecoveryConfirmed 为 true 表示满足「连续成功 ≥3 次」或「自 recover_since 起持续正常 ≥5 分钟」。
+func (st EventState) RecoveryConfirmed(now time.Time) bool {
+	const minStreak = 3
+	const minStable = 5 * time.Minute
+	if st.RecoverStreak >= minStreak {
+		return true
+	}
+	s := strings.TrimSpace(st.RecoverSince)
+	if s == "" {
+		return false
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return false
+	}
+	return now.Sub(t) >= minStable
+}
+
+type AlertEvent struct {
+	Fingerprint       string
+	DefinitionID      string // 对应 alert_parent_definitions.id（UUID）
+	AlertType         string
+	Target            string
+	Level             string
+	Status            string
+	Title             string
+	Message           string
+	FirstSeenAt       string
+	LastSeenAt        string
+	ResolvedAt        string
+	OccurrenceCount   int64
+	LastError         string
+	LastNotifyAt      string
+	ParentFingerprint string
+	Suppressed        bool
+	SuppressReason    string
+	CreatedAt         string
+	UpdatedAt         string
+}
+
+type AlertCandidate struct {
+	Fingerprint string
+	AlertType   string
+	Target      string
+	Level       string
+	Title       string
+	Message     string
+	LastError   string
+	WarningKey  string
+	FirstSeenAt string
+	LastSeenAt  string
+}
+
+// AlertParentDef 父级异常类定义：sort_rank 越小优先级越高；相同 sort_rank 为同一层级可同时触发。
+type AlertParentDef struct {
+	ID                string
+	ParentKey         string
+	SortRank          int
+	BlocksDownstream  bool
+	SuppressProxyCert bool
+	Label             string
+	Description       string
 }
 
 func New(db *sql.DB) *Store {
@@ -65,103 +130,210 @@ func New(db *sql.DB) *Store {
 func (s *Store) InitDB() error {
 	stmts := []string{
 		`PRAGMA journal_mode=WAL`,
-		`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS proxy_counters (name TEXT NOT NULL, type TEXT NOT NULL, last_in INTEGER NOT NULL, last_out INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(name,type))`,
-		`CREATE TABLE IF NOT EXISTS daily_traffic (day TEXT NOT NULL, proxy_name TEXT NOT NULL, proxy_type TEXT NOT NULL, in_bytes INTEGER NOT NULL DEFAULT 0, out_bytes INTEGER NOT NULL DEFAULT 0, peak_conns INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(day,proxy_name,proxy_type))`,
-		`CREATE TABLE IF NOT EXISTS alert_state (month TEXT NOT NULL, direction TEXT NOT NULL, sent_at TEXT NOT NULL, PRIMARY KEY(month,direction))`,
-		`CREATE TABLE IF NOT EXISTS event_alert_state (key TEXT PRIMARY KEY, sent_at TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 0, fail_streak INTEGER NOT NULL DEFAULT 0, total_checks INTEGER NOT NULL DEFAULT 0, online_checks INTEGER NOT NULL DEFAULT 0, last_change_at TEXT NOT NULL DEFAULT '', last_offline_at TEXT NOT NULL DEFAULT '', last_recovery_at TEXT NOT NULL DEFAULT '', first_fail_at TEXT NOT NULL DEFAULT '', last_seen_at TEXT NOT NULL DEFAULT '')`,
-		`CREATE TABLE IF NOT EXISTS proxy_status_events (key TEXT NOT NULL, status INTEGER NOT NULL, at TEXT NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS app_meta (id TEXT PRIMARY KEY, key TEXT NOT NULL UNIQUE, value TEXT NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS proxy_counters (id TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL, last_in INTEGER NOT NULL, last_out INTEGER NOT NULL, updated_at TEXT NOT NULL, UNIQUE(name,type))`,
+		`CREATE TABLE IF NOT EXISTS daily_traffic (id TEXT PRIMARY KEY, day TEXT NOT NULL, proxy_name TEXT NOT NULL, proxy_type TEXT NOT NULL, in_bytes INTEGER NOT NULL DEFAULT 0, out_bytes INTEGER NOT NULL DEFAULT 0, peak_conns INTEGER NOT NULL DEFAULT 0, UNIQUE(day,proxy_name,proxy_type))`,
+		`CREATE TABLE IF NOT EXISTS event_alert_state (id TEXT PRIMARY KEY, key TEXT NOT NULL UNIQUE, sent_at TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 0, fail_streak INTEGER NOT NULL DEFAULT 0, total_checks INTEGER NOT NULL DEFAULT 0, online_checks INTEGER NOT NULL DEFAULT 0, last_change_at TEXT NOT NULL DEFAULT '', last_offline_at TEXT NOT NULL DEFAULT '', last_recovery_at TEXT NOT NULL DEFAULT '', first_fail_at TEXT NOT NULL DEFAULT '', last_seen_at TEXT NOT NULL DEFAULT '', recover_streak INTEGER NOT NULL DEFAULT 0, recover_since TEXT NOT NULL DEFAULT '')`,
+		`CREATE TABLE IF NOT EXISTS proxy_status_events (id TEXT PRIMARY KEY, key TEXT NOT NULL, status INTEGER NOT NULL, at TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, password_salt TEXT NOT NULL, recovery_email TEXT NOT NULL DEFAULT '', is_initial_password INTEGER NOT NULL DEFAULT 1)`,
-		`CREATE TABLE IF NOT EXISTS warnings (key TEXT PRIMARY KEY, message TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS iface_counters (iface TEXT NOT NULL, public_ip TEXT NOT NULL, last_rx_bytes INTEGER NOT NULL, last_tx_bytes INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(iface,public_ip))`,
-		`CREATE TABLE IF NOT EXISTS daily_iface_traffic (day TEXT NOT NULL, iface TEXT NOT NULL, public_ip TEXT NOT NULL, rx_kb INTEGER NOT NULL DEFAULT 0, tx_kb INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(day,iface,public_ip))`,
+		`CREATE TABLE IF NOT EXISTS warnings (id TEXT PRIMARY KEY, key TEXT NOT NULL UNIQUE, message TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS iface_counters (id TEXT PRIMARY KEY, iface TEXT NOT NULL, public_ip TEXT NOT NULL, last_rx_bytes INTEGER NOT NULL, last_tx_bytes INTEGER NOT NULL, updated_at TEXT NOT NULL, UNIQUE(iface,public_ip))`,
+		`CREATE TABLE IF NOT EXISTS daily_iface_traffic (id TEXT PRIMARY KEY, day TEXT NOT NULL, iface TEXT NOT NULL, public_ip TEXT NOT NULL, rx_kb INTEGER NOT NULL DEFAULT 0, tx_kb INTEGER NOT NULL DEFAULT 0, UNIQUE(day,iface,public_ip))`,
+		`CREATE TABLE IF NOT EXISTS alert_events (
+			id TEXT PRIMARY KEY,
+			fingerprint TEXT NOT NULL UNIQUE,
+			definition_id TEXT NOT NULL DEFAULT '',
+			alert_type TEXT NOT NULL,
+			target TEXT NOT NULL,
+			level TEXT NOT NULL,
+			status TEXT NOT NULL,
+			title TEXT NOT NULL,
+			message TEXT NOT NULL,
+			first_seen_at TEXT NOT NULL,
+			last_seen_at TEXT NOT NULL,
+			resolved_at TEXT NOT NULL DEFAULT '',
+			occurrence_count INTEGER NOT NULL DEFAULT 0,
+			last_error TEXT NOT NULL DEFAULT '',
+			last_notify_at TEXT NOT NULL DEFAULT '',
+			parent_fingerprint TEXT NOT NULL DEFAULT '',
+			suppressed INTEGER NOT NULL DEFAULT 0,
+			suppress_reason TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS alert_candidate_cache (
+			id TEXT PRIMARY KEY,
+			fingerprint TEXT NOT NULL UNIQUE,
+			alert_type TEXT NOT NULL,
+			target TEXT NOT NULL,
+			level TEXT NOT NULL,
+			title TEXT NOT NULL,
+			message TEXT NOT NULL,
+			last_error TEXT NOT NULL DEFAULT '',
+			warning_key TEXT NOT NULL DEFAULT '',
+			first_seen_at TEXT NOT NULL,
+			last_seen_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS alert_parent_definitions (
+			id TEXT PRIMARY KEY,
+			parent_key TEXT NOT NULL UNIQUE,
+			sort_rank INTEGER NOT NULL,
+			blocks_downstream INTEGER NOT NULL DEFAULT 0,
+			suppress_proxy_cert INTEGER NOT NULL DEFAULT 1,
+			label TEXT NOT NULL DEFAULT '',
+			description TEXT NOT NULL DEFAULT ''
+		)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.Exec(stmt); err != nil {
 			return logStoreErr("init database schema", err)
 		}
 	}
-	_, _ = s.db.Exec(`ALTER TABLE daily_traffic ADD COLUMN peak_conns INTEGER NOT NULL DEFAULT 0`)
-	_, _ = s.db.Exec(`ALTER TABLE users ADD COLUMN is_initial_password INTEGER NOT NULL DEFAULT 1`)
-	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN active INTEGER NOT NULL DEFAULT 0`)
-	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN fail_streak INTEGER NOT NULL DEFAULT 0`)
-	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN total_checks INTEGER NOT NULL DEFAULT 0`)
-	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN online_checks INTEGER NOT NULL DEFAULT 0`)
-	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN last_change_at TEXT NOT NULL DEFAULT ''`)
-	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN last_offline_at TEXT NOT NULL DEFAULT ''`)
-	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN last_recovery_at TEXT NOT NULL DEFAULT ''`)
-	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN first_fail_at TEXT NOT NULL DEFAULT ''`)
-	_, _ = s.db.Exec(`ALTER TABLE event_alert_state ADD COLUMN last_seen_at TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_proxy_status_events_key_at ON proxy_status_events(key, at)`)
 	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_daily_iface_traffic_day ON daily_iface_traffic(day)`)
-	defaults := map[string]string{
-		"threshold_in_gb":        "0",
-		"threshold_out_gb":       "0",
-		"threshold_total_gb":     "0",
-		"limit_in_gb":            "0",
-		"limit_out_gb":           "0",
-		"limit_total_gb":         "0",
-		"initial_in_gb":          "0",
-		"initial_out_gb":         "0",
-		"smtp_port":              "465",
-		"smtp_enabled":           "false",
-		"alert_proxy_offline":    "false",
-		"alert_cert_expiry":      "false",
-		"alert_cert_days":        "15",
-		"smtp_verified":          "false",
-		"history_retention_days": "60",
+	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_alert_events_status ON alert_events(status)`)
+	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_alert_candidate_cache_last_seen ON alert_candidate_cache(last_seen_at)`)
+
+	const deployKey = "deploy_date"
+	if _, err := s.db.Exec(`INSERT INTO app_meta(id,key,value) VALUES(?,?,?) ON CONFLICT(key) DO NOTHING`, uuid.NewString(), deployKey, time.Now().Format("2006-01-02")); err != nil {
+		return logStoreErr("init deploy_date", err)
 	}
-	for k, v := range defaults {
-		if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)`, k, v); err != nil {
-			return logStoreErr("init default setting "+k, err)
-		}
-	}
-	if _, err := s.db.Exec(`INSERT OR IGNORE INTO settings(key,value) VALUES('deploy_date',?)`, time.Now().Format("2006-01-02")); err != nil {
-		return logStoreErr("init deploy date setting", err)
+	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_alert_parent_defs_rank ON alert_parent_definitions(sort_rank, parent_key)`)
+
+	if err := seedAlertParentDefinitions(s.db); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (s *Store) Setting(key string) string {
+func seedAlertParentDefinitions(db *sql.DB) error {
+	// sort_rank：0=独立告警（不抑制下游）；10=主机基础设施类（可多条同秩）；20=FRPS/反代服务入口；30=预留更下游父级。
+	rows := []struct {
+		key, label, desc   string
+		rank               int
+		blocks, suppressPC int
+	}{
+		{"traffic_threshold_in", "入站流量阈值", "独立告警：月入站流量达到提醒阈值。", 0, 0, 0},
+		{"traffic_threshold_out", "出站流量阈值", "独立告警：月出站流量达到提醒阈值。", 0, 0, 0},
+		{"traffic_threshold_total", "总流量阈值", "独立告警：月总流量达到提醒阈值。", 0, 0, 0},
+		{"traffic_limit_in", "入站流量限额", "独立告警：月入站流量达到限额。", 0, 0, 0},
+		{"traffic_limit_out", "出站流量限额", "独立告警：月出站流量达到限额。", 0, 0, 0},
+		{"traffic_limit_total", "总流量限额", "独立告警：月总流量达到限额。", 0, 0, 0},
+		{"monitor_network_down", "检测机网络/DNS/外网", "DNS 或 HTTPS 外网探测失败；抑制下游代理与证书检测结论。", 10, 1, 1},
+		{"host_storage_pressure", "本机存储压力", "预留：磁盘危急、数据目录不可写等。", 10, 1, 1},
+		{"host_memory_pressure", "内存压力", "预留：内存不足或 OOM 风险。", 10, 1, 1},
+		{"host_cpu_saturation", "CPU 饱和", "预留：CPU 持续满载。", 10, 1, 1},
+		{"frps_dashboard_unreachable", "FRPS 面板/反代", "无法拉取 FRPS 代理列表；抑制代理离线及证书检测类子告警。", 20, 0, 1},
+	}
+	for _, r := range rows {
+		if _, err := db.Exec(`INSERT OR IGNORE INTO alert_parent_definitions(id,parent_key,sort_rank,blocks_downstream,suppress_proxy_cert,label,description) VALUES(?,?,?,?,?,?,?)`,
+			uuid.NewString(), r.key, r.rank, r.blocks, r.suppressPC, r.label, r.desc); err != nil {
+			return logStoreErr("seed alert_parent_definitions "+r.key, err)
+		}
+	}
+	return nil
+}
+
+// ListAlertParentDefinitions 返回父级定义，按 sort_rank、parent_key 排序。
+func (s *Store) ListAlertParentDefinitions() ([]AlertParentDef, error) {
+	rows, err := s.db.Query(`SELECT id,parent_key,sort_rank,blocks_downstream,suppress_proxy_cert,label,description FROM alert_parent_definitions ORDER BY sort_rank ASC, parent_key ASC`)
+	if err != nil {
+		return nil, logStoreErr("list alert_parent_definitions", err)
+	}
+	defer rows.Close()
+	var out []AlertParentDef
+	for rows.Next() {
+		var d AlertParentDef
+		var blocks, supPC int
+		if err := rows.Scan(&d.ID, &d.ParentKey, &d.SortRank, &blocks, &supPC, &d.Label, &d.Description); err != nil {
+			return nil, logStoreErr("scan alert_parent_definitions", err)
+		}
+		d.BlocksDownstream = blocks == 1
+		d.SuppressProxyCert = supPC == 1
+		out = append(out, d)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, logStoreErr("list alert_parent_definitions rows", err)
+	}
+	return out, nil
+}
+
+// AlertParentDefsByKey 父级 key -> 定义；表为空时返回内置默认，避免告警停摆。
+func (s *Store) AlertParentDefsByKey() map[string]AlertParentDef {
+	list, err := s.ListAlertParentDefinitions()
+	if err != nil || len(list) == 0 {
+		logger.Error("加载 alert_parent_definitions 失败或为空，使用内置父级排序: %v", err)
+		return defaultAlertParentDefsByKey()
+	}
+	m := make(map[string]AlertParentDef, len(list))
+	for _, d := range list {
+		m[d.ParentKey] = d
+	}
+	return m
+}
+
+func defaultAlertParentDefsByKey() map[string]AlertParentDef {
+	return map[string]AlertParentDef{
+		"traffic_threshold_in": {
+			ID: uuid.NewString(), ParentKey: "traffic_threshold_in", SortRank: 0,
+			BlocksDownstream: false, SuppressProxyCert: false, Label: "入站流量阈值", Description: "",
+		},
+		"traffic_threshold_out": {
+			ID: uuid.NewString(), ParentKey: "traffic_threshold_out", SortRank: 0,
+			BlocksDownstream: false, SuppressProxyCert: false, Label: "出站流量阈值", Description: "",
+		},
+		"traffic_threshold_total": {
+			ID: uuid.NewString(), ParentKey: "traffic_threshold_total", SortRank: 0,
+			BlocksDownstream: false, SuppressProxyCert: false, Label: "总流量阈值", Description: "",
+		},
+		"traffic_limit_in": {
+			ID: uuid.NewString(), ParentKey: "traffic_limit_in", SortRank: 0,
+			BlocksDownstream: false, SuppressProxyCert: false, Label: "入站流量限额", Description: "",
+		},
+		"traffic_limit_out": {
+			ID: uuid.NewString(), ParentKey: "traffic_limit_out", SortRank: 0,
+			BlocksDownstream: false, SuppressProxyCert: false, Label: "出站流量限额", Description: "",
+		},
+		"traffic_limit_total": {
+			ID: uuid.NewString(), ParentKey: "traffic_limit_total", SortRank: 0,
+			BlocksDownstream: false, SuppressProxyCert: false, Label: "总流量限额", Description: "",
+		},
+		"monitor_network_down": {
+			ID: uuid.NewString(), ParentKey: "monitor_network_down", SortRank: 10,
+			BlocksDownstream: true, SuppressProxyCert: true, Label: "检测机网络/DNS/外网", Description: "",
+		},
+		"host_storage_pressure": {
+			ID: uuid.NewString(), ParentKey: "host_storage_pressure", SortRank: 10,
+			BlocksDownstream: true, SuppressProxyCert: true, Label: "本机存储压力", Description: "",
+		},
+		"host_memory_pressure": {
+			ID: uuid.NewString(), ParentKey: "host_memory_pressure", SortRank: 10,
+			BlocksDownstream: true, SuppressProxyCert: true, Label: "内存压力", Description: "",
+		},
+		"host_cpu_saturation": {
+			ID: uuid.NewString(), ParentKey: "host_cpu_saturation", SortRank: 10,
+			BlocksDownstream: true, SuppressProxyCert: true, Label: "CPU 饱和", Description: "",
+		},
+		"frps_dashboard_unreachable": {
+			ID: uuid.NewString(), ParentKey: "frps_dashboard_unreachable", SortRank: 20,
+			BlocksDownstream: false, SuppressProxyCert: true, Label: "FRPS 面板/反代", Description: "",
+		},
+	}
+}
+
+// DeployDate 返回与数据库文件绑定的部署日期（YYYY-MM-DD），仅来自 app_meta。
+func (s *Store) DeployDate() string {
 	var v string
-	_ = s.db.QueryRow(`SELECT value FROM settings WHERE key=?`, key).Scan(&v)
-	return v
-}
-
-func (s *Store) SaveSetting(key, value string) error {
-	_, err := s.db.Exec(`INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
-	return logStoreErr("save setting "+key, err)
-}
-
-func (s *Store) PublicSettings() (model.PublicSettings, error) {
-	return model.PublicSettings{
-		ThresholdInGB:        parseFloat(s.Setting("threshold_in_gb")),
-		ThresholdOutGB:       parseFloat(s.Setting("threshold_out_gb")),
-		ThresholdTotalGB:     parseFloat(s.Setting("threshold_total_gb")),
-		LimitInGB:            parseFloat(s.Setting("limit_in_gb")),
-		LimitOutGB:           parseFloat(s.Setting("limit_out_gb")),
-		LimitTotalGB:         parseFloat(s.Setting("limit_total_gb")),
-		InitialInGB:          parseFloat(s.Setting("initial_in_gb")),
-		InitialOutGB:         parseFloat(s.Setting("initial_out_gb")),
-		DeployDate:           s.Setting("deploy_date"),
-		HistoryRetentionDays: int(parseFloatDefault(s.Setting("history_retention_days"), 60)),
-		SMTPHost:             s.Setting("smtp_host"),
-		SMTPPort:             int(parseFloatDefault(s.Setting("smtp_port"), 465)),
-		SMTPUser:             s.Setting("smtp_user"),
-		SMTPFrom:             s.Setting("smtp_from"),
-		SMTPTo:               s.Setting("smtp_to"),
-		SMTPEnabled:          strings.EqualFold(s.Setting("smtp_enabled"), "true"),
-		SMTPAuthCode:         s.Setting("smtp_auth_code"),
-		AlertProxyOffline:    strings.EqualFold(s.Setting("alert_proxy_offline"), "true"),
-		AlertCertExpiry:      strings.EqualFold(s.Setting("alert_cert_expiry"), "true"),
-		AlertCertDays:        int(parseFloatDefault(s.Setting("alert_cert_days"), 15)),
-	}, nil
+	err := s.db.QueryRow(`SELECT value FROM app_meta WHERE key=?`, "deploy_date").Scan(&v)
+	if err != nil || strings.TrimSpace(v) == "" {
+		return ""
+	}
+	return strings.TrimSpace(v)
 }
 
 func (s *Store) RecordTraffic(proxies []model.ProxyTraffic) error {
 	now := time.Now()
 	day := now.Format("2006-01-02")
-	cutoff := now.AddDate(0, 0, -30).Format("2006-01-02")
 	tx, err := s.db.Begin()
 	if err != nil {
 		return logStoreErr("begin record traffic transaction", err)
@@ -171,7 +343,7 @@ func (s *Store) RecordTraffic(proxies []model.ProxyTraffic) error {
 		var lastIn, lastOut uint64
 		err := tx.QueryRow(`SELECT last_in,last_out FROM proxy_counters WHERE name=? AND type=?`, p.Name, p.Type).Scan(&lastIn, &lastOut)
 		if errors.Is(err, sql.ErrNoRows) {
-			_, err = tx.Exec(`INSERT INTO proxy_counters(name,type,last_in,last_out,updated_at) VALUES(?,?,?,?,?)`, p.Name, p.Type, p.CurrentIn, p.CurrentOut, now.UTC().Format(time.RFC3339))
+			_, err = tx.Exec(`INSERT INTO proxy_counters(id,name,type,last_in,last_out,updated_at) VALUES(?,?,?,?,?,?)`, uuid.NewString(), p.Name, p.Type, p.CurrentIn, p.CurrentOut, now.UTC().Format(time.RFC3339))
 			if err != nil {
 				return logStoreErr("insert proxy counter "+p.Type+"/"+p.Name, err)
 			}
@@ -181,8 +353,8 @@ func (s *Store) RecordTraffic(proxies []model.ProxyTraffic) error {
 			return logStoreErr("query proxy counter "+p.Type+"/"+p.Name, err)
 		}
 		deltaIn, deltaOut := deltaCounter(lastIn, p.CurrentIn), deltaCounter(lastOut, p.CurrentOut)
-		_, err = tx.Exec(`INSERT INTO daily_traffic(day,proxy_name,proxy_type,in_bytes,out_bytes,peak_conns) VALUES(?,?,?,?,?,?)
-ON CONFLICT(day,proxy_name,proxy_type) DO UPDATE SET in_bytes=in_bytes+excluded.in_bytes,out_bytes=out_bytes+excluded.out_bytes,peak_conns=MAX(daily_traffic.peak_conns,excluded.peak_conns)`, day, p.Name, p.Type, deltaIn, deltaOut, p.CurConns)
+		_, err = tx.Exec(`INSERT INTO daily_traffic(id,day,proxy_name,proxy_type,in_bytes,out_bytes,peak_conns) VALUES(?,?,?,?,?,?,?)
+ON CONFLICT(day,proxy_name,proxy_type) DO UPDATE SET in_bytes=in_bytes+excluded.in_bytes,out_bytes=out_bytes+excluded.out_bytes,peak_conns=MAX(daily_traffic.peak_conns,excluded.peak_conns)`, uuid.NewString(), day, p.Name, p.Type, deltaIn, deltaOut, p.CurConns)
 		if err != nil {
 			return logStoreErr("upsert daily traffic "+p.Type+"/"+p.Name, err)
 		}
@@ -190,9 +362,6 @@ ON CONFLICT(day,proxy_name,proxy_type) DO UPDATE SET in_bytes=in_bytes+excluded.
 		if err != nil {
 			return logStoreErr("update proxy counter "+p.Type+"/"+p.Name, err)
 		}
-	}
-	if _, err := tx.Exec(`DELETE FROM daily_traffic WHERE day < ?`, cutoff); err != nil {
-		return logStoreErr("delete expired daily traffic", err)
 	}
 	return logStoreErr("commit record traffic transaction", tx.Commit())
 }
@@ -209,40 +378,11 @@ func (s *Store) MonthTotalForProxy(name, typ, month string) (uint64, uint64, err
 	return uint64(clampZero(in)), uint64(clampZero(out)), logStoreErr("query month total for proxy "+typ+"/"+name, err)
 }
 
-func (s *Store) AlertSent(month, direction string) bool {
-	var count int
-	_ = s.db.QueryRow(`SELECT COUNT(*) FROM alert_state WHERE month=? AND direction=?`, month, direction).Scan(&count)
-	return count > 0
-}
-
-func (s *Store) MarkAlertSent(month, direction string) error {
-	_, err := s.db.Exec(`INSERT OR REPLACE INTO alert_state(month,direction,sent_at) VALUES(?,?,?)`, month, direction, time.Now().UTC().Format(time.RFC3339))
-	return logStoreErr("mark alert sent "+month+"/"+direction, err)
-}
-
-func (s *Store) EventAlertSent(key string) bool {
-	var active int
-	err := s.db.QueryRow(`SELECT active FROM event_alert_state WHERE key=?`, key).Scan(&active)
-	return err == nil && active == 1
-}
-
-func (s *Store) SetEventAlert(key string) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.db.Exec(`INSERT INTO event_alert_state(key,sent_at,active,last_seen_at) VALUES(?,?,1,?)
-ON CONFLICT(key) DO UPDATE SET sent_at=excluded.sent_at,active=1,last_seen_at=excluded.last_seen_at`, key, now, now)
-	return logStoreErr("set event alert "+key, err)
-}
-
-func (s *Store) ClearEventAlert(key string) error {
-	_, err := s.db.Exec(`UPDATE event_alert_state SET active=0, fail_streak=0, first_fail_at='', last_recovery_at=? WHERE key=?`, time.Now().UTC().Format(time.RFC3339), key)
-	return logStoreErr("clear event alert "+key, err)
-}
-
 func (s *Store) GetEventState(key string) (EventState, error) {
 	var st EventState
 	var active int
-	err := s.db.QueryRow(`SELECT key,active,fail_streak,total_checks,online_checks,sent_at,last_change_at,last_offline_at,last_recovery_at,first_fail_at,last_seen_at FROM event_alert_state WHERE key=?`, key).
-		Scan(&st.Key, &active, &st.FailStreak, &st.TotalChecks, &st.OnlineChecks, &st.SentAt, &st.LastChangeAt, &st.LastOfflineAt, &st.LastRecoveryAt, &st.FirstFailAt, &st.LastSeenAt)
+	err := s.db.QueryRow(`SELECT key,active,fail_streak,total_checks,online_checks,sent_at,last_change_at,last_offline_at,last_recovery_at,first_fail_at,last_seen_at,recover_streak,recover_since FROM event_alert_state WHERE key=?`, key).
+		Scan(&st.Key, &active, &st.FailStreak, &st.TotalChecks, &st.OnlineChecks, &st.SentAt, &st.LastChangeAt, &st.LastOfflineAt, &st.LastRecoveryAt, &st.FirstFailAt, &st.LastSeenAt, &st.RecoverStreak, &st.RecoverSince)
 	if errors.Is(err, sql.ErrNoRows) {
 		return EventState{Key: key}, nil
 	}
@@ -258,10 +398,10 @@ func (s *Store) SaveEventState(st EventState) error {
 	if st.Active {
 		active = 1
 	}
-	_, err := s.db.Exec(`INSERT INTO event_alert_state(key,sent_at,active,fail_streak,total_checks,online_checks,last_change_at,last_offline_at,last_recovery_at,first_fail_at,last_seen_at)
-VALUES(?,?,?,?,?,?,?,?,?,?,?)
-ON CONFLICT(key) DO UPDATE SET sent_at=excluded.sent_at,active=excluded.active,fail_streak=excluded.fail_streak,total_checks=excluded.total_checks,online_checks=excluded.online_checks,last_change_at=excluded.last_change_at,last_offline_at=excluded.last_offline_at,last_recovery_at=excluded.last_recovery_at,first_fail_at=excluded.first_fail_at,last_seen_at=excluded.last_seen_at`,
-		st.Key, st.SentAt, active, st.FailStreak, st.TotalChecks, st.OnlineChecks, st.LastChangeAt, st.LastOfflineAt, st.LastRecoveryAt, st.FirstFailAt, st.LastSeenAt)
+	_, err := s.db.Exec(`INSERT INTO event_alert_state(id,key,sent_at,active,fail_streak,total_checks,online_checks,last_change_at,last_offline_at,last_recovery_at,first_fail_at,last_seen_at,recover_streak,recover_since)
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+ON CONFLICT(key) DO UPDATE SET sent_at=excluded.sent_at,active=excluded.active,fail_streak=excluded.fail_streak,total_checks=excluded.total_checks,online_checks=excluded.online_checks,last_change_at=excluded.last_change_at,last_offline_at=excluded.last_offline_at,last_recovery_at=excluded.last_recovery_at,first_fail_at=excluded.first_fail_at,last_seen_at=excluded.last_seen_at,recover_streak=excluded.recover_streak,recover_since=excluded.recover_since`,
+		uuid.NewString(), st.Key, st.SentAt, active, st.FailStreak, st.TotalChecks, st.OnlineChecks, st.LastChangeAt, st.LastOfflineAt, st.LastRecoveryAt, st.FirstFailAt, st.LastSeenAt, st.RecoverStreak, st.RecoverSince)
 	return logStoreErr("save event state "+st.Key, err)
 }
 
@@ -270,7 +410,7 @@ func (s *Store) AddProxyStatusEvent(key string, online bool, at time.Time) error
 	if online {
 		status = 1
 	}
-	_, err := s.db.Exec(`INSERT INTO proxy_status_events(key,status,at) VALUES(?,?,?)`, key, status, at.UTC().Format(time.RFC3339))
+	_, err := s.db.Exec(`INSERT INTO proxy_status_events(id,key,status,at) VALUES(?,?,?,?)`, uuid.NewString(), key, status, at.UTC().Format(time.RFC3339))
 	return logStoreErr("add proxy status event "+key, err)
 }
 
@@ -278,6 +418,142 @@ func (s *Store) ProxyFlapCountSince(key string, since time.Time) (int, error) {
 	var count int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM proxy_status_events WHERE key=? AND at>=?`, key, since.UTC().Format(time.RFC3339)).Scan(&count)
 	return count, logStoreErr("proxy flap count "+key, err)
+}
+
+func (s *Store) GetAlertEvent(fingerprint string) (AlertEvent, error) {
+	var ev AlertEvent
+	var suppressed int
+	err := s.db.QueryRow(`SELECT fingerprint,definition_id,alert_type,target,level,status,title,message,first_seen_at,last_seen_at,resolved_at,occurrence_count,last_error,last_notify_at,parent_fingerprint,suppressed,suppress_reason,created_at,updated_at FROM alert_events WHERE fingerprint=?`, fingerprint).
+		Scan(&ev.Fingerprint, &ev.DefinitionID, &ev.AlertType, &ev.Target, &ev.Level, &ev.Status, &ev.Title, &ev.Message, &ev.FirstSeenAt, &ev.LastSeenAt, &ev.ResolvedAt, &ev.OccurrenceCount, &ev.LastError, &ev.LastNotifyAt, &ev.ParentFingerprint, &suppressed, &ev.SuppressReason, &ev.CreatedAt, &ev.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return AlertEvent{Fingerprint: fingerprint}, nil
+	}
+	if err != nil {
+		return ev, logStoreErr("get alert event "+fingerprint, err)
+	}
+	ev.Suppressed = suppressed == 1
+	return ev, nil
+}
+
+func (s *Store) UpsertAlertEvent(ev AlertEvent) (AlertEvent, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	existing, err := s.GetAlertEvent(ev.Fingerprint)
+	if err != nil {
+		return ev, err
+	}
+	if existing.CreatedAt == "" {
+		if ev.FirstSeenAt == "" {
+			ev.FirstSeenAt = now
+		}
+		if ev.LastSeenAt == "" {
+			ev.LastSeenAt = now
+		}
+		if ev.CreatedAt == "" {
+			ev.CreatedAt = now
+		}
+		ev.UpdatedAt = now
+		if ev.OccurrenceCount <= 0 {
+			ev.OccurrenceCount = 1
+		}
+	} else {
+		ev.FirstSeenAt = existing.FirstSeenAt
+		ev.CreatedAt = existing.CreatedAt
+		ev.LastNotifyAt = existing.LastNotifyAt
+		if ev.DefinitionID == "" {
+			ev.DefinitionID = existing.DefinitionID
+		}
+		if ev.LastSeenAt == "" {
+			ev.LastSeenAt = now
+		}
+		ev.UpdatedAt = now
+		ev.OccurrenceCount = existing.OccurrenceCount + 1
+	}
+	suppressed := 0
+	if ev.Suppressed {
+		suppressed = 1
+	}
+	_, err = s.db.Exec(`INSERT INTO alert_events(id,fingerprint,definition_id,alert_type,target,level,status,title,message,first_seen_at,last_seen_at,resolved_at,occurrence_count,last_error,last_notify_at,parent_fingerprint,suppressed,suppress_reason,created_at,updated_at)
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+ON CONFLICT(fingerprint) DO UPDATE SET definition_id=excluded.definition_id,alert_type=excluded.alert_type,target=excluded.target,level=excluded.level,status=excluded.status,title=excluded.title,message=excluded.message,last_seen_at=excluded.last_seen_at,resolved_at=excluded.resolved_at,occurrence_count=excluded.occurrence_count,last_error=excluded.last_error,parent_fingerprint=excluded.parent_fingerprint,suppressed=excluded.suppressed,suppress_reason=excluded.suppress_reason,updated_at=excluded.updated_at`,
+		uuid.NewString(), ev.Fingerprint, ev.DefinitionID, ev.AlertType, ev.Target, ev.Level, ev.Status, ev.Title, ev.Message, ev.FirstSeenAt, ev.LastSeenAt, ev.ResolvedAt, ev.OccurrenceCount, ev.LastError, ev.LastNotifyAt, ev.ParentFingerprint, suppressed, ev.SuppressReason, ev.CreatedAt, ev.UpdatedAt)
+	return ev, logStoreErr("upsert alert event "+ev.Fingerprint, err)
+}
+
+func (s *Store) MarkAlertEventNotified(fingerprint string, at time.Time) error {
+	_, err := s.db.Exec(`UPDATE alert_events SET last_notify_at=?, updated_at=? WHERE fingerprint=?`, at.UTC().Format(time.RFC3339), at.UTC().Format(time.RFC3339), fingerprint)
+	return logStoreErr("mark alert event notified "+fingerprint, err)
+}
+
+func (s *Store) ResolveAlertEvent(fingerprint, title, message string) (AlertEvent, bool, error) {
+	ev, err := s.GetAlertEvent(fingerprint)
+	if err != nil || ev.CreatedAt == "" || ev.Status == "resolved" {
+		return ev, false, err
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	ev.Status = "resolved"
+	ev.Title = title
+	ev.Message = message
+	ev.ResolvedAt = now
+	ev.LastSeenAt = now
+	ev.UpdatedAt = now
+	ev.Suppressed = false
+	ev.SuppressReason = ""
+	suppressed := 0
+	if ev.Suppressed {
+		suppressed = 1
+	}
+	_, err = s.db.Exec(`UPDATE alert_events SET status=?,title=?,message=?,resolved_at=?,last_seen_at=?,suppressed=?,suppress_reason=?,updated_at=? WHERE fingerprint=?`, ev.Status, ev.Title, ev.Message, ev.ResolvedAt, ev.LastSeenAt, suppressed, ev.SuppressReason, ev.UpdatedAt, ev.Fingerprint)
+	return ev, true, logStoreErr("resolve alert event "+fingerprint, err)
+}
+
+func (s *Store) UpsertAlertCandidates(items []AlertCandidate, at time.Time) error {
+	if len(items) == 0 {
+		return nil
+	}
+	now := at.UTC().Format(time.RFC3339)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return logStoreErr("begin upsert alert candidates transaction", err)
+	}
+	defer tx.Rollback()
+	for _, item := range items {
+		if strings.TrimSpace(item.Fingerprint) == "" {
+			continue
+		}
+		_, err := tx.Exec(`INSERT INTO alert_candidate_cache(id,fingerprint,alert_type,target,level,title,message,last_error,warning_key,first_seen_at,last_seen_at)
+VALUES(?,?,?,?,?,?,?,?,?,?,?)
+ON CONFLICT(fingerprint) DO UPDATE SET alert_type=excluded.alert_type,target=excluded.target,level=excluded.level,title=excluded.title,message=excluded.message,last_error=excluded.last_error,warning_key=excluded.warning_key,last_seen_at=excluded.last_seen_at`,
+			uuid.NewString(), item.Fingerprint, item.AlertType, item.Target, item.Level, item.Title, item.Message, item.LastError, item.WarningKey, now, now)
+		if err != nil {
+			return logStoreErr("upsert alert candidate "+item.Fingerprint, err)
+		}
+	}
+	return logStoreErr("commit upsert alert candidates transaction", tx.Commit())
+}
+
+func (s *Store) RecentAlertCandidates(since time.Time) ([]AlertCandidate, error) {
+	rows, err := s.db.Query(`SELECT fingerprint,alert_type,target,level,title,message,last_error,warning_key,first_seen_at,last_seen_at FROM alert_candidate_cache WHERE last_seen_at>=? ORDER BY first_seen_at ASC, fingerprint ASC`, since.UTC().Format(time.RFC3339))
+	if err != nil {
+		return nil, logStoreErr("query recent alert candidates", err)
+	}
+	defer rows.Close()
+	var out []AlertCandidate
+	for rows.Next() {
+		var item AlertCandidate
+		if err := rows.Scan(&item.Fingerprint, &item.AlertType, &item.Target, &item.Level, &item.Title, &item.Message, &item.LastError, &item.WarningKey, &item.FirstSeenAt, &item.LastSeenAt); err != nil {
+			return nil, logStoreErr("scan alert candidate", err)
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, logStoreErr("recent alert candidates rows", err)
+	}
+	return out, nil
+}
+
+func (s *Store) DeleteAlertCandidatesOlderThan(cutoff time.Time) error {
+	_, err := s.db.Exec(`DELETE FROM alert_candidate_cache WHERE last_seen_at<?`, cutoff.UTC().Format(time.RFC3339))
+	return logStoreErr("delete stale alert candidates", err)
 }
 
 func (s *Store) Vacuum() error {
@@ -329,7 +605,6 @@ func (s *Store) DailyTraffic() ([]map[string]any, error) {
 
 func (s *Store) RecordInterfaceTraffic(iface, publicIP string, rxBytes, txBytes uint64, now time.Time) error {
 	day := now.Format("2006-01-02")
-	cutoff := now.AddDate(0, 0, -90).Format("2006-01-02")
 	tx, err := s.db.Begin()
 	if err != nil {
 		return logStoreErr("begin record iface traffic transaction", err)
@@ -339,8 +614,8 @@ func (s *Store) RecordInterfaceTraffic(iface, publicIP string, rxBytes, txBytes 
 	var lastRx, lastTx uint64
 	err = tx.QueryRow(`SELECT last_rx_bytes,last_tx_bytes FROM iface_counters WHERE iface=? AND public_ip=?`, iface, publicIP).Scan(&lastRx, &lastTx)
 	if errors.Is(err, sql.ErrNoRows) {
-		_, err = tx.Exec(`INSERT INTO iface_counters(iface,public_ip,last_rx_bytes,last_tx_bytes,updated_at) VALUES(?,?,?,?,?)`,
-			iface, publicIP, rxBytes, txBytes, now.UTC().Format(time.RFC3339))
+		_, err = tx.Exec(`INSERT INTO iface_counters(id,iface,public_ip,last_rx_bytes,last_tx_bytes,updated_at) VALUES(?,?,?,?,?,?)`,
+			uuid.NewString(), iface, publicIP, rxBytes, txBytes, now.UTC().Format(time.RFC3339))
 		if err != nil {
 			return logStoreErr("insert iface counter "+iface+"/"+publicIP, err)
 		}
@@ -356,9 +631,9 @@ func (s *Store) RecordInterfaceTraffic(iface, publicIP string, rxBytes, txBytes 
 	txKB := deltaTx / 1024
 
 	if rxKB > 0 || txKB > 0 {
-		_, err = tx.Exec(`INSERT INTO daily_iface_traffic(day,iface,public_ip,rx_kb,tx_kb) VALUES(?,?,?,?,?)
+		_, err = tx.Exec(`INSERT INTO daily_iface_traffic(id,day,iface,public_ip,rx_kb,tx_kb) VALUES(?,?,?,?,?,?)
 ON CONFLICT(day,iface,public_ip) DO UPDATE SET rx_kb=rx_kb+excluded.rx_kb,tx_kb=tx_kb+excluded.tx_kb`,
-			day, iface, publicIP, rxKB, txKB)
+			uuid.NewString(), day, iface, publicIP, rxKB, txKB)
 		if err != nil {
 			return logStoreErr("upsert daily iface traffic "+iface+"/"+publicIP, err)
 		}
@@ -368,10 +643,60 @@ ON CONFLICT(day,iface,public_ip) DO UPDATE SET rx_kb=rx_kb+excluded.rx_kb,tx_kb=
 	if err != nil {
 		return logStoreErr("update iface counter "+iface+"/"+publicIP, err)
 	}
-	if _, err := tx.Exec(`DELETE FROM daily_iface_traffic WHERE day < ?`, cutoff); err != nil {
-		return logStoreErr("delete expired daily iface traffic", err)
-	}
 	return logStoreErr("commit record iface traffic transaction", tx.Commit())
+}
+
+// PurgeTrafficDayBefore 删除 day 早于 cutoffDay 的流量日表与网卡日表行（cutoff 当日及之后保留）。
+func (s *Store) PurgeTrafficDayBefore(cutoffDay string) (int64, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, logStoreErr("begin purge traffic before day transaction", err)
+	}
+	defer tx.Rollback()
+	res1, err := tx.Exec(`DELETE FROM daily_traffic WHERE day < ?`, cutoffDay)
+	if err != nil {
+		return 0, logStoreErr("purge daily traffic before day", err)
+	}
+	res2, err := tx.Exec(`DELETE FROM daily_iface_traffic WHERE day < ?`, cutoffDay)
+	if err != nil {
+		return 0, logStoreErr("purge daily iface traffic before day", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, logStoreErr("commit purge traffic before day", err)
+	}
+	n1, _ := res1.RowsAffected()
+	n2, _ := res2.RowsAffected()
+	return n1 + n2, nil
+}
+
+// TrafficDistinctDayCount 返回日流量与网卡日流量并集中不同日期的个数。
+func (s *Store) TrafficDistinctDayCount() (int, error) {
+	var n int
+	err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM (
+			SELECT DISTINCT day FROM daily_traffic
+			UNION
+			SELECT DISTINCT day FROM daily_iface_traffic
+		)`).Scan(&n)
+	return n, logStoreErr("count distinct traffic days", err)
+}
+
+// OldestTrafficDay 返回所有日流量相关表中的最早日期；若无数据则返回空字符串。
+func (s *Store) OldestTrafficDay() (string, error) {
+	var min sql.NullString
+	err := s.db.QueryRow(`
+		SELECT MIN(day) FROM (
+			SELECT day FROM daily_traffic
+			UNION ALL
+			SELECT day FROM daily_iface_traffic
+		)`).Scan(&min)
+	if err != nil {
+		return "", logStoreErr("query oldest traffic day", err)
+	}
+	if !min.Valid {
+		return "", nil
+	}
+	return min.String, nil
 }
 
 func (s *Store) DailyInterfaceTraffic(fromDay, toDay string) ([]map[string]any, error) {
@@ -433,22 +758,6 @@ func clampZero(v int64) int64 {
 	return v
 }
 
-func parseFloat(v string) float64 {
-	f, _ := strconv.ParseFloat(v, 64)
-	if math.IsNaN(f) || math.IsInf(f, 0) || f < 0 {
-		return 0
-	}
-	return f
-}
-
-func parseFloatDefault(v string, fallback float64) float64 {
-	f := parseFloat(v)
-	if f == 0 {
-		return fallback
-	}
-	return f
-}
-
 type Warning struct {
 	Key       string `json:"key"`
 	Message   string `json:"message"`
@@ -458,9 +767,9 @@ type Warning struct {
 func (s *Store) SetWarning(key, message string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.Exec(
-		`INSERT INTO warnings(key,message,created_at,updated_at) VALUES(?,?,?,?)
+		`INSERT INTO warnings(id,key,message,created_at,updated_at) VALUES(?,?,?,?,?)
          ON CONFLICT(key) DO UPDATE SET message=excluded.message, updated_at=excluded.updated_at`,
-		key, message, now, now,
+		uuid.NewString(), key, message, now, now,
 	)
 	return logStoreErr("set warning "+key, err)
 }
@@ -504,7 +813,7 @@ func (s *Store) SeedUser(username, password string) error {
 	}
 	_, err = s.db.Exec(
 		`INSERT INTO users(id,username,password_hash,password_salt,recovery_email,is_initial_password) VALUES(?,?,?,?,'',1)`,
-		uuid.New().String(), username, HashPassword(salt, password), salt,
+		uuid.NewString(), username, HashPassword(salt, password), salt,
 	)
 	return logStoreErr("seed initial user", err)
 }

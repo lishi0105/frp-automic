@@ -2,8 +2,10 @@
 .env
 .env.local
 
-# 数据目录
+# 数据 / 配置 / 日志目录（由 compose 挂载自动创建，不入库）
 data/
+config/
+logs/
 frps-status-app/frontend/design
 
 # Go 编译产物

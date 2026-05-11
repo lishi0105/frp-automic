@@ -139,8 +139,6 @@ def write_deploy_state(ctx: DeployContext) -> None:
         "token": ctx.token,
         "dashboard_user": ctx.dashboard_user,
         "dashboard_password": ctx.dashboard_password,
-        "status_user": ctx.status_user,
-        "status_password": ctx.status_password,
         "suffix": ctx.suffix,
         "services": desired_services_state(),
     }

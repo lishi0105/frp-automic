@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from frps_deploy import config
-from frps_deploy.console import print
+from frps_deploy.console import COLOR_YELLOW, print
 from frps_deploy.constants import (
     BASE_DIR, COMPOSE_FILE, FRPC_BASE_DIR, FRPC_COMPOSE_FILE, FRPC_TOML_FILE,
     FRPS_TOML_FILE, GENERATED_INFO_FILE, NGINX_CONF_DIR,
@@ -10,31 +10,17 @@ from frps_deploy.constants import (
 from frps_deploy.models import DeployContext
 from frps_deploy.services import (
     dashboard_domain, http_services, local_ip, local_port, remote_port,
-    needs_tunnel, status_domain, tcp_services, tunneled_services,
+    needs_tunnel, status_domain, tcp_services,
 )
-from frps_deploy.utils import toml_str
 
 
 def print_frpc_config(ctx: DeployContext) -> None:
-    print("\n================ frpc.toml 示例 ================")
-    print("# 下列键名为 frp 客户端要求的英文配置项，请原样复制到 frpc.toml")
-    print(f"serverAddr = {toml_str(ctx.vps_public_ip)}")
-    print(f"serverPort = {ctx.bind_port}")
+    print("\n================ frpc 客户端文件 ================")
+    print(f"frpc.toml 路径：{FRPC_TOML_FILE}")
+    print(f"docker-compose.yml 路径：{FRPC_COMPOSE_FILE}")
     print("")
-    print('auth.method = "token"')
-    print(f"auth.token = {toml_str(ctx.token)}")
-    print("")
-    print("[transport.tls]")
-    print("enable = true")
-    for item in tunneled_services():
-        print("")
-        print(f"# {item.get('comment', item['alias'])}")
-        print("[[proxies]]")
-        print(f"name = {toml_str(str(item['alias']))}")
-        print('type = "tcp"')
-        print(f"localIP = {toml_str(local_ip(item))}")
-        print(f"localPort = {local_port(item)}")
-        print(f"remotePort = {remote_port(item)}")
+    print("请将上面的 frpc.toml 和 docker-compose.yml 拷贝到客户机同一目录后执行：")
+    print("  docker compose up -d")
     print("================================================")
 
 
@@ -56,8 +42,8 @@ def print_result(ctx: DeployContext) -> None:
         else:
             print(f"  http://127.0.0.1:{ctx.status_port}  （仅本机）")
         print(f"  https://{status_domain(ctx.root_domain)}")
-        print(f"  用户名 = {ctx.status_user}")
-        print(f"  密码   = {ctx.status_password}")
+        print(f"  初始用户名 = admin", color=COLOR_YELLOW)
+        print(f"  初始密码   = admin123", color=COLOR_YELLOW)
 
     tunneled_tcp_services = [item for item in tcp_services() if needs_tunnel(item)]
     if tunneled_tcp_services:
@@ -74,8 +60,8 @@ def print_result(ctx: DeployContext) -> None:
     else:
         print(f"  仅 VPS 本机访问：http://127.0.0.1:{ctx.dashboard_port}")
     print(f"  https://{dashboard_domain(ctx.root_domain)}")
-    print(f"  用户名 = {ctx.dashboard_user}")
-    print(f"  密码   = {ctx.dashboard_password}")
+    print(f"  用户名 = {ctx.dashboard_user}", color=COLOR_YELLOW)
+    print(f"  密码   = {ctx.dashboard_password}", color=COLOR_YELLOW)
     print("\n常用命令（终端中需原样输入，含英文子命令）：")
     print(f"  cd {BASE_DIR}")
     print("  docker compose ps")
@@ -83,8 +69,6 @@ def print_result(ctx: DeployContext) -> None:
     print("  docker compose logs -f nginx")
     print("  docker compose logs -f certbot")
     print("  docker compose restart nginx")
-    print(f"  cd {FRPC_BASE_DIR}")
-    print("  docker compose up -d")
     if config.STATUS_APP_ENABLED:
         print("  docker compose logs -f frps-status")
     print_frpc_config(ctx)

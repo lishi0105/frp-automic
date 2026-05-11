@@ -1,6 +1,7 @@
 <template>
-  <div v-if="open" class="policy-mask" @click.self="$emit('close')">
-    <section class="policy-modal" role="dialog" aria-modal="true" aria-labelledby="policy-title">
+  <Transition name="modal-pop">
+    <div v-if="open" class="policy-mask" @click.self="$emit('close')">
+      <section class="policy-modal" role="dialog" aria-modal="true" aria-labelledby="policy-title">
       <header class="policy-head">
         <div>
           <h3 id="policy-title">流量与告警策略</h3>
@@ -109,8 +110,9 @@
           {{ saving ? '保存中…' : '保存策略' }}
         </button>
       </footer>
-    </section>
-  </div>
+      </section>
+    </div>
+  </Transition>
 </template>
 
 <script setup>

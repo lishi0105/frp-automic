@@ -23,8 +23,7 @@
         <div class="flex-center">
           <button class="btn btn-outline btn-sm icon-btn" title="导出列表" aria-label="导出列表" @click="exportCsv">⇩</button>
           <button class="btn btn-outline btn-sm icon-btn" title="刷新" aria-label="刷新" :disabled="loading || localLoading" @click="$emit('refresh')">
-            <span v-if="loading || localLoading" class="spinner"></span>
-            <span v-else>↻</span>
+            <span class="refresh-glyph" :class="{ 'is-spinning': loading || localLoading }" aria-hidden="true">↻</span>
           </button>
         </div>
       </div>
@@ -121,12 +120,10 @@
               <div class="detail-row"><span>24h在线率</span><b>{{ (selectedProxy.health?.online_rate ?? 0) + '%' }}</b></div>
               <div class="detail-row"><span>24h波动</span><b>{{ selectedProxy.health?.flap_count_24h ?? 0 }} 次</b></div>
             </div>
-            <div class="detail-row"><span>当前连接</span><b>{{ selectedProxy.cur_conns }}</b></div>
             <div class="detail-pair">
-              <div class="detail-row"><span>入站</span><b>{{ humanBytes(selectedProxy.month_in) }}</b></div>
-              <div class="detail-row"><span>出站</span><b>{{ humanBytes(selectedProxy.month_out) }}</b></div>
+              <div class="detail-row"><span>当前连接</span><b>{{ selectedProxy.cur_conns }}</b></div>
+              <div class="detail-row"><span>最大连接</span><b>{{ selectedPeakConns }}</b></div>
             </div>
-            <div class="detail-row"><span>总流量</span><b>{{ humanBytes(selectedProxy.month_in + selectedProxy.month_out) }}</b></div>
             <div class="detail-pair">
               <div class="detail-row"><span>连续离线轮询</span><b>{{ selectedProxy.health?.consecutive_offline ?? 0 }}</b></div>
               <div class="detail-row"><span>本次离线时长</span><b>{{ selectedProxy.online ? '-' : offlineSecondsText(selectedProxy.health?.offline_seconds) }}</b></div>
@@ -136,9 +133,10 @@
               <div class="out" :style="{ width: selectedTotal ? ((selectedProxy.month_out / selectedTotal) * 100).toFixed(1) + '%' : '0%' }"></div>
             </div>
             <div class="detail-legend">
-              <span><i class="dot in"></i>入站 {{ humanBytes(selectedProxy.month_in) }}</span>
-              <span><i class="dot out"></i>出站 {{ humanBytes(selectedProxy.month_out) }}</span>
+              <span><i class="dot in"></i>入站 {{ humanBytes(selectedProxy.month_in) }} · {{ selectedInPct }}%</span>
+              <span><i class="dot out"></i>出站 {{ humanBytes(selectedProxy.month_out) }} · {{ selectedOutPct }}%</span>
             </div>
+            <div class="detail-row"><span>总流量</span><b>{{ humanBytes(selectedProxy.month_in + selectedProxy.month_out) }}</b></div>
             <div class="detail-cert-title">证书状态</div>
             <div v-if="selectedCerts.length" class="detail-certs">
               <div class="cert-item" v-for="c in selectedCerts" :key="c.domain">
@@ -163,7 +161,7 @@ import { RouterLink } from 'vue-router'
 import { api } from '../api/index.js'
 import { humanBytes } from '../utils/format.js'
 
-const props = defineProps({ status: Object, loading: Boolean })
+const props = defineProps({ status: Object, daily: Array, loading: Boolean })
 defineEmits(['refresh'])
 
 const selectedProxy = ref(null)
@@ -201,6 +199,15 @@ const pageNumbers = computed(() => {
 })
 const showRightEllipsis = computed(() => pageNumbers.value[pageNumbers.value.length - 1] < totalPages.value)
 const selectedTotal = computed(() => selectedProxy.value ? Number(selectedProxy.value.month_in || 0) + Number(selectedProxy.value.month_out || 0) : 0)
+const selectedInPct = computed(() => selectedTotal.value && selectedProxy.value ? ((Number(selectedProxy.value.month_in || 0) / selectedTotal.value) * 100).toFixed(1) : '0.0')
+const selectedOutPct = computed(() => selectedTotal.value && selectedProxy.value ? ((Number(selectedProxy.value.month_out || 0) / selectedTotal.value) * 100).toFixed(1) : '0.0')
+const selectedPeakConns = computed(() => {
+  if (!selectedProxy.value) return 0
+  const name = selectedProxy.value.name
+  return (props.daily || [])
+    .filter(row => row.name === name)
+    .reduce((max, row) => Math.max(max, Number(row.peak_conns || 0)), 0)
+})
 const selectedCerts = computed(() => selectedProxy.value ? proxyCerts(selectedProxy.value).slice(0, 3) : [])
 
 function certColor(days) {

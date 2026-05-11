@@ -8,7 +8,7 @@ from pathlib import Path
 from frps_deploy.console import eprint, print
 from frps_deploy.constants import (
     BASE_DIR, FRPC_BASE_DIR,
-    STATUS_APP_DATA_DIR, STATUS_APP_ENV_FILE,
+    STATUS_APP_DATA_DIR, STATUS_APP_ENV_FILE, STATUS_APP_LOGS_DIR,
 )
 
 
@@ -68,13 +68,14 @@ def clean_all() -> None:
     _compose_down(FRPC_BASE_DIR)
 
     # 2. 修改 root 可能产生的文件权限（certbot 会以 root 写入 conf/）
-    for d in (BASE_DIR, STATUS_APP_DATA_DIR):
+    for d in (BASE_DIR, STATUS_APP_DATA_DIR, STATUS_APP_LOGS_DIR):
         _fix_permissions(d)
 
     # 3. 删除生成的目录和文件
     _remove_dir(BASE_DIR)
     _remove_dir(FRPC_BASE_DIR)
     _remove_dir(STATUS_APP_DATA_DIR)
+    _remove_dir(STATUS_APP_LOGS_DIR)
     _remove_file(STATUS_APP_ENV_FILE)
 
     print("\n清理完成。")

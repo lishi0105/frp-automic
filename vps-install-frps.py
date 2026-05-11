@@ -37,7 +37,7 @@ FRPS + Nginx + Certbot 一体化部署脚本
 - 使用 -p/--proxy 时只更新/启动代理相关配置，不自动申请证书，所有服务强制按 TCP 代理处理。
 - 使用 -s/--stop 时停止所有已启动的 Docker Compose 服务，不删除文件或镜像。
 - 使用 --clean 时停止并删除所有生成的容器，先通过 docker alpine
-  容器将 frps/、frpc/、frps-status-app/data/ 的权限修改为 777，再删除这些目录。
+  容器将 frps/、frpc/、frps-status-app/data/、frps-status-app/logs/ 的权限修改为 777，再删除这些目录。
 """
 
 from frps_deploy.main import main

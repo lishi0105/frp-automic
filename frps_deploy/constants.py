@@ -24,9 +24,11 @@ FRPC_BASE_DIR     = SCRIPT_DIR / "frpc"
 FRPC_COMPOSE_FILE = FRPC_BASE_DIR / "docker-compose.yml"
 FRPC_TOML_FILE    = FRPC_BASE_DIR / "frpc.toml"
 
-STATUS_APP_DIR      = SCRIPT_DIR / "frps-status-app"
-STATUS_APP_ENV_FILE = STATUS_APP_DIR / ".env"
-STATUS_APP_DATA_DIR = STATUS_APP_DIR / "data"
+STATUS_APP_DIR       = SCRIPT_DIR / "frps-status-app"
+STATUS_APP_ENV_FILE  = STATUS_APP_DIR / ".env"
+STATUS_APP_DATA_DIR   = STATUS_APP_DIR / "data"
+STATUS_APP_CONFIG_DIR = STATUS_APP_DIR / "config"
+STATUS_APP_LOGS_DIR   = STATUS_APP_DIR / "logs"
 
 DEFAULT_SERVICES: List[Dict[str, Any]] = [
     {"alias": "emby",      "comment": "Emby 媒体服务", "mode": "http", "tunnel": True, "port": 7096, "local_ip": "127.0.0.1", "expose_http_port": False},
@@ -52,8 +54,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "enabled": True,
         "port": 0,
         "http": False,
-        "user": "admin",
-        "password": "admin123",
     },
     "services": DEFAULT_SERVICES,
 }
