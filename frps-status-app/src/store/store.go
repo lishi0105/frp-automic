@@ -130,57 +130,226 @@ func New(db *sql.DB) *Store {
 func (s *Store) InitDB() error {
 	stmts := []string{
 		`PRAGMA journal_mode=WAL`,
-		`CREATE TABLE IF NOT EXISTS app_meta (id TEXT PRIMARY KEY, key TEXT NOT NULL UNIQUE, value TEXT NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS proxy_counters (id TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL, last_in INTEGER NOT NULL, last_out INTEGER NOT NULL, updated_at TEXT NOT NULL, UNIQUE(name,type))`,
-		`CREATE TABLE IF NOT EXISTS daily_traffic (id TEXT PRIMARY KEY, day TEXT NOT NULL, proxy_name TEXT NOT NULL, proxy_type TEXT NOT NULL, in_bytes INTEGER NOT NULL DEFAULT 0, out_bytes INTEGER NOT NULL DEFAULT 0, peak_conns INTEGER NOT NULL DEFAULT 0, UNIQUE(day,proxy_name,proxy_type))`,
-		`CREATE TABLE IF NOT EXISTS event_alert_state (id TEXT PRIMARY KEY, key TEXT NOT NULL UNIQUE, sent_at TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 0, fail_streak INTEGER NOT NULL DEFAULT 0, total_checks INTEGER NOT NULL DEFAULT 0, online_checks INTEGER NOT NULL DEFAULT 0, last_change_at TEXT NOT NULL DEFAULT '', last_offline_at TEXT NOT NULL DEFAULT '', last_recovery_at TEXT NOT NULL DEFAULT '', first_fail_at TEXT NOT NULL DEFAULT '', last_seen_at TEXT NOT NULL DEFAULT '', recover_streak INTEGER NOT NULL DEFAULT 0, recover_since TEXT NOT NULL DEFAULT '')`,
-		`CREATE TABLE IF NOT EXISTS proxy_status_events (id TEXT PRIMARY KEY, key TEXT NOT NULL, status INTEGER NOT NULL, at TEXT NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, password_salt TEXT NOT NULL, recovery_email TEXT NOT NULL DEFAULT '', is_initial_password INTEGER NOT NULL DEFAULT 1)`,
-		`CREATE TABLE IF NOT EXISTS warnings (id TEXT PRIMARY KEY, key TEXT NOT NULL UNIQUE, message TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS iface_counters (id TEXT PRIMARY KEY, iface TEXT NOT NULL, public_ip TEXT NOT NULL, last_rx_bytes INTEGER NOT NULL, last_tx_bytes INTEGER NOT NULL, updated_at TEXT NOT NULL, UNIQUE(iface,public_ip))`,
-		`CREATE TABLE IF NOT EXISTS daily_iface_traffic (id TEXT PRIMARY KEY, day TEXT NOT NULL, iface TEXT NOT NULL, public_ip TEXT NOT NULL, rx_kb INTEGER NOT NULL DEFAULT 0, tx_kb INTEGER NOT NULL DEFAULT 0, UNIQUE(day,iface,public_ip))`,
-		`CREATE TABLE IF NOT EXISTS alert_events (
+		`CREATE TABLE IF NOT EXISTS app_meta (
+			-- 元数据记录唯一 ID。
 			id TEXT PRIMARY KEY,
-			fingerprint TEXT NOT NULL UNIQUE,
-			definition_id TEXT NOT NULL DEFAULT '',
-			alert_type TEXT NOT NULL,
-			target TEXT NOT NULL,
-			level TEXT NOT NULL,
-			status TEXT NOT NULL,
-			title TEXT NOT NULL,
+			-- 元数据键名，例如 deploy_date。
+			key TEXT NOT NULL UNIQUE,
+			-- 元数据键值。
+			value TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS proxy_counters (
+			-- 代理计数器记录唯一 ID。
+			id TEXT PRIMARY KEY,
+			-- FRPS 代理名称。
+			name TEXT NOT NULL,
+			-- FRPS 代理类型，例如 tcp、http、https。
+			type TEXT NOT NULL,
+			-- 上一次采集到的入站累计字节数。
+			last_in INTEGER NOT NULL,
+			-- 上一次采集到的出站累计字节数。
+			last_out INTEGER NOT NULL,
+			-- 计数器最后更新时间，RFC3339 UTC 字符串。
+			updated_at TEXT NOT NULL,
+			-- 同一名称与类型的代理只保留一条计数器记录。
+			UNIQUE(name,type)
+		)`,
+		`CREATE TABLE IF NOT EXISTS daily_traffic (
+			-- 日代理流量记录唯一 ID。
+			id TEXT PRIMARY KEY,
+			-- 统计日期，格式 YYYY-MM-DD。
+			day TEXT NOT NULL,
+			-- FRPS 代理名称。
+			proxy_name TEXT NOT NULL,
+			-- FRPS 代理类型，例如 tcp、http、https。
+			proxy_type TEXT NOT NULL,
+			-- 当日新增入站字节数。
+			in_bytes INTEGER NOT NULL DEFAULT 0,
+			-- 当日新增出站字节数。
+			out_bytes INTEGER NOT NULL DEFAULT 0,
+			-- 当日观测到的最大连接数。
+			peak_conns INTEGER NOT NULL DEFAULT 0,
+			-- 每个日期、代理名称、代理类型只保留一条汇总记录。
+			UNIQUE(day,proxy_name,proxy_type)
+		)`,
+		`CREATE TABLE IF NOT EXISTS event_alert_state (
+			-- 告警状态记录唯一 ID。
+			id TEXT PRIMARY KEY,
+			-- 告警状态键，通常对应代理或检测对象。
+			key TEXT NOT NULL UNIQUE,
+			-- 最近一次发送告警通知的时间，RFC3339 UTC 字符串。
+			sent_at TEXT NOT NULL,
+			-- 当前异常是否处于激活状态，1 表示激活。
+			active INTEGER NOT NULL DEFAULT 0,
+			-- 连续失败次数。
+			fail_streak INTEGER NOT NULL DEFAULT 0,
+			-- 总检测次数。
+			total_checks INTEGER NOT NULL DEFAULT 0,
+			-- 在线或成功检测次数。
+			online_checks INTEGER NOT NULL DEFAULT 0,
+			-- 状态最近一次变化时间，RFC3339 UTC 字符串。
+			last_change_at TEXT NOT NULL DEFAULT '',
+			-- 最近一次离线时间，RFC3339 UTC 字符串。
+			last_offline_at TEXT NOT NULL DEFAULT '',
+			-- 最近一次恢复时间，RFC3339 UTC 字符串。
+			last_recovery_at TEXT NOT NULL DEFAULT '',
+			-- 本轮异常首次失败时间，RFC3339 UTC 字符串。
+			first_fail_at TEXT NOT NULL DEFAULT '',
+			-- 最近一次检测看到该对象的时间，RFC3339 UTC 字符串。
+			last_seen_at TEXT NOT NULL DEFAULT '',
+			-- 连续恢复成功次数。
+			recover_streak INTEGER NOT NULL DEFAULT 0,
+			-- 本轮稳定恢复起始时间，RFC3339 UTC 字符串。
+			recover_since TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE TABLE IF NOT EXISTS proxy_status_events (
+			-- 代理状态事件唯一 ID。
+			id TEXT PRIMARY KEY,
+			-- 代理状态键，通常对应代理名称与类型。
+			key TEXT NOT NULL,
+			-- 状态值，1 表示在线，0 表示离线。
+			status INTEGER NOT NULL,
+			-- 状态记录时间，RFC3339 UTC 字符串。
+			at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS users (
+			-- 用户唯一 ID。
+			id TEXT PRIMARY KEY,
+			-- 登录用户名。
+			username TEXT NOT NULL UNIQUE,
+			-- 密码哈希值。
+			password_hash TEXT NOT NULL,
+			-- 密码哈希盐值。
+			password_salt TEXT NOT NULL,
+			-- 找回或通知使用的邮箱地址。
+			recovery_email TEXT NOT NULL DEFAULT '',
+			-- 是否仍使用初始化密码，1 表示是。
+			is_initial_password INTEGER NOT NULL DEFAULT 1
+		)`,
+		`CREATE TABLE IF NOT EXISTS warnings (
+			-- 警告记录唯一 ID。
+			id TEXT PRIMARY KEY,
+			-- 警告键，用于去重与覆盖。
+			key TEXT NOT NULL UNIQUE,
+			-- 警告展示内容。
 			message TEXT NOT NULL,
-			first_seen_at TEXT NOT NULL,
-			last_seen_at TEXT NOT NULL,
-			resolved_at TEXT NOT NULL DEFAULT '',
-			occurrence_count INTEGER NOT NULL DEFAULT 0,
-			last_error TEXT NOT NULL DEFAULT '',
-			last_notify_at TEXT NOT NULL DEFAULT '',
-			parent_fingerprint TEXT NOT NULL DEFAULT '',
-			suppressed INTEGER NOT NULL DEFAULT 0,
-			suppress_reason TEXT NOT NULL DEFAULT '',
+			-- 警告首次创建时间，RFC3339 UTC 字符串。
 			created_at TEXT NOT NULL,
+			-- 警告最近更新时间，RFC3339 UTC 字符串。
+			updated_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS iface_counters (
+			-- 网卡计数器记录唯一 ID。
+			id TEXT PRIMARY KEY,
+			-- 网卡名称。
+			iface TEXT NOT NULL,
+			-- 该网卡对应的公网 IP。
+			public_ip TEXT NOT NULL,
+			-- 上一次采集到的接收累计字节数。
+			last_rx_bytes INTEGER NOT NULL,
+			-- 上一次采集到的发送累计字节数。
+			last_tx_bytes INTEGER NOT NULL,
+			-- 计数器最后更新时间，RFC3339 UTC 字符串。
+			updated_at TEXT NOT NULL,
+			-- 同一网卡与公网 IP 只保留一条计数器记录。
+			UNIQUE(iface,public_ip)
+		)`,
+		`CREATE TABLE IF NOT EXISTS daily_iface_traffic (
+			-- 日网卡流量记录唯一 ID。
+			id TEXT PRIMARY KEY,
+			-- 统计日期，格式 YYYY-MM-DD。
+			day TEXT NOT NULL,
+			-- 网卡名称。
+			iface TEXT NOT NULL,
+			-- 该网卡对应的公网 IP。
+			public_ip TEXT NOT NULL,
+			-- 当日新增接收流量，单位 KB。
+			rx_kb INTEGER NOT NULL DEFAULT 0,
+			-- 当日新增发送流量，单位 KB。
+			tx_kb INTEGER NOT NULL DEFAULT 0,
+			-- 每个日期、网卡、公网 IP 只保留一条汇总记录。
+			UNIQUE(day,iface,public_ip)
+		)`,
+		`CREATE TABLE IF NOT EXISTS alert_events (
+			-- 告警事件记录唯一 ID。
+			id TEXT PRIMARY KEY,
+			-- 告警指纹，用于同类事件去重。
+			fingerprint TEXT NOT NULL UNIQUE,
+			-- 父级异常定义 ID，对应 alert_parent_definitions.id。
+			definition_id TEXT NOT NULL DEFAULT '',
+			-- 告警类型，例如 proxy_offline、cert_expiry。
+			alert_type TEXT NOT NULL,
+			-- 告警目标，例如代理名、域名或系统资源。
+			target TEXT NOT NULL,
+			-- 告警级别，例如 warning、critical。
+			level TEXT NOT NULL,
+			-- 告警状态，例如 active、resolved。
+			status TEXT NOT NULL,
+			-- 告警标题。
+			title TEXT NOT NULL,
+			-- 告警正文。
+			message TEXT NOT NULL,
+			-- 首次发现时间，RFC3339 UTC 字符串。
+			first_seen_at TEXT NOT NULL,
+			-- 最近发现时间，RFC3339 UTC 字符串。
+			last_seen_at TEXT NOT NULL,
+			-- 恢复时间，未恢复时为空。
+			resolved_at TEXT NOT NULL DEFAULT '',
+			-- 同一指纹累计出现次数。
+			occurrence_count INTEGER NOT NULL DEFAULT 0,
+			-- 最近一次错误详情。
+			last_error TEXT NOT NULL DEFAULT '',
+			-- 最近一次通知发送时间，未发送时为空。
+			last_notify_at TEXT NOT NULL DEFAULT '',
+			-- 抑制本事件的父级告警指纹。
+			parent_fingerprint TEXT NOT NULL DEFAULT '',
+			-- 是否被父级告警抑制，1 表示被抑制。
+			suppressed INTEGER NOT NULL DEFAULT 0,
+			-- 被抑制原因说明。
+			suppress_reason TEXT NOT NULL DEFAULT '',
+			-- 记录创建时间，RFC3339 UTC 字符串。
+			created_at TEXT NOT NULL,
+			-- 记录最近更新时间，RFC3339 UTC 字符串。
 			updated_at TEXT NOT NULL
 		)`,
 		`CREATE TABLE IF NOT EXISTS alert_candidate_cache (
+			-- 候选告警缓存记录唯一 ID。
 			id TEXT PRIMARY KEY,
+			-- 候选告警指纹，用于同类候选事件去重。
 			fingerprint TEXT NOT NULL UNIQUE,
+			-- 候选告警类型。
 			alert_type TEXT NOT NULL,
+			-- 候选告警目标。
 			target TEXT NOT NULL,
+			-- 候选告警级别。
 			level TEXT NOT NULL,
+			-- 候选告警标题。
 			title TEXT NOT NULL,
+			-- 候选告警正文。
 			message TEXT NOT NULL,
+			-- 最近一次错误详情。
 			last_error TEXT NOT NULL DEFAULT '',
+			-- 关联 warning 记录的 key。
 			warning_key TEXT NOT NULL DEFAULT '',
+			-- 候选告警首次发现时间，RFC3339 UTC 字符串。
 			first_seen_at TEXT NOT NULL,
+			-- 候选告警最近发现时间，RFC3339 UTC 字符串。
 			last_seen_at TEXT NOT NULL
 		)`,
 		`CREATE TABLE IF NOT EXISTS alert_parent_definitions (
+			-- 父级异常定义唯一 ID。
 			id TEXT PRIMARY KEY,
+			-- 父级异常键，作为业务识别名称。
 			parent_key TEXT NOT NULL UNIQUE,
+			-- 排序与层级优先级，数值越小越优先。
 			sort_rank INTEGER NOT NULL,
+			-- 是否阻断下游告警判断，1 表示阻断。
 			blocks_downstream INTEGER NOT NULL DEFAULT 0,
+			-- 是否抑制代理与证书类子告警，1 表示抑制。
 			suppress_proxy_cert INTEGER NOT NULL DEFAULT 1,
+			-- 父级异常展示名称。
 			label TEXT NOT NULL DEFAULT '',
+			-- 父级异常说明。
 			description TEXT NOT NULL DEFAULT ''
 		)`,
 	}
