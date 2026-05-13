@@ -102,14 +102,14 @@
             <div class="storage-donut-wrap">
               <div ref="storagePieEl" class="storage-donut"></div>
               <div v-if="storagePieCenterShow" class="storage-donut-center">
-                <span class="storage-donut-pct">{{ storageFreePct }}%</span>
+                <span class="storage-donut-pct" :class="`storage-free-${storageFreeStatus}`">{{ storageFreePct }}%</span>
                 <span class="storage-donut-lbl">可用</span>
               </div>
             </div>
             <div class="storage-meta">
               <div class="storage-stat total"><span>分区</span><b>{{ humanBytes(storageTotalBytes) }}</b></div>
               <div class="storage-stat used"><span>已用</span><b>{{ humanBytes(storageUsedBytes) }}</b></div>
-              <div class="storage-stat free"><span>可用</span><b>{{ humanBytes(storageFreeBytes) }}</b></div>
+              <div class="storage-stat free" :class="`storage-free-${storageFreeStatus}`"><span>可用</span><b>{{ humanBytes(storageFreeBytes) }}</b></div>
             </div>
           </div>
         </section>
@@ -279,6 +279,16 @@ const storagePieCenterShow = computed(() => {
 const storageHasData = computed(() => {
   return Boolean(storagePartition.value?.partition && storageTotalBytes.value > 0)
 })
+
+/** 可用空间占比：≥30% 充足、12%~29% 不富裕、<12% 紧张（与环形图配色一致） */
+function storageFreeStatusFromPct(pct) {
+  const p = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)))
+  if (p >= 45) return 'ok'
+  if (p >= 30) return 'warn'
+  return 'critical'
+}
+const STORAGE_FREE_RING_HEX = { ok: '#22c55e', warn: '#eab308', critical: '#dc2626' }
+const storageFreeStatus = computed(() => storageFreeStatusFromPct(storageFreePct.value))
 
 function fmtMB(v) {
   if (v == null || Number.isNaN(Number(v))) return '-'
@@ -633,6 +643,10 @@ function buildStoragePie() {
     storageChart.clear()
     return
   }
+  const usedPct = Math.round((used / total) * 100)
+  const freePct = Math.max(0, Math.min(100, 100 - usedPct))
+  const tier = storageFreeStatusFromPct(freePct)
+  const ringColor = STORAGE_FREE_RING_HEX[tier]
   storageChart.setOption({
     backgroundColor: 'transparent',
     animation: true,
@@ -650,8 +664,8 @@ function buildStoragePie() {
         label: { show: false },
         emphasis: { disabled: true },
         data: [
-          { name: '已用', value: used, itemStyle: { color: '#2563eb' } },
-          { name: '可用', value: free, itemStyle: { color: '#cbd5e1' } }
+          { name: '已用', value: used, itemStyle: { color: '#cbd5e1' } },
+          { name: '可用', value: free, itemStyle: { color: ringColor } }
         ]
       }
     ]
@@ -844,6 +858,15 @@ onUnmounted(() => {
   font-weight: 800;
   color: #0f172a;
 }
+.storage-donut-pct.storage-free-ok {
+  color: #15803d;
+}
+.storage-donut-pct.storage-free-warn {
+  color: #b45309;
+}
+.storage-donut-pct.storage-free-critical {
+  color: #b91c1c;
+}
 .storage-donut-lbl {
   margin-top: 2px;
   font-size: 10px;
@@ -895,17 +918,21 @@ onUnmounted(() => {
   border-color: transparent;
   background: transparent;
 }
-.storage-stat.used span,
-.storage-stat.used b {
-  color: #2563eb;
-}
 .storage-stat.free {
   border-color: transparent;
   background: transparent;
 }
-.storage-stat.free span,
-.storage-stat.free b {
-  color: #16a34a;
+.storage-stat.free.storage-free-ok span,
+.storage-stat.free.storage-free-ok b {
+  color: #15803d;
+}
+.storage-stat.free.storage-free-warn span,
+.storage-stat.free.storage-free-warn b {
+  color: #b45309;
+}
+.storage-stat.free.storage-free-critical span,
+.storage-stat.free.storage-free-critical b {
+  color: #b91c1c;
 }
 .storage-legend {
   display: flex;
