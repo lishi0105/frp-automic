@@ -1409,6 +1409,11 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 			filtered[key] = value
 		}
 		smtpChanged := a.appcfg.ApplyPOST(filtered)
+		if err := appsettings.SaveAppSettings(a.appcfg); err != nil {
+			logger.Error("设置写入配置文件失败 路径=%s 错误=%v", appsettings.AppSettingsYAMLPath, err)
+			http.Error(w, "settings saved in memory but failed to write config file: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 		if smtpChanged {
 			logger.Info("SMTP 配置已变更，验证状态已重置")
 		}
