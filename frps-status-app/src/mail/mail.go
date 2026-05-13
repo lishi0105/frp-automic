@@ -8,6 +8,7 @@ import (
 	"net/smtp"
 	"strconv"
 	"strings"
+	"time"
 
 	"frps-status-app.local/status/src/logger"
 	"frps-status-app.local/status/src/model"
@@ -20,9 +21,12 @@ func Send(settings model.PublicSettings, authCode, subject, body string) error {
 func SendTo(settings model.PublicSettings, authCode, to, subject, body string) error {
 	addr := net.JoinHostPort(settings.SMTPHost, strconv.Itoa(settings.SMTPPort))
 	auth := smtp.PlainAuth("", settings.SMTPFrom, authCode, settings.SMTPHost)
+	sentAt := time.Now()
+	body = withSentTime(body, sentAt)
 	msg := "From: " + formatFrom(settings) + "\r\n" +
 		"To: " + to + "\r\n" +
 		"Subject: " + subject + "\r\n" +
+		"Date: " + sentAt.Format(time.RFC1123Z) + "\r\n" +
 		"Content-Type: text/plain; charset=UTF-8\r\n\r\n" + body
 	toList := splitCSV(to)
 	logger.Info("准备发送邮件 主机=%s 端口=%d 发件人=%s 收件人数=%d 主题=%s", settings.SMTPHost, settings.SMTPPort, settings.SMTPFrom, len(toList), subject)
@@ -35,6 +39,15 @@ func SendTo(settings model.PublicSettings, authCode, to, subject, body string) e
 	}
 	logger.Info("SMTP 发送完成 地址=%s 发件人=%s 收件人=%v", addr, settings.SMTPFrom, toList)
 	return nil
+}
+
+func withSentTime(body string, sentAt time.Time) string {
+	line := "发送时间：" + sentAt.Format("2006-01-02 15:04:05 -0700 MST")
+	body = strings.TrimLeft(body, "\r\n")
+	if body == "" {
+		return line
+	}
+	return line + "\n\n" + body
 }
 
 func formatFrom(settings model.PublicSettings) string {
