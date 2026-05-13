@@ -267,41 +267,6 @@ https://frps.<你的根域名>
 | `local_port`       | 否       | 内网真实服务端口，不填时等于 `port`                          |
 | `local_ip`         | 否       | 内网真实服务 IP，默认 `127.0.0.1`                            |
 | `expose_http_port` | 否       | HTTP 模式下是否额外开放 `VPS_IP:port` 直连入口，默认 `false` |
-| `iperf_test`       | 否       | 是否为该服务生成 iperf3 测速代理，默认 `false`               |
-| `iperf_port`       | 否       | frps 侧 iperf3 测速端口，不填时脚本自动生成并尽量复用历史值 |
-| `iperf_local_port` | 否       | 内网机 iperf3 server 监听端口，默认 `5201`                   |
-
-启用测速示例：
-
-```jsonc
-{
-  "alias": "nas",
-  "comment": "NAS 服务",
-  "mode": "tcp",
-  "tunnel": true,
-  "port": 2222,
-  "local_port": 22,
-  "local_ip": "127.0.0.1",
-  "iperf_test": true
-}
-```
-
-脚本会生成：
-
-- `frpc.toml` 中的 `nas_iperf3` TCP 代理；
-- `frpc/docker-compose.yml` 中的 `iperf3-server` 服务；
-- 状态页环境变量 `SPEEDTEST_TARGETS`，供 Web 面板创建测速任务。
-
-把 `frpc/` 目录复制到内网机器上，执行：
-
-```bash
-docker compose up -d
-```
-
-如果开启了 `iperf_test`，同一个 Compose 会同时启动 `frpc` 和 `iperf3-server`。
-
-状态页的“链路测速”页面支持正向测速（VPS 到内网）和反向测速（内网到 VPS）。测速会占用带宽和 CPU，建议按需短时间运行。
-
 ### 4.2 穿透内网 Web 服务
 
 例如内网机器上有一个 Emby 服务，端口是 `8096`：
@@ -546,10 +511,6 @@ frps-status-app/web/
 | POST       | `/api/settings/test-email` | 发送测试邮件                          |
 | POST       | `/api/db/vacuum`           | 执行 SQLite VACUUM                    |
 | POST       | `/api/db/purge`            | 清理旧数据                            |
-| GET        | `/api/speedtests`          | 查询测速目标和任务列表                |
-| POST       | `/api/speedtests`          | 创建异步测速任务                      |
-| DELETE     | `/api/speedtests`          | 清理测速历史（可传 `keep_latest`）    |
-| GET        | `/api/speedtests/{id}`     | 查询单个测速任务状态和结果            |
 
 除 `/api/login`、`/api/session`、`/api/user/forgot-password` 外，其余接口需要登录态。
 
@@ -578,7 +539,7 @@ frp-automic/
 │   │   └── server/           # HTTP 路由与处理器
 │   └── web/                  # 前端构建产物
 ├── frps/                     # 由部署脚本生成
-└── frpc/                     # 由部署脚本生成，复制到内网机器使用；开启测速时包含 iperf3-server
+└── frpc/                     # 由部署脚本生成，复制到内网机器使用
 ```
 
 ---

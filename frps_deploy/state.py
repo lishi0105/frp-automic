@@ -8,8 +8,7 @@ from frps_deploy import config
 from frps_deploy.constants import DEPLOY_STATE_FILE, GENERATED_INFO_FILE
 from frps_deploy.models import DeployContext
 from frps_deploy.services import (
-    expose_http_port, iperf_local_port, iperf_remote_port, iperf_test_enabled,
-    local_ip, local_port, mode_of, needs_tunnel, remote_port,
+    expose_http_port, local_ip, local_port, mode_of, needs_tunnel, remote_port,
 )
 from frps_deploy.utils import safe_alias
 
@@ -26,11 +25,7 @@ def _service_state(item: Dict[str, Any]) -> Dict[str, Any]:
         "local_port": local_port(item),
         "local_ip": local_ip(item),
         "expose_http_port": expose_http_port(item),
-        "iperf_test": iperf_test_enabled(item),
     }
-    if iperf_test_enabled(item):
-        state["iperf_local_port"] = iperf_local_port(item)
-        state["iperf_port"] = iperf_remote_port(item)
     return state
 
 

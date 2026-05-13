@@ -123,24 +123,6 @@ type AlertParentDef struct {
 	Description       string
 }
 
-type SpeedtestTaskRecord struct {
-	ID              string
-	TargetName      string
-	TargetHost      string
-	TargetPort      int
-	Direction       string
-	DurationSeconds int
-	Status          string
-	ErrorMsg        string
-	CreatedAt       string
-	StartedAt       string
-	FinishedAt      string
-	SentMbps        float64
-	ReceivedMbps    float64
-	Retransmits     int64
-	RawJSON         string
-}
-
 func New(db *sql.DB) *Store {
 	return &Store{db: db}
 }
@@ -370,23 +352,6 @@ func (s *Store) InitDB() error {
 			-- 父级异常说明。
 			description TEXT NOT NULL DEFAULT ''
 		)`,
-		`CREATE TABLE IF NOT EXISTS speedtest_tasks (
-			id TEXT PRIMARY KEY,
-			target_name TEXT NOT NULL,
-			target_host TEXT NOT NULL,
-			target_port INTEGER NOT NULL,
-			direction TEXT NOT NULL,
-			duration_seconds INTEGER NOT NULL,
-			status TEXT NOT NULL,
-			error_msg TEXT NOT NULL DEFAULT '',
-			created_at TEXT NOT NULL,
-			started_at TEXT NOT NULL DEFAULT '',
-			finished_at TEXT NOT NULL DEFAULT '',
-			sent_mbps REAL NOT NULL DEFAULT 0,
-			received_mbps REAL NOT NULL DEFAULT 0,
-			retransmits INTEGER NOT NULL DEFAULT 0,
-			raw_json TEXT NOT NULL DEFAULT ''
-		)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.Exec(stmt); err != nil {
@@ -397,8 +362,6 @@ func (s *Store) InitDB() error {
 	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_daily_iface_traffic_day ON daily_iface_traffic(day)`)
 	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_alert_events_status ON alert_events(status)`)
 	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_alert_candidate_cache_last_seen ON alert_candidate_cache(last_seen_at)`)
-	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_speedtest_tasks_created_at ON speedtest_tasks(created_at DESC)`)
-	_, _ = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_speedtest_tasks_status ON speedtest_tasks(status)`)
 
 	const deployKey = "deploy_date"
 	if _, err := s.db.Exec(`INSERT INTO app_meta(id,key,value) VALUES(?,?,?) ON CONFLICT(key) DO NOTHING`, uuid.NewString(), deployKey, time.Now().Format("2006-01-02")); err != nil {
@@ -410,94 +373,6 @@ func (s *Store) InitDB() error {
 		return err
 	}
 	return nil
-}
-
-func (s *Store) CreateSpeedtestTask(r SpeedtestTaskRecord) error {
-	_, err := s.db.Exec(`INSERT INTO speedtest_tasks(id,target_name,target_host,target_port,direction,duration_seconds,status,error_msg,created_at,started_at,finished_at,sent_mbps,received_mbps,retransmits,raw_json)
-VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		r.ID, r.TargetName, r.TargetHost, r.TargetPort, r.Direction, r.DurationSeconds, r.Status, r.ErrorMsg, r.CreatedAt, r.StartedAt, r.FinishedAt, r.SentMbps, r.ReceivedMbps, r.Retransmits, r.RawJSON)
-	return logStoreErr("create speedtest task "+r.ID, err)
-}
-
-func (s *Store) UpdateSpeedtestTaskStarted(id, startedAt string) error {
-	_, err := s.db.Exec(`UPDATE speedtest_tasks SET status='running', started_at=?, error_msg='' WHERE id=?`, startedAt, id)
-	return logStoreErr("update speedtest task started "+id, err)
-}
-
-func (s *Store) FinishSpeedtestTask(id, status, errMsg, finishedAt string, sentMbps, recvMbps float64, retransmits int64, rawJSON string) error {
-	_, err := s.db.Exec(`UPDATE speedtest_tasks
-SET status=?, error_msg=?, finished_at=?, sent_mbps=?, received_mbps=?, retransmits=?, raw_json=?
-WHERE id=?`, status, errMsg, finishedAt, sentMbps, recvMbps, retransmits, rawJSON, id)
-	return logStoreErr("finish speedtest task "+id, err)
-}
-
-func (s *Store) GetSpeedtestTask(id string) (SpeedtestTaskRecord, error) {
-	var r SpeedtestTaskRecord
-	err := s.db.QueryRow(`SELECT id,target_name,target_host,target_port,direction,duration_seconds,status,error_msg,created_at,started_at,finished_at,sent_mbps,received_mbps,retransmits,raw_json FROM speedtest_tasks WHERE id=?`, id).
-		Scan(&r.ID, &r.TargetName, &r.TargetHost, &r.TargetPort, &r.Direction, &r.DurationSeconds, &r.Status, &r.ErrorMsg, &r.CreatedAt, &r.StartedAt, &r.FinishedAt, &r.SentMbps, &r.ReceivedMbps, &r.Retransmits, &r.RawJSON)
-	if errors.Is(err, sql.ErrNoRows) {
-		return r, sql.ErrNoRows
-	}
-	return r, logStoreErr("get speedtest task "+id, err)
-}
-
-func (s *Store) ListSpeedtestTasks(limit int) ([]SpeedtestTaskRecord, error) {
-	if limit <= 0 {
-		limit = 50
-	}
-	rows, err := s.db.Query(`SELECT id,target_name,target_host,target_port,direction,duration_seconds,status,error_msg,created_at,started_at,finished_at,sent_mbps,received_mbps,retransmits,raw_json
-FROM speedtest_tasks ORDER BY created_at DESC LIMIT ?`, limit)
-	if err != nil {
-		return nil, logStoreErr("list speedtest tasks", err)
-	}
-	defer rows.Close()
-	out := make([]SpeedtestTaskRecord, 0, limit)
-	for rows.Next() {
-		var r SpeedtestTaskRecord
-		if err := rows.Scan(&r.ID, &r.TargetName, &r.TargetHost, &r.TargetPort, &r.Direction, &r.DurationSeconds, &r.Status, &r.ErrorMsg, &r.CreatedAt, &r.StartedAt, &r.FinishedAt, &r.SentMbps, &r.ReceivedMbps, &r.Retransmits, &r.RawJSON); err != nil {
-			return nil, logStoreErr("scan speedtest task", err)
-		}
-		out = append(out, r)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, logStoreErr("list speedtest tasks rows", err)
-	}
-	return out, nil
-}
-
-func (s *Store) HasRunningSpeedtestTask() (bool, error) {
-	var count int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM speedtest_tasks WHERE status IN ('queued','running')`).Scan(&count)
-	if err != nil {
-		return false, logStoreErr("has running speedtest task", err)
-	}
-	return count > 0, nil
-}
-
-func (s *Store) DeleteAllSpeedtestTasks() (int64, error) {
-	res, err := s.db.Exec(`DELETE FROM speedtest_tasks`)
-	if err != nil {
-		return 0, logStoreErr("delete all speedtest tasks", err)
-	}
-	n, _ := res.RowsAffected()
-	return n, nil
-}
-
-func (s *Store) DeleteSpeedtestTasksKeepLatest(keepLatest int) (int64, error) {
-	if keepLatest < 0 {
-		keepLatest = 0
-	}
-	res, err := s.db.Exec(`DELETE FROM speedtest_tasks
-WHERE id IN (
-	SELECT id FROM speedtest_tasks
-	ORDER BY created_at DESC
-	LIMIT -1 OFFSET ?
-)`, keepLatest)
-	if err != nil {
-		return 0, logStoreErr("delete speedtest tasks keep latest", err)
-	}
-	n, _ := res.RowsAffected()
-	return n, nil
 }
 
 func seedAlertParentDefinitions(db *sql.DB) error {

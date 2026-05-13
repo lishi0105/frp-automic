@@ -50,7 +50,6 @@ def write_default_config() -> None:
         pass
     print(f"未找到配置文件，已生成默认配置：{CONFIG_FILE}")
     print("请按需填写主域名（root_domain）、证书邮箱（cert_email）与服务列表（services）。")
-    print("提示：运行脚本时会交互询问是否开启 iperf3 测速服务（iperf_test）。")
 
 
 def load_config_file() -> Dict[str, Any]:

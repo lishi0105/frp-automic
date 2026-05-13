@@ -39,23 +39,6 @@ def local_ip(item: Dict[str, Any]) -> str:
 def expose_http_port(item: Dict[str, Any]) -> bool:
     return bool_value(item.get("expose_http_port", False), default=False)
 
-
-def iperf_test_enabled(item: Dict[str, Any]) -> bool:
-    return needs_tunnel(item) and bool_value(item.get("iperf_test", False), default=False)
-
-
-def iperf_local_port(item: Dict[str, Any]) -> int:
-    return int(item.get("iperf_local_port", 5201))
-
-
-def iperf_remote_port(item: Dict[str, Any]) -> int:
-    return int(item["iperf_port"])
-
-
-def iperf_proxy_name(item: Dict[str, Any]) -> str:
-    return f"{item['alias']}_iperf3"
-
-
 def upstream_host(item: Dict[str, Any]) -> str:
     host = local_ip(item).strip() or "127.0.0.1"
     if host in {"127.0.0.1", "localhost"}:
@@ -76,13 +59,7 @@ def tcp_services() -> List[Dict[str, Any]]:
 
 
 def all_remote_ports() -> List[int]:
-    ports = {remote_port(s) for s in tunneled_services()}
-    ports.update(iperf_remote_port(s) for s in iperf_test_services() if "iperf_port" in s)
-    return sorted(ports)
-
-
-def iperf_test_services() -> List[Dict[str, Any]]:
-    return [s for s in config.SERVICES if iperf_test_enabled(s)]
+    return sorted({remote_port(s) for s in tunneled_services()})
 
 
 def http_remote_ports() -> List[int]:
@@ -158,24 +135,6 @@ def validate_services() -> None:
         if rp in ports:
             raise ValueError(f"各服务的远端端口（port）重复：{rp}")
         ports.add(rp)
-
-        if iperf_test_enabled(item):
-            try:
-                ilp = iperf_local_port(item)
-            except (TypeError, ValueError) as exc:
-                raise ValueError(f"服务 {alias} 的测速本地端口（iperf_local_port）必须是整数：{item.get('iperf_local_port')!r}") from exc
-            if not (1000 <= ilp <= 65535):
-                raise ValueError(f"服务 {alias} 的测速本地端口（iperf_local_port）非法：{ilp}")
-            if "iperf_port" in item and item.get("iperf_port") not in (None, ""):
-                try:
-                    irp = iperf_remote_port(item)
-                except (TypeError, ValueError) as exc:
-                    raise ValueError(f"服务 {alias} 的测速远端端口（iperf_port）必须是整数：{item.get('iperf_port')!r}") from exc
-                if not (1000 <= irp <= 65535):
-                    raise ValueError(f"服务 {alias} 的测速远端端口（iperf_port）非法：{irp}")
-                if irp in ports:
-                    raise ValueError(f"测速远端端口（iperf_port）与已使用端口冲突：{irp}")
-                ports.add(irp)
 
         tunnel = item.get("tunnel", True)
         if not isinstance(tunnel, (bool, str, int)):

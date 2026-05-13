@@ -82,8 +82,6 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/api/db/purge", a.withAuth(a.handlePurge))
 	mux.HandleFunc("/api/logs/current", a.withAuth(a.handleCurrentLog))
 	mux.HandleFunc("/api/logs/clear", a.withAuth(a.handleClearLog))
-	mux.HandleFunc("/api/speedtests", a.withAuth(a.handleSpeedtests))
-	mux.HandleFunc("/api/speedtests/", a.withAuth(a.handleSpeedtestTask))
 	mux.HandleFunc("/", a.serveIndex)
 	return mux
 }

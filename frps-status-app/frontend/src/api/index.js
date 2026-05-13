@@ -17,14 +17,6 @@ function post(url, body) {
   })
 }
 
-function del(url, body) {
-  return request(url, {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: body != null ? JSON.stringify(body) : undefined
-  })
-}
-
 function withQuery(url, params = {}) {
   const qs = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) {
@@ -57,10 +49,6 @@ export const api = {
   getCurrentLog: () => request('api/logs/current'),
   clearCurrentLog: () => post('api/logs/clear'),
   getWarnings: () => request('api/warnings'),
-  getSpeedtests: () => request('api/speedtests'),
-  createSpeedtest: (data) => post('api/speedtests', data),
-  getSpeedtest: (id) => request(`api/speedtests/${encodeURIComponent(id)}`),
-  cleanupSpeedtests: (keepLatest = 0) => del('api/speedtests', { keep_latest: keepLatest }),
   getUser: () => request('api/user'),
   changeCredentials: (data) => post('api/user/credentials', data),
   changeRecoveryEmail: (data) => post('api/user/recovery-email', data),

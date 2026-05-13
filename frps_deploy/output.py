@@ -9,8 +9,8 @@ from frps_deploy.constants import (
 )
 from frps_deploy.models import DeployContext
 from frps_deploy.services import (
-    dashboard_domain, http_services, iperf_local_port, iperf_remote_port,
-    iperf_test_services, local_ip, local_port, remote_port, needs_tunnel,
+    dashboard_domain, http_services, local_ip, local_port, remote_port,
+    needs_tunnel,
     status_domain, tcp_services,
 )
 
@@ -19,11 +19,6 @@ def print_frpc_config(ctx: DeployContext) -> None:
     print("\n================ frpc 客户端文件 ================")
     print(f"frpc.toml 路径：{FRPC_TOML_FILE}")
     print(f"docker-compose.yml 路径：{FRPC_COMPOSE_FILE}")
-    if iperf_test_services():
-        print("已在 frpc/docker-compose.yml 中合并生成 iperf3-server 测速服务。")
-        print("测速端口：")
-        for item in iperf_test_services():
-            print(f"  {item.get('comment', item['alias'])}: frps:{iperf_remote_port(item)} -> 127.0.0.1:{iperf_local_port(item)}")
     print("")
     print("请将上面的 frpc.toml 和 docker-compose.yml 拷贝到客户机同一目录后执行：")
     print("  docker compose up -d")
