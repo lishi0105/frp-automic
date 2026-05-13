@@ -63,11 +63,16 @@
         <section class="summary-card online-card">
           <div class="summary-title">代理在线</div>
           <div class="online-head">
-            <div><b>{{ onlineProxies }}</b><span>/ {{ totalProxies }}</span></div>
             <div class="summary-icon chart-icon" aria-hidden="true"></div>
+            <div class="online-main">
+              <div class="online-count"><b>{{ onlineProxies }}</b><span>/ {{ totalProxies }}</span></div>
+              <div class="online-rate-text">在线率 {{ onlinePct }}%</div>
+            </div>
           </div>
-          <div class="summary-sub">在线率 {{ onlinePct }}%</div>
-          <div class="summary-sub">TCP {{ proxyTypeMap.tcp || 0 }} · HTTP {{ proxyTypeMap.http || 0 }} · HTTPS {{ proxyTypeMap.https || 0 }}</div>
+          <div class="proxy-type-list" aria-label="代理类型数量">
+            <span v-for="item in proxyTypeStats" :key="item.type">{{ item.label }} {{ item.count }}</span>
+            <span v-if="!proxyTypeStats.length">暂无代理</span>
+          </div>
         </section>
 
         <section class="summary-card cert-card">
@@ -75,10 +80,16 @@
           <span class="cert-pill" :class="certHealthClass">{{ certHealthText }}</span>
           <div class="cert-body">
             <div class="summary-icon shield-icon" aria-hidden="true"></div>
-            <div>
-              <div class="cert-days"><b>{{ certSummary.min_days_left ?? '-' }}</b><span>天</span></div>
-              <div class="summary-sub">WARN {{ certSummary.warn || 0 }} · FAIL {{ certSummary.fail || 0 }}</div>
+            <div class="cert-main">
+              <div class="cert-days"><b>{{ certMinDaysText }}</b><span>天</span></div>
+              <div class="cert-domain" :title="certNearestDomain">{{ certNearestDomain }}</div>
             </div>
+          </div>
+          <div class="cert-stats" aria-label="证书统计">
+            <div><span>总数</span><b>{{ certDashboard.total }}</b></div>
+            <div class="ok"><span>正常</span><b>{{ certDashboard.ok }}</b></div>
+            <div class="warn"><span>预警</span><b>{{ certDashboard.warn }}</b></div>
+            <div class="bad"><span>异常</span><b>{{ certDashboard.fail }}</b></div>
           </div>
         </section>
 
@@ -316,10 +327,15 @@ const proxies = computed(() => props.status?.proxies ?? [])
 const onlineProxies = computed(() => proxies.value.filter(p => p.online).length)
 const totalProxies = computed(() => proxies.value.length)
 const onlinePct = computed(() => totalProxies.value ? Math.round((onlineProxies.value / totalProxies.value) * 100) : 0)
-const proxyTypeMap = computed(() => {
-  const m = {}
-  for (const p of proxies.value) m[p.type] = (m[p.type] || 0) + 1
-  return m
+const proxyTypeStats = computed(() => {
+  const counts = new Map()
+  for (const p of proxies.value) {
+    const type = String(p.type || 'unknown').trim().toLowerCase() || 'unknown'
+    counts.set(type, (counts.get(type) || 0) + 1)
+  }
+  return [...counts.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([type, count]) => ({ type, label: proxyTypeLabel(type), count }))
 })
 
 const topProxies = computed(() => {
@@ -476,25 +492,41 @@ const rootDomain = computed(() => {
   return domain.replace(/^frps\./i, '')
 })
 
-const certSummary = computed(() => props.status?.dashboard?.certificate || {
-  total: certs.value.length,
-  ok: certs.value.filter(c => c.ok && (c.days_left == null || c.days_left >= 15)).length,
-  warn: certs.value.filter(c => c.ok && c.days_left != null && c.days_left < 15).length,
-  fail: certs.value.filter(c => !c.ok).length,
-  min_domain: certs.value[0]?.domain || '',
-  min_days_left: certs.value[0]?.days_left ?? null
+const certAlertDays = computed(() => Number(props.status?.settings?.alert_cert_days || 15))
+const certDashboard = computed(() => {
+  const out = { total: certs.value.length, ok: 0, warn: 0, fail: 0 }
+  for (const c of certs.value) {
+    if (isCertFailed(c)) out.fail += 1
+    else if (c.days_left != null && Number(c.days_left) < certAlertDays.value) out.warn += 1
+    else out.ok += 1
+  }
+  return out
 })
+const nearestCert = computed(() => certs.value.find(c => c.days_left != null) || certs.value[0] || null)
+const certMinDaysText = computed(() => nearestCert.value?.days_left ?? '-')
+const certNearestDomain = computed(() => nearestCert.value?.domain || '暂无证书')
 
 const certHealthText = computed(() => {
-  if ((certSummary.value.fail || 0) > 0) return '异常'
-  if ((certSummary.value.warn || 0) > 0) return '预警'
+  if ((certDashboard.value.fail || 0) > 0) return '异常'
+  if ((certDashboard.value.warn || 0) > 0) return '预警'
   return '正常'
 })
 const certHealthClass = computed(() => {
-  if ((certSummary.value.fail || 0) > 0) return 'bad'
-  if ((certSummary.value.warn || 0) > 0) return 'warn'
+  if ((certDashboard.value.fail || 0) > 0) return 'bad'
+  if ((certDashboard.value.warn || 0) > 0) return 'warn'
   return 'ok'
 })
+
+function isCertFailed(c) {
+  if (!c) return true
+  if (!c.present || !c.ok || !c.tls_ok) return true
+  return Boolean(c.tls_has_local_cert && !c.tls_match_local)
+}
+
+function proxyTypeLabel(type) {
+  if (type === 'unknown') return '未知'
+  return type.toUpperCase()
+}
 
 function buildChart(daily) {
   if (!chart) return
@@ -1163,23 +1195,73 @@ onUnmounted(() => {
 }
 .online-head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
   margin-top: 8px;
 }
-.online-head b {
-  font-size: 28px;
+.online-main {
+  min-width: 0;
+}
+.online-count {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: #0f172a;
+}
+.online-count b {
+  font-size: 30px;
   line-height: 1;
-  color: #0f172a;
 }
-.online-head span {
-  margin-left: 7px;
+.online-count span {
   font-size: 18px;
-  font-weight: 700;
-  color: #0f172a;
+  font-weight: 750;
 }
-.online-card .summary-sub {
+.online-rate-text {
+  margin-top: 3px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 650;
+}
+.proxy-type-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 10px;
   margin-top: 6px;
+  color: #475569;
+  font-size: 12px;
+}
+.proxy-type-list span {
+  white-space: nowrap;
+}
+.cert-stats div {
+  min-width: 0;
+  padding: 5px 4px;
+  border-radius: 6px;
+  background: #f8fafc;
+  text-align: center;
+  line-height: 1.1;
+}
+.cert-stats span {
+  display: block;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 650;
+}
+.cert-stats b {
+  display: block;
+  margin-top: 3px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+}
+.cert-stats .ok b {
+  color: #15803d;
+}
+.cert-stats .warn b {
+  color: #b45309;
+}
+.cert-stats .bad b {
+  color: #dc2626;
 }
 .chart-icon {
   width: 42px;
@@ -1224,8 +1306,15 @@ onUnmounted(() => {
 .cert-body {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-top: 10px;
+  gap: 12px;
+  margin-top: 8px;
+}
+.cert-card .summary-title {
+  padding-right: 58px;
+}
+.cert-card .summary-icon {
+  width: 52px;
+  height: 52px;
 }
 .shield-icon {
   position: relative;
@@ -1256,16 +1345,34 @@ onUnmounted(() => {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  margin-bottom: 4px;
   color: #0f172a;
 }
 .cert-days b {
-  font-size: 28px;
+  font-size: 30px;
   line-height: 1;
 }
 .cert-days span {
   font-size: 16px;
   font-weight: 750;
+}
+.cert-main {
+  min-width: 0;
+}
+.cert-domain {
+  max-width: 142px;
+  margin-top: 3px;
+  overflow: hidden;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cert-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 9px;
 }
 .dashboard-main {
   display: grid;

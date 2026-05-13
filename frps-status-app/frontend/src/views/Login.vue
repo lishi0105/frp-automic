@@ -11,7 +11,7 @@
           <img :src="logoUrl" alt="FRPS状态监控" />
           <span>FRPS状态监控</span>
         </div>
-        <h1>FRPS 综合管理平台</h1>
+        <h1>内网穿透运维工具</h1>
         <p>SSL证书 · 流量告警 · 历史统计</p>
         <ul class="login-feature-list">
           <li><span class="feature-dot blue"></span>自动化证书签发与续期</li>
@@ -71,7 +71,7 @@
           <button type="button" class="link-btn" @click="showForgot = true">忘记密码？</button>
         </p>
 
-        <p class="login-version">frp监控平台 v0.1</p>
+        <p class="login-version">内网穿透运维工具 v0.1</p>
       </form>
 
       <form v-else class="login-panel" @submit.prevent="submitForgot">
