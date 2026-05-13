@@ -14,8 +14,8 @@ from frps_deploy.models import DeployContext
 from frps_deploy.services import (
     all_remote_ports, dashboard_domain, exposed_http_remote_ports,
     http_remote_ports, http_services, local_ip, local_port, managed_domains,
-    needs_tunnel, remote_port, status_domain, tcp_remote_ports, tcp_services,
-    tunneled_services, upstream_host,
+    needs_tunnel, remote_port, status_domain,
+    tcp_remote_ports, tcp_services, tunneled_services, upstream_host,
 )
 from frps_deploy.utils import safe_alias, toml_str
 
@@ -61,7 +61,12 @@ def generate_frps_toml(ctx: DeployContext) -> None:
     lines = [
         'bindAddr = "0.0.0.0"',
         f"bindPort = {ctx.bind_port}",
+        f"transport.tcpMux = {str(config.FRPC_TCP_MUX).lower()}",
     ]
+    if config.FRPC_PROTOCOL == "kcp":
+        lines.append(f"kcpBindPort = {ctx.bind_port}")
+    elif config.FRPC_PROTOCOL == "quic":
+        lines.append(f"quicBindPort = {ctx.bind_port}")
     if config.FRPS_ENABLE_PROMETHEUS:
         lines.append("enablePrometheus = true")
     lines += [
@@ -90,6 +95,8 @@ def generate_frpc_toml(ctx: DeployContext) -> None:
         f"serverAddr = {toml_str(ctx.vps_public_ip)}",
         f"serverPort = {ctx.bind_port}",
         f"loginFailExit = false",
+        f"transport.protocol = {toml_str(config.FRPC_PROTOCOL)}",
+        f"transport.tcpMux = {str(config.FRPC_TCP_MUX).lower()}",
         "",
         "[auth]",
         'method = "token"',
@@ -125,6 +132,9 @@ def generate_frps_compose(ctx: DeployContext) -> None:
 
     for p in exposed_http_remote_ports():
         port_lines.append(f'      - "{p}:{p}/tcp"')
+
+    if config.FRPC_PROTOCOL in {"kcp", "quic"}:
+        port_lines.append(f'      - "{ctx.bind_port}:{ctx.bind_port}/udp"')
 
     expose_section = ""
     if http_remote_ports():
@@ -430,6 +440,10 @@ def write_generated_info(ctx: DeployContext) -> None:
         f"FRPS_DASHBOARD_PORT={ctx.dashboard_port}",
         f"FRPS_TOKEN={ctx.token}",
         f"FRPS_DASHBOARD_PASSWORD={ctx.dashboard_password}",
+        f"FRPC_USE_ENCRYPTION={str(config.FRPC_USE_ENCRYPTION).lower()}",
+        f"FRPC_USE_COMPRESSION={str(config.FRPC_USE_COMPRESSION).lower()}",
+        f"FRPC_TCP_MUX={str(config.FRPC_TCP_MUX).lower()}",
+        f"FRPC_PROTOCOL={config.FRPC_PROTOCOL}",
         f"FRPS_DASHBOARD_URL=https://{dashboard_domain(ctx.root_domain)}",
         f"CONTAINER_SUFFIX={ctx.suffix}",
         f"FRPS_DIR={BASE_DIR}",

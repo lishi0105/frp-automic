@@ -26,8 +26,11 @@ FRPS_SERVER_PORT   = 0
 FRPS_TOKEN         = ""
 FRPS_DASHBOARD_HTTP = False
 FRPS_ENABLE_PROMETHEUS = True
-FRPC_USE_ENCRYPTION = True
-FRPC_USE_COMPRESSION = True
+FRPC_USE_ENCRYPTION = False
+FRPC_USE_COMPRESSION = False
+FRPC_TCP_MUX = False
+FRPC_PROTOCOL = "tcp"
+FRPC_PROTOCOLS = {"tcp", "kcp", "quic", "websocket", "wss"}
 STATUS_APP_ENABLED   = True
 STATUS_APP_PORT      = 0
 STATUS_APP_HTTP      = False
@@ -102,7 +105,7 @@ def _bool_config(value: Any, default: bool = False) -> bool:
 
 
 def load_runtime_config() -> None:
-    global CONFIG, SERVICES, ROOT_DOMAIN, CERT_EMAIL, VPS_PUBLIC_IP, FRPS_SERVER_PORT, FRPS_TOKEN, FRPS_DASHBOARD_HTTP, FRPS_ENABLE_PROMETHEUS, FRPC_USE_ENCRYPTION, FRPC_USE_COMPRESSION, STATUS_APP_ENABLED, STATUS_APP_PORT, STATUS_APP_HTTP
+    global CONFIG, SERVICES, ROOT_DOMAIN, CERT_EMAIL, VPS_PUBLIC_IP, FRPS_SERVER_PORT, FRPS_TOKEN, FRPS_DASHBOARD_HTTP, FRPS_ENABLE_PROMETHEUS, FRPC_USE_ENCRYPTION, FRPC_USE_COMPRESSION, FRPC_TCP_MUX, FRPC_PROTOCOL, STATUS_APP_ENABLED, STATUS_APP_PORT, STATUS_APP_HTTP
 
     CONFIG = load_config_file()
     _validate_runtime_config_shape(CONFIG)
@@ -127,8 +130,12 @@ def load_runtime_config() -> None:
     FRPS_ENABLE_PROMETHEUS = _bool_config(frps_config.get("enable_prometheus", True), default=True)
 
     frpc_config = _require_object(CONFIG.get("frpc", {}), "frpc")
-    FRPC_USE_ENCRYPTION = _bool_config(frpc_config.get("use_encryption", True), default=True)
-    FRPC_USE_COMPRESSION = _bool_config(frpc_config.get("use_compression", True), default=True)
+    FRPC_USE_ENCRYPTION = _bool_config(frpc_config.get("use_encryption", False), default=False)
+    FRPC_USE_COMPRESSION = _bool_config(frpc_config.get("use_compression", False), default=False)
+    FRPC_TCP_MUX = _bool_config(frpc_config.get("tcp_mux", False), default=False)
+    FRPC_PROTOCOL = str(frpc_config.get("protocol") or "tcp").strip().lower()
+    if FRPC_PROTOCOL not in FRPC_PROTOCOLS:
+        raise ValueError(f"frpc.protocol 只支持：{', '.join(sorted(FRPC_PROTOCOLS))}")
 
     status_config = _require_object(CONFIG.get("status"), "status")
 

@@ -8,8 +8,8 @@ import (
 )
 
 type Config struct {
-	Listen            string
-	DBPath            string
+	Listen string
+	DBPath string
 	// ProcRoot 为空时使用 /proc；可设为挂载的宿主机 proc（如 /host/proc），便于容器内读取 loadavg/meminfo。
 	ProcRoot          string
 	FRPSHost          string

@@ -39,7 +39,6 @@ def local_ip(item: Dict[str, Any]) -> str:
 def expose_http_port(item: Dict[str, Any]) -> bool:
     return bool_value(item.get("expose_http_port", False), default=False)
 
-
 def upstream_host(item: Dict[str, Any]) -> str:
     host = local_ip(item).strip() or "127.0.0.1"
     if host in {"127.0.0.1", "localhost"}:

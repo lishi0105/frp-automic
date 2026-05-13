@@ -47,8 +47,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "enable_prometheus": True,
     },
     "frpc": {
-        "use_encryption": True,
-        "use_compression": True,
+        "use_encryption": False,
+        "use_compression": False,
+        "tcp_mux": False,
+        "protocol": "tcp",
     },
     "status": {
         "enabled": True,

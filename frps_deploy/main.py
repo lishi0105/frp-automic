@@ -33,7 +33,8 @@ from frps_deploy.models import DeployContext
 from frps_deploy.output import print_generate_only_result, print_proxy_only_result, print_result
 from frps_deploy.services import (
     all_remote_ports, exposed_http_remote_ports, force_all_services_tcp,
-    managed_domains, tcp_remote_ports, validate_services,
+    managed_domains, needs_tunnel, remote_port,
+    tcp_remote_ports, validate_services,
 )
 from frps_deploy.state import (
     classify_services, load_deploy_state, previous_http_safe_aliases, write_deploy_state,
@@ -108,6 +109,30 @@ def prompt_user(require_email: bool = True) -> tuple[str, str]:
     return root_domain, email
 
 
+def prompt_frpc_transport_options() -> None:
+    print("\nfrp 传输选项：")
+    print("  加密会增加 CPU 开销；压缩会增加 CPU 和内存开销。VPS 性能较差时，开启后可能影响传输速度。")
+    answer = prompt_input("是否开启 frp 代理加密？仅输入 y 开启，其他输入不开启：")
+    config.FRPC_USE_ENCRYPTION = answer.strip().lower() == "y"
+    answer = prompt_input("是否开启 frp 代理压缩？仅输入 y 开启，其他输入不开启：")
+    config.FRPC_USE_COMPRESSION = answer.strip().lower() == "y"
+    print("  tcpMux 会复用 frpc 与 frps 之间的连接，可减少建连开销和文件描述符占用；该选项必须服务端和客户端一致。")
+    answer = prompt_input("是否开启 frp tcpMux？仅输入 y 开启，其他输入不开启：")
+    config.FRPC_TCP_MUX = answer.strip().lower() == "y"
+
+    print("\n请选择 frpc 与 frps 的通信协议（frpc.transport.protocol）：")
+    print("  tcp       默认协议，兼容性最好，适合大多数场景。")
+    print("  kcp       基于 UDP，弱网可能更流畅，但会增加流量消耗，需要放行同端口 UDP。")
+    print("  quic      基于 UDP，连接建立较快，适合延迟敏感场景，需要放行同端口 UDP。")
+    print("  websocket 通过 WebSocket 承载，适合需要穿过部分 HTTP 代理或防火墙的网络。")
+    print("  wss       WebSocket over TLS，适合需要 TLS WebSocket 的网络环境。")
+    protocol = prompt_input("请输入协议 [tcp/kcp/quic/websocket/wss]，直接回车默认 tcp：").strip().lower() or "tcp"
+    if protocol not in config.FRPC_PROTOCOLS:
+        print(f"协议 {protocol!r} 不支持，已使用默认 tcp。", color=COLOR_YELLOW)
+        protocol = "tcp"
+    config.FRPC_PROTOCOL = protocol
+
+
 def _previous_int(previous: dict, key: str) -> int:
     try:
         return int(previous.get(key) or 0)
@@ -122,7 +147,7 @@ def _previous_str(previous: dict, key: str) -> str:
 def build_context(root_domain: str, email: str, previous: dict | None = None) -> DeployContext:
     previous = previous or {}
     can_reuse = _previous_str(previous, "root_domain") == root_domain
-    generated_ports: set = set(all_remote_ports())
+    generated_ports: set = {remote_port(item) for item in config.SERVICES if needs_tunnel(item)}
     if config.FRPS_SERVER_PORT >= 1000:
         if config.FRPS_SERVER_PORT in generated_ports:
             raise ValueError(f"frps.server_port 与各服务端口（services 中的 port）冲突：{config.FRPS_SERVER_PORT}")
@@ -231,6 +256,8 @@ def prompt_firewall_confirmation(ctx: DeployContext) -> None:
         ports.append((f"{p}/tcp", "TCP 直通服务"))
     for p in exposed_http_remote_ports():
         ports.append((f"{p}/tcp", "HTTP 服务直通"))
+    if config.FRPC_PROTOCOL in {"kcp", "quic"}:
+        ports.append((f"{ctx.bind_port}/udp", f"frps {config.FRPC_PROTOCOL.upper()} 客户端连接"))
     if config.FRPS_DASHBOARD_HTTP:
         ports.append((f"{ctx.dashboard_port}/tcp", "frps 控制台公网访问"))
     if config.STATUS_APP_ENABLED and config.STATUS_APP_HTTP:
@@ -288,6 +315,7 @@ def main() -> None:
     print_service_plan(previous_state)
 
     root_domain, email = prompt_user(require_email=not args.proxy)
+    prompt_frpc_transport_options()
     try:
         ctx = build_context(root_domain, email, previous_state)
     except Exception as exc:

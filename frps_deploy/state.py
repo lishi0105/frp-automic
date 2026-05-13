@@ -7,13 +7,15 @@ from typing import Any, Dict, List
 from frps_deploy import config
 from frps_deploy.constants import DEPLOY_STATE_FILE, GENERATED_INFO_FILE
 from frps_deploy.models import DeployContext
-from frps_deploy.services import expose_http_port, local_ip, local_port, mode_of, needs_tunnel, remote_port
+from frps_deploy.services import (
+    expose_http_port, local_ip, local_port, mode_of, needs_tunnel, remote_port,
+)
 from frps_deploy.utils import safe_alias
 
 
 def _service_state(item: Dict[str, Any]) -> Dict[str, Any]:
     alias = str(item["alias"])
-    return {
+    state = {
         "alias": alias,
         "safe_alias": safe_alias(alias),
         "comment": str(item.get("comment", alias)),
@@ -24,6 +26,7 @@ def _service_state(item: Dict[str, Any]) -> Dict[str, Any]:
         "local_ip": local_ip(item),
         "expose_http_port": expose_http_port(item),
     }
+    return state
 
 
 def _read_generated_info_state() -> Dict[str, Any]:
@@ -57,6 +60,10 @@ def _read_generated_info_state() -> Dict[str, Any]:
         "token": values.get("FRPS_TOKEN", ""),
         "dashboard_user": "admin",
         "dashboard_password": values.get("FRPS_DASHBOARD_PASSWORD", ""),
+        "frpc_use_encryption": values.get("FRPC_USE_ENCRYPTION", "").lower() in {"1", "true", "yes", "y", "on"},
+        "frpc_use_compression": values.get("FRPC_USE_COMPRESSION", "").lower() in {"1", "true", "yes", "y", "on"},
+        "frpc_tcp_mux": values.get("FRPC_TCP_MUX", "").lower() in {"1", "true", "yes", "y", "on"},
+        "frpc_protocol": values.get("FRPC_PROTOCOL", "tcp"),
         "suffix": values.get("CONTAINER_SUFFIX", ""),
         "services": [],
     }
@@ -139,6 +146,10 @@ def write_deploy_state(ctx: DeployContext) -> None:
         "token": ctx.token,
         "dashboard_user": ctx.dashboard_user,
         "dashboard_password": ctx.dashboard_password,
+        "frpc_use_encryption": config.FRPC_USE_ENCRYPTION,
+        "frpc_use_compression": config.FRPC_USE_COMPRESSION,
+        "frpc_tcp_mux": config.FRPC_TCP_MUX,
+        "frpc_protocol": config.FRPC_PROTOCOL,
         "suffix": ctx.suffix,
         "services": desired_services_state(),
     }

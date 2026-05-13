@@ -107,7 +107,30 @@ python3 vps-install-frps.py
 - `root_domain`：你的根域名，例如 `example.com`；
 - `vps_public_ip`：VPS 公网 IP，不填时脚本会尝试自动获取；
 - `cert_email`：申请 HTTPS 证书时使用的邮箱；
+- `frpc.protocol`：frpc 与 frps 的通信协议，支持 `tcp`、`kcp`、`quic`、`websocket`、`wss`，默认 `tcp`；
+- `frpc.tcp_mux`：是否开启 TCP 多路复用，必须与服务端和客户端生成结果保持一致；
 - `services`：你想穿透或反代的服务列表。
+
+生成部署文件时，脚本会询问是否开启 frp 代理加密、压缩和 `tcpMux`。加密、压缩会增加 VPS 的 CPU 或内存开销，VPS 性能较差时可能影响速度；只有输入 `y` 才会开启。脚本也会提示选择 `frpc.transport.protocol`，直接回车使用默认 `tcp`。
+
+`tcpMux` 说明：
+
+| 选项 | 说明 | 建议 |
+|------|------|------|
+| 开启 | 复用 frpc 与 frps 之间的连接，减少每次请求重新建连的开销，也能降低大量连接时的文件描述符占用 | 并发连接较多、希望减少建连延迟时可开启 |
+| 不开启 | 每个请求按普通连接处理，行为更直观，排障更简单 | 低并发、小型 VPS 或不确定网络表现时可保持关闭 |
+
+注意：`tcpMux` 必须在 `frps.toml` 和 `frpc.toml` 中保持一致。脚本会同时生成两端配置，不要只手动修改其中一端。
+
+`frpc.protocol` 可选值：
+
+| 协议 | 说明 | 适用场景 | 额外要求 |
+|------|------|----------|----------|
+| `tcp` | 默认协议，兼容性最好，稳定可靠 | 大多数普通公网 VPS、家庭宽带、NAS 穿透场景 | 放行 frps 服务端 TCP 端口 |
+| `kcp` | 基于 UDP，弱网下可能更流畅，但通常会增加流量消耗 | 丢包或抖动较明显的网络 | 放行 frps 服务端同端口 UDP |
+| `quic` | 基于 UDP，连接建立较快，适合延迟敏感场景 | 希望降低连接延迟，且网络允许 UDP | 放行 frps 服务端同端口 UDP |
+| `websocket` | 通过 WebSocket 承载 frp 连接 | 需要穿过部分 HTTP 代理、防火墙或特殊网络环境 | 放行 frps 服务端 TCP 端口 |
+| `wss` | WebSocket over TLS，带 TLS 的 WebSocket 传输 | 网络环境要求 WebSocket TLS，或希望传输层表现为加密 WebSocket | 放行 frps 服务端 TCP 端口 |
 
 ### 第 3 步：部署服务端
 
@@ -244,7 +267,6 @@ https://frps.<你的根域名>
 | `local_port`       | 否       | 内网真实服务端口，不填时等于 `port`                          |
 | `local_ip`         | 否       | 内网真实服务 IP，默认 `127.0.0.1`                            |
 | `expose_http_port` | 否       | HTTP 模式下是否额外开放 `VPS_IP:port` 直连入口，默认 `false` |
-
 ### 4.2 穿透内网 Web 服务
 
 例如内网机器上有一个 Emby 服务，端口是 `8096`：

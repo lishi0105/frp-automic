@@ -10,7 +10,8 @@ from frps_deploy.constants import (
 from frps_deploy.models import DeployContext
 from frps_deploy.services import (
     dashboard_domain, http_services, local_ip, local_port, remote_port,
-    needs_tunnel, status_domain, tcp_services,
+    needs_tunnel,
+    status_domain, tcp_services,
 )
 
 
