@@ -4,11 +4,11 @@ services:
       context: .
       tags:
         - lishi0105/frps-status:latest
-    image: lishi0105/frps-status:v0.1
+    image: lishi0105/frps-status:v1.0.0
     container_name: frps_status
     restart: unless-stopped
     ports:
-      - "${STATUS_APP_BIND:-127.0.0.1}:${STATUS_APP_PORT:-28080}:8080"
+      - "${STATUS_APP_BIND:-0.0.0.0}:${STATUS_APP_PORT:-28080}:8080"
     environment:
       LISTEN: "${LISTEN:-0.0.0.0:8080}"
       FRPS_HOST: "${FRPS_HOST:-frps}"
@@ -22,11 +22,12 @@ services:
       HOST_IFACE: "${HOST_IFACE:-}"
       HOST_NET_STATS_DIR: "${HOST_NET_STATS_DIR:-/host-net-stats}"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./data:/data
       - ./config:/config
       - ./logs:/logs
       - ./frps/certbot/conf:/etc/letsencrypt:ro
-      - ${HOST_NET_STATS_MOUNT:-/sys/class/net/eth0/statistics}:/host-net-stats:ro
+      - ${HOST_NET_STATS_MOUNT:-/sys/class/net/ens34/statistics}:/host-net-stats:ro
     networks:
       - frps_net
 

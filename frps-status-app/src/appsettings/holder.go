@@ -172,7 +172,7 @@ func (m *Manager) SetHistoryRetentionDays(days int) {
 	m.data.normalize()
 }
 
-// ApplyPOST 合并前端 POST 的字段，仅更新内存。
+// ApplyPOST 合并前端 POST 的字段，并更新进程内配置。
 func (m *Manager) ApplyPOST(in map[string]any) (smtpChanged bool) {
 	smtpKeys := map[string]bool{
 		"smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true,

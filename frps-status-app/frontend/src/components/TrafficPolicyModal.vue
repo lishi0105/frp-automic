@@ -1,6 +1,6 @@
 <template>
   <Transition name="modal-pop">
-    <div v-if="open" class="policy-mask" @click.self="$emit('close')">
+    <div v-if="open" class="policy-mask">
       <section class="policy-modal" role="dialog" aria-modal="true" aria-labelledby="policy-title">
       <header class="policy-head">
         <div>

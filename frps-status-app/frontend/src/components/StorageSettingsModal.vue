@@ -1,6 +1,6 @@
 <template>
   <Transition name="modal-pop">
-    <div v-if="open" class="ss-mask" @click.self="$emit('close')">
+    <div v-if="open" class="ss-mask">
       <section class="ss-modal" role="dialog" aria-modal="true" aria-labelledby="ss-title">
       <header class="ss-head">
         <div>

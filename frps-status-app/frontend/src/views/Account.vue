@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="account-modal">
-      <div v-if="modelValue" class="account-modal-overlay" @click.self="requestClose">
+      <div v-if="modelValue" class="account-modal-overlay">
         <section class="account-modal" role="dialog" aria-modal="true" aria-labelledby="account-title">
           <header class="account-modal-head">
             <div class="account-title-block">

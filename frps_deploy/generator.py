@@ -1,6 +1,8 @@
 """生成配置文件：frps.toml、frpc.toml、docker-compose、nginx、.env。"""
 from __future__ import annotations
 
+from pathlib import Path
+
 from frps_deploy import config
 from frps_deploy.constants import (
     CERTBOT_CONF_DIR, CERTBOT_WWW_DIR, COMPOSE_FILE, FRPC_BASE_DIR,
@@ -155,6 +157,8 @@ def generate_frps_compose(ctx: DeployContext) -> None:
       HOST_IFACE: "{ctx.host_iface}"
       HOST_NET_STATS_DIR: "/host-net-stats"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
       - ./frps-status/data:/data
       - ./frps-status/config:/config
       - ./frps-status/logs:/logs
@@ -168,6 +172,8 @@ def generate_frps_compose(ctx: DeployContext) -> None:
     container_name: frps_{ctx.suffix}
     restart: unless-stopped
     volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
       - ./frps.toml:/etc/frp/frps.toml:ro
     command: ["-c", "/etc/frp/frps.toml"]
     ports:
@@ -186,6 +192,8 @@ def generate_frps_compose(ctx: DeployContext) -> None:
       - "80:80/tcp"
       - "443:443/tcp"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./certbot/www:/var/www/certbot:ro
       - ./certbot/conf:/etc/letsencrypt:ro
@@ -198,6 +206,8 @@ def generate_frps_compose(ctx: DeployContext) -> None:
     container_name: certbot_{ctx.suffix}
     restart: unless-stopped
     volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
       - ./certbot/www:/var/www/certbot
       - ./certbot/conf:/etc/letsencrypt
     entrypoint: >
@@ -218,6 +228,7 @@ def generate_frpc_compose(ctx: DeployContext) -> None:
     restart: unless-stopped
     network_mode: host
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./frpc.toml:/etc/frp/frpc.toml:ro
     command: ["-c", "/etc/frp/frpc.toml"]
 """
