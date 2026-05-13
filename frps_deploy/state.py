@@ -57,6 +57,10 @@ def _read_generated_info_state() -> Dict[str, Any]:
         "token": values.get("FRPS_TOKEN", ""),
         "dashboard_user": "admin",
         "dashboard_password": values.get("FRPS_DASHBOARD_PASSWORD", ""),
+        "frpc_use_encryption": values.get("FRPC_USE_ENCRYPTION", "").lower() in {"1", "true", "yes", "y", "on"},
+        "frpc_use_compression": values.get("FRPC_USE_COMPRESSION", "").lower() in {"1", "true", "yes", "y", "on"},
+        "frpc_tcp_mux": values.get("FRPC_TCP_MUX", "").lower() in {"1", "true", "yes", "y", "on"},
+        "frpc_protocol": values.get("FRPC_PROTOCOL", "tcp"),
         "suffix": values.get("CONTAINER_SUFFIX", ""),
         "services": [],
     }
@@ -139,6 +143,10 @@ def write_deploy_state(ctx: DeployContext) -> None:
         "token": ctx.token,
         "dashboard_user": ctx.dashboard_user,
         "dashboard_password": ctx.dashboard_password,
+        "frpc_use_encryption": config.FRPC_USE_ENCRYPTION,
+        "frpc_use_compression": config.FRPC_USE_COMPRESSION,
+        "frpc_tcp_mux": config.FRPC_TCP_MUX,
+        "frpc_protocol": config.FRPC_PROTOCOL,
         "suffix": ctx.suffix,
         "services": desired_services_state(),
     }
