@@ -4,7 +4,7 @@ services:
       context: .
       tags:
         - lishi0105/frps-status:latest
-    image: lishi0105/frps-status:v0.1
+    image: lishi0105/frps-status:v1.0.0
     container_name: frps_status
     restart: unless-stopped
     ports:

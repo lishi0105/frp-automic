@@ -69,9 +69,10 @@
               <div class="online-rate-text">在线率 {{ onlinePct }}%</div>
             </div>
           </div>
-          <div class="proxy-type-list" aria-label="代理类型数量">
-            <span v-for="item in proxyTypeStats" :key="item.type">{{ item.label }} {{ item.count }}</span>
-            <span v-if="!proxyTypeStats.length">暂无代理</span>
+          <div class="proxy-stats" aria-label="代理统计">
+            <div><span>TCP</span><b>{{ tcpProxyCount }}</b></div>
+            <div><span>HTTP</span><b>{{ httpProxyCount }}</b></div>
+            <div><span>连接</span><b>{{ currentProxyConnections }}</b></div>
           </div>
         </section>
 
@@ -327,16 +328,9 @@ const proxies = computed(() => props.status?.proxies ?? [])
 const onlineProxies = computed(() => proxies.value.filter(p => p.online).length)
 const totalProxies = computed(() => proxies.value.length)
 const onlinePct = computed(() => totalProxies.value ? Math.round((onlineProxies.value / totalProxies.value) * 100) : 0)
-const proxyTypeStats = computed(() => {
-  const counts = new Map()
-  for (const p of proxies.value) {
-    const type = String(p.type || 'unknown').trim().toLowerCase() || 'unknown'
-    counts.set(type, (counts.get(type) || 0) + 1)
-  }
-  return [...counts.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([type, count]) => ({ type, label: proxyTypeLabel(type), count }))
-})
+const tcpProxyCount = computed(() => proxies.value.filter(p => String(p.type || '').toLowerCase() === 'tcp').length)
+const httpProxyCount = computed(() => proxies.value.filter(p => String(p.type || '').toLowerCase() === 'http').length)
+const currentProxyConnections = computed(() => proxies.value.reduce((sum, p) => sum + Number(p.cur_conns || 0), 0))
 
 const topProxies = computed(() => {
   const fromBackend = props.status?.dashboard?.top_proxies
@@ -521,11 +515,6 @@ function isCertFailed(c) {
   if (!c) return true
   if (!c.present || !c.ok || !c.tls_ok) return true
   return Boolean(c.tls_has_local_cert && !c.tls_match_local)
-}
-
-function proxyTypeLabel(type) {
-  if (type === 'unknown') return '未知'
-  return type.toUpperCase()
 }
 
 function buildChart(daily) {
@@ -1222,17 +1211,13 @@ onUnmounted(() => {
   font-size: 11px;
   font-weight: 650;
 }
-.proxy-type-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px 10px;
-  margin-top: 6px;
-  color: #475569;
-  font-size: 12px;
+.proxy-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 9px;
 }
-.proxy-type-list span {
-  white-space: nowrap;
-}
+.proxy-stats div,
 .cert-stats div {
   min-width: 0;
   padding: 5px 4px;
@@ -1241,12 +1226,14 @@ onUnmounted(() => {
   text-align: center;
   line-height: 1.1;
 }
+.proxy-stats span,
 .cert-stats span {
   display: block;
   color: #64748b;
   font-size: 10px;
   font-weight: 650;
 }
+.proxy-stats b,
 .cert-stats b {
   display: block;
   margin-top: 3px;
