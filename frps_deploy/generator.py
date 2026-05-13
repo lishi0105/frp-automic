@@ -1,6 +1,9 @@
 """生成配置文件：frps.toml、frpc.toml、docker-compose、nginx、.env。"""
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 from frps_deploy import config
 from frps_deploy.constants import (
     CERTBOT_CONF_DIR, CERTBOT_WWW_DIR, COMPOSE_FILE, FRPC_BASE_DIR,
@@ -114,7 +117,38 @@ def generate_frpc_toml(ctx: DeployContext) -> None:
     FRPC_TOML_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def detect_host_timezone() -> str:
+    zoneinfo_dir = Path("/usr/share/zoneinfo")
+    try:
+        localtime = Path("/etc/localtime").resolve()
+        tz = localtime.relative_to(zoneinfo_dir).as_posix()
+        if valid_timezone_name(tz):
+            return tz
+    except (OSError, ValueError):
+        pass
+
+    for path in (Path("/etc/timezone"),):
+        try:
+            tz = path.read_text(encoding="utf-8").splitlines()[0].strip()
+        except (OSError, IndexError, UnicodeDecodeError):
+            continue
+        if valid_timezone_name(tz):
+            return tz
+
+    tz = os.environ.get("TZ", "").strip()
+    if valid_timezone_name(tz):
+        return tz
+    return "UTC"
+
+
+def valid_timezone_name(value: str) -> bool:
+    if not value or value.startswith(("/", ".")) or ".." in value:
+        return False
+    return all(ch.isalnum() or ch in {"/", "_", "-", "+"} for ch in value)
+
+
 def generate_frps_compose(ctx: DeployContext) -> None:
+    host_timezone = detect_host_timezone()
     dashboard_bind = "" if config.FRPS_DASHBOARD_HTTP else "127.0.0.1:"
     port_lines = [
         f'      - "{ctx.bind_port}:{ctx.bind_port}/tcp"',
@@ -143,6 +177,7 @@ def generate_frps_compose(ctx: DeployContext) -> None:
     ports:
       - "{status_bind}:{ctx.status_port}:8080"
     environment:
+      TZ: "{host_timezone}"
       LISTEN: "0.0.0.0:8080"
       FRPS_HOST: "frps"
       FRPS_BIND_PORT: "{ctx.bind_port}"
@@ -155,6 +190,7 @@ def generate_frps_compose(ctx: DeployContext) -> None:
       HOST_IFACE: "{ctx.host_iface}"
       HOST_NET_STATS_DIR: "/host-net-stats"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./frps-status/data:/data
       - ./frps-status/config:/config
       - ./frps-status/logs:/logs
@@ -167,7 +203,10 @@ def generate_frps_compose(ctx: DeployContext) -> None:
     image: fatedier/frps:{ctx.frp_version}
     container_name: frps_{ctx.suffix}
     restart: unless-stopped
+    environment:
+      TZ: "{host_timezone}"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./frps.toml:/etc/frp/frps.toml:ro
     command: ["-c", "/etc/frp/frps.toml"]
     ports:
@@ -180,12 +219,15 @@ def generate_frps_compose(ctx: DeployContext) -> None:
     restart: unless-stopped
     depends_on:
       - frps
+    environment:
+      TZ: "{host_timezone}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "80:80/tcp"
       - "443:443/tcp"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./certbot/www:/var/www/certbot:ro
       - ./certbot/conf:/etc/letsencrypt:ro
@@ -197,7 +239,10 @@ def generate_frps_compose(ctx: DeployContext) -> None:
     image: certbot/certbot:latest
     container_name: certbot_{ctx.suffix}
     restart: unless-stopped
+    environment:
+      TZ: "{host_timezone}"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./certbot/www:/var/www/certbot
       - ./certbot/conf:/etc/letsencrypt
     entrypoint: >
@@ -211,13 +256,17 @@ def generate_frps_compose(ctx: DeployContext) -> None:
 
 
 def generate_frpc_compose(ctx: DeployContext) -> None:
+    host_timezone = detect_host_timezone()
     compose = f"""services:
   frpc:
     image: fatedier/frpc:{ctx.frp_version}
     container_name: frpc_{ctx.suffix}
     restart: unless-stopped
     network_mode: host
+    environment:
+      TZ: "{host_timezone}"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./frpc.toml:/etc/frp/frpc.toml:ro
     command: ["-c", "/etc/frp/frpc.toml"]
 """
