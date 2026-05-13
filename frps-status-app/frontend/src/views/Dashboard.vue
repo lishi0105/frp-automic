@@ -149,7 +149,7 @@
 
     <Teleport to="body">
       <Transition name="log-modal-fade">
-        <div v-if="logOpen" class="log-modal-mask" @click.self="logOpen = false">
+        <div v-if="logOpen" class="log-modal-mask">
           <section class="log-modal" role="dialog" aria-modal="true" aria-labelledby="log-modal-title">
             <header class="log-modal-head">
               <div>
