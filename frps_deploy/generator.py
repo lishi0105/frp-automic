@@ -13,9 +13,10 @@ from frps_deploy.constants import (
 from frps_deploy.models import DeployContext
 from frps_deploy.services import (
     all_remote_ports, dashboard_domain, exposed_http_remote_ports,
-    http_remote_ports, http_services, local_ip, local_port, managed_domains,
-    needs_tunnel, remote_port, status_domain, tcp_remote_ports, tcp_services,
-    tunneled_services, upstream_host,
+    http_remote_ports, http_services, iperf_local_port, iperf_proxy_name,
+    iperf_remote_port, iperf_test_services, local_ip, local_port,
+    managed_domains, needs_tunnel, remote_port, status_domain,
+    tcp_remote_ports, tcp_services, tunneled_services, upstream_host,
 )
 from frps_deploy.utils import safe_alias, toml_str
 
@@ -120,6 +121,21 @@ def generate_frpc_toml(ctx: DeployContext) -> None:
             lines.append("transport.useEncryption = true")
         if config.FRPC_USE_COMPRESSION:
             lines.append("transport.useCompression = true")
+    for item in iperf_test_services():
+        lines += [
+            "",
+            f"# {item.get('comment', item['alias'])} iperf3 测速服务",
+            "[[proxies]]",
+            f"name = {toml_str(iperf_proxy_name(item))}",
+            'type = "tcp"',
+            'localIP = "127.0.0.1"',
+            f"localPort = {iperf_local_port(item)}",
+            f"remotePort = {iperf_remote_port(item)}",
+        ]
+        if config.FRPC_USE_ENCRYPTION:
+            lines.append("transport.useEncryption = true")
+        if config.FRPC_USE_COMPRESSION:
+            lines.append("transport.useCompression = true")
     FRPC_TOML_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -166,6 +182,7 @@ def generate_frps_compose(ctx: DeployContext) -> None:
       HOST_PUBLIC_IP: "{ctx.vps_public_ip}"
       HOST_IFACE: "{ctx.host_iface}"
       HOST_NET_STATS_DIR: "/host-net-stats"
+      SPEEDTEST_TARGETS: "{speedtest_targets_env()}"
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
@@ -231,6 +248,20 @@ def generate_frps_compose(ctx: DeployContext) -> None:
 
 
 def generate_frpc_compose(ctx: DeployContext) -> None:
+    iperf_section = ""
+    if iperf_test_services():
+        local_ports = sorted({iperf_local_port(item) for item in iperf_test_services()})
+        port_lines = "\n".join(f'      - "127.0.0.1:{port}:5201/tcp"' for port in local_ports)
+        iperf_section = f"""
+
+  iperf3-server:
+    image: networkstatic/iperf3:latest
+    container_name: iperf3_server_{ctx.suffix}
+    restart: unless-stopped
+    command: ["-s"]
+    ports:
+{port_lines}
+"""
     compose = f"""services:
   frpc:
     image: fatedier/frpc:{ctx.frp_version}
@@ -241,8 +272,16 @@ def generate_frpc_compose(ctx: DeployContext) -> None:
       - /etc/localtime:/etc/localtime:ro
       - ./frpc.toml:/etc/frp/frpc.toml:ro
     command: ["-c", "/etc/frp/frpc.toml"]
-"""
+{iperf_section}"""
     FRPC_COMPOSE_FILE.write_text(compose, encoding="utf-8")
+
+
+def speedtest_targets_env() -> str:
+    parts = []
+    for item in iperf_test_services():
+        name = str(item["alias"]).replace(";", "_").replace("=", "_").replace(",", "_")
+        parts.append(f"{name}=frps:{iperf_remote_port(item)}")
+    return ";".join(parts)
 
 
 def generate_http_challenge_conf(ctx: DeployContext) -> None:
@@ -468,6 +507,13 @@ def write_generated_info(ctx: DeployContext) -> None:
             f"TCP_{str(item['alias']).upper()}={ctx.vps_public_ip}:{remote_port(item)} "
             f"本地={local_ip(item)}:{local_port(item)}"
         )
+    if iperf_test_services():
+        lines += ["", "# iperf3 测速服务"]
+        for item in iperf_test_services():
+            lines.append(
+                f"IPERF_{str(item['alias']).upper()}=frps:{iperf_remote_port(item)} "
+                f"本地={local_ip(item)}:{iperf_local_port(item)}"
+            )
     GENERATED_INFO_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -492,6 +538,7 @@ def write_status_app_env(ctx: DeployContext) -> None:
         f"HOST_IFACE={ctx.host_iface}",
         "HOST_NET_STATS_DIR=/host-net-stats",
         f"HOST_NET_STATS_MOUNT=/sys/class/net/{ctx.host_iface}/statistics",
+        f"SPEEDTEST_TARGETS={speedtest_targets_env()}",
         "",
     ]
     STATUS_APP_ENV_FILE.write_text("\n".join(lines), encoding="utf-8")

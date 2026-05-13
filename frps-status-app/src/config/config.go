@@ -8,8 +8,8 @@ import (
 )
 
 type Config struct {
-	Listen            string
-	DBPath            string
+	Listen string
+	DBPath string
 	// ProcRoot 为空时使用 /proc；可设为挂载的宿主机 proc（如 /host/proc），便于容器内读取 loadavg/meminfo。
 	ProcRoot          string
 	FRPSHost          string
@@ -26,6 +26,13 @@ type Config struct {
 	StatusPassword    string
 	LogDir            string
 	PollInterval      time.Duration
+	SpeedtestTargets  []SpeedtestTarget
+}
+
+type SpeedtestTarget struct {
+	Name string `json:"name"`
+	Host string `json:"host"`
+	Port int    `json:"port"`
 }
 
 // 数据库路径固定（不由环境变量配置）。
@@ -62,6 +69,7 @@ func Load() Config {
 		StatusPassword:    StatusPasswordFixed,
 		LogDir:            env("LOG_DIR", LogDirFixed),
 		PollInterval:      time.Duration(envInt("POLL_SECONDS", 60)) * time.Second,
+		SpeedtestTargets:  ParseSpeedtestTargets(os.Getenv("SPEEDTEST_TARGETS")),
 	}
 }
 
@@ -72,6 +80,35 @@ func SplitCSV(v string) []string {
 		if part != "" {
 			out = append(out, part)
 		}
+	}
+	return out
+}
+
+func ParseSpeedtestTargets(v string) []SpeedtestTarget {
+	var out []SpeedtestTarget
+	for _, part := range strings.Split(v, ";") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		name, addr, ok := strings.Cut(part, "=")
+		if !ok {
+			continue
+		}
+		host, portText, ok := strings.Cut(strings.TrimSpace(addr), ":")
+		if !ok {
+			continue
+		}
+		port, err := strconv.Atoi(strings.TrimSpace(portText))
+		if err != nil || port < 1 || port > 65535 {
+			continue
+		}
+		name = strings.TrimSpace(name)
+		host = strings.TrimSpace(host)
+		if name == "" || host == "" {
+			continue
+		}
+		out = append(out, SpeedtestTarget{Name: name, Host: host, Port: port})
 	}
 	return out
 }

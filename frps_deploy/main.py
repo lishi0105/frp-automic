@@ -33,7 +33,8 @@ from frps_deploy.models import DeployContext
 from frps_deploy.output import print_generate_only_result, print_proxy_only_result, print_result
 from frps_deploy.services import (
     all_remote_ports, exposed_http_remote_ports, force_all_services_tcp,
-    managed_domains, tcp_remote_ports, validate_services,
+    iperf_test_enabled, managed_domains, needs_tunnel, remote_port,
+    tcp_remote_ports, validate_services,
 )
 from frps_deploy.state import (
     classify_services, load_deploy_state, previous_http_safe_aliases, write_deploy_state,
@@ -143,10 +144,45 @@ def _previous_str(previous: dict, key: str) -> str:
     return str(previous.get(key) or "").strip()
 
 
+def _previous_service_iperf_ports(previous: dict) -> dict[str, int]:
+    ports: dict[str, int] = {}
+    for item in previous.get("services", []):
+        if not isinstance(item, dict):
+            continue
+        alias = str(item.get("alias") or "")
+        try:
+            port = int(item.get("iperf_port") or 0)
+        except (TypeError, ValueError):
+            port = 0
+        if alias and port >= 1000:
+            ports[alias] = port
+    return ports
+
+
+def assign_iperf_ports(previous: dict, can_reuse: bool, generated_ports: set[int]) -> None:
+    previous_ports = _previous_service_iperf_ports(previous) if can_reuse else {}
+    for item in config.SERVICES:
+        if not iperf_test_enabled(item):
+            continue
+        alias = str(item["alias"])
+        configured = item.get("iperf_port")
+        if configured not in (None, ""):
+            port = int(configured)
+            if port in generated_ports:
+                raise ValueError(f"服务 {alias} 的测速远端端口（iperf_port）与已使用端口冲突：{port}")
+            item["iperf_port"] = port
+        elif previous_ports.get(alias) and previous_ports[alias] not in generated_ports:
+            item["iperf_port"] = previous_ports[alias]
+        else:
+            item["iperf_port"] = random_free_port_excluding(generated_ports)
+        generated_ports.add(int(item["iperf_port"]))
+
+
 def build_context(root_domain: str, email: str, previous: dict | None = None) -> DeployContext:
     previous = previous or {}
     can_reuse = _previous_str(previous, "root_domain") == root_domain
-    generated_ports: set = set(all_remote_ports())
+    generated_ports: set = {remote_port(item) for item in config.SERVICES if needs_tunnel(item)}
+    assign_iperf_ports(previous, can_reuse, generated_ports)
     if config.FRPS_SERVER_PORT >= 1000:
         if config.FRPS_SERVER_PORT in generated_ports:
             raise ValueError(f"frps.server_port 与各服务端口（services 中的 port）冲突：{config.FRPS_SERVER_PORT}")
