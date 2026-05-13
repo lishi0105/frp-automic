@@ -17,6 +17,7 @@ COPY src ./src
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/frps-status .
 
 FROM alpine:3.20
+RUN apk add --no-cache tzdata
 WORKDIR /app
 COPY --from=go-build /out/frps-status /app/frps-status
 COPY --from=frontend /workspace/web /app/web

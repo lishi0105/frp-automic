@@ -22,6 +22,7 @@ services:
       HOST_IFACE: "${HOST_IFACE:-}"
       HOST_NET_STATS_DIR: "${HOST_NET_STATS_DIR:-/host-net-stats}"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./data:/data
       - ./config:/config
       - ./logs:/logs
