@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 
 	"frps-status-app.local/status/src/config"
 	"frps-status-app.local/status/src/logger"
+	"frps-status-app.local/status/src/store"
 )
 
 type speedtestTask struct {
@@ -42,17 +44,27 @@ type speedtestCreateRequest struct {
 	DurationSeconds int    `json:"duration_seconds"`
 }
 
+type speedtestCleanupRequest struct {
+	KeepLatest int `json:"keep_latest"`
+}
+
 func (a *App) handleSpeedtests(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		a.speedtestsMu.Lock()
-		tasks := make([]*speedtestTask, 0, len(a.speedtests))
-		for _, task := range a.speedtests {
-			copyTask := *task
-			tasks = append(tasks, &copyTask)
+		records, err := a.store.ListSpeedtestTasks(50)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
-		running := a.speedtestRunning
-		a.speedtestsMu.Unlock()
+		tasks := make([]*speedtestTask, 0, len(records))
+		for _, record := range records {
+			tasks = append(tasks, taskFromRecord(record))
+		}
+		running, err := a.store.HasRunningSpeedtestTask()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		writeJSON(w, map[string]any{
 			"targets": a.cfg.SpeedtestTargets,
 			"tasks":   tasks,
@@ -60,6 +72,8 @@ func (a *App) handleSpeedtests(w http.ResponseWriter, r *http.Request) {
 		})
 	case http.MethodPost:
 		a.createSpeedtest(w, r)
+	case http.MethodDelete:
+		a.cleanupSpeedtests(w, r)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -75,19 +89,16 @@ func (a *App) handleSpeedtestTask(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	a.speedtestsMu.Lock()
-	task := a.speedtests[id]
-	var copyTask *speedtestTask
-	if task != nil {
-		copied := *task
-		copyTask = &copied
-	}
-	a.speedtestsMu.Unlock()
-	if copyTask == nil {
+	record, err := a.store.GetSpeedtestTask(id)
+	if errors.Is(err, sql.ErrNoRows) {
 		http.NotFound(w, r)
 		return
 	}
-	writeJSON(w, copyTask)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, taskFromRecord(record))
 }
 
 func (a *App) createSpeedtest(w http.ResponseWriter, r *http.Request) {
@@ -130,18 +141,49 @@ func (a *App) createSpeedtest(w http.ResponseWriter, r *http.Request) {
 		Status:          "queued",
 		CreatedAt:       time.Now(),
 	}
-	a.speedtestsMu.Lock()
-	if a.speedtestRunning {
-		a.speedtestsMu.Unlock()
+	running, err := a.store.HasRunningSpeedtestTask()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if running {
 		writeJSONStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": "已有测速任务正在运行"})
 		return
 	}
-	a.speedtests[task.ID] = task
-	a.speedtestRunning = true
-	a.speedtestsMu.Unlock()
+	if err := a.store.CreateSpeedtestTask(recordFromTask(task)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	go a.runSpeedtest(task.ID)
 	writeJSONStatus(w, http.StatusAccepted, task)
+}
+
+func (a *App) cleanupSpeedtests(w http.ResponseWriter, r *http.Request) {
+	running, err := a.store.HasRunningSpeedtestTask()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if running {
+		writeJSONStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": "测速任务运行中，暂不允许清理"})
+		return
+	}
+	var in speedtestCleanupRequest
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&in)
+	}
+	var deleted int64
+	if in.KeepLatest > 0 {
+		deleted, err = a.store.DeleteSpeedtestTasksKeepLatest(in.KeepLatest)
+	} else {
+		deleted, err = a.store.DeleteAllSpeedtestTasks()
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "deleted": deleted, "keep_latest": in.KeepLatest})
 }
 
 func (a *App) findSpeedtestTarget(name string) (config.SpeedtestTarget, bool) {
@@ -158,39 +200,39 @@ func (a *App) findSpeedtestTarget(name string) (config.SpeedtestTarget, bool) {
 }
 
 func (a *App) runSpeedtest(id string) {
-	a.speedtestsMu.Lock()
-	task := a.speedtests[id]
-	if task == nil {
-		a.speedtestRunning = false
-		a.speedtestsMu.Unlock()
+	record, err := a.store.GetSpeedtestTask(id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return
+	}
+	if err != nil {
+		logger.Error("读取测速任务失败: id=%s err=%v", id, err)
 		return
 	}
 	now := time.Now()
-	task.Status = "running"
-	task.StartedAt = &now
-	target := task.Target
-	direction := task.Direction
-	duration := task.DurationSeconds
-	a.speedtestsMu.Unlock()
+	if err := a.store.UpdateSpeedtestTaskStarted(id, now.UTC().Format(time.RFC3339)); err != nil {
+		logger.Error("更新测速任务为 running 失败: id=%s err=%v", id, err)
+		return
+	}
+	target := config.SpeedtestTarget{Name: record.TargetName, Host: record.TargetHost, Port: record.TargetPort}
+	direction := record.Direction
+	duration := record.DurationSeconds
 
 	result, err := runIperf3(target, direction, duration)
 
 	finished := time.Now()
-	a.speedtestsMu.Lock()
-	defer a.speedtestsMu.Unlock()
-	if task = a.speedtests[id]; task != nil {
-		task.FinishedAt = &finished
-		if err != nil {
-			task.Status = "failed"
-			task.Error = err.Error()
-			logger.Warn("iperf3 测速失败: target=%s error=%v", target.Name, err)
-		} else {
-			task.Status = "completed"
-			task.Result = result
-			logger.Info("iperf3 测速完成: target=%s direction=%s duration=%ds", target.Name, direction, duration)
+	if err != nil {
+		if dbErr := a.store.FinishSpeedtestTask(id, "failed", err.Error(), finished.UTC().Format(time.RFC3339), 0, 0, 0, ""); dbErr != nil {
+			logger.Error("写入测速失败结果失败: id=%s err=%v", id, dbErr)
 		}
+		logger.Warn("iperf3 测速失败: target=%s error=%v", target.Name, err)
+		return
 	}
-	a.speedtestRunning = false
+	rawJSON, _ := json.Marshal(result.Raw)
+	if dbErr := a.store.FinishSpeedtestTask(id, "completed", "", finished.UTC().Format(time.RFC3339), result.SentMbps, result.ReceivedMbps, result.Retransmits, string(rawJSON)); dbErr != nil {
+		logger.Error("写入测速成功结果失败: id=%s err=%v", id, dbErr)
+		return
+	}
+	logger.Info("iperf3 测速完成: target=%s direction=%s duration=%ds", target.Name, direction, duration)
 }
 
 func runIperf3(target config.SpeedtestTarget, direction string, duration int) (*speedtestResult, error) {
@@ -246,4 +288,64 @@ func numberValue(v any) float64 {
 	default:
 		return 0
 	}
+}
+
+func recordFromTask(task *speedtestTask) store.SpeedtestTaskRecord {
+	return store.SpeedtestTaskRecord{
+		ID:              task.ID,
+		TargetName:      task.Target.Name,
+		TargetHost:      task.Target.Host,
+		TargetPort:      task.Target.Port,
+		Direction:       task.Direction,
+		DurationSeconds: task.DurationSeconds,
+		Status:          task.Status,
+		ErrorMsg:        task.Error,
+		CreatedAt:       task.CreatedAt.UTC().Format(time.RFC3339),
+	}
+}
+
+func taskFromRecord(record store.SpeedtestTaskRecord) *speedtestTask {
+	task := &speedtestTask{
+		ID: record.ID,
+		Target: config.SpeedtestTarget{
+			Name: record.TargetName,
+			Host: record.TargetHost,
+			Port: record.TargetPort,
+		},
+		Direction:       record.Direction,
+		DurationSeconds: record.DurationSeconds,
+		Status:          record.Status,
+		Error:           record.ErrorMsg,
+		CreatedAt:       parseRFC3339OrZero(record.CreatedAt),
+	}
+	if record.StartedAt != "" {
+		t := parseRFC3339OrZero(record.StartedAt)
+		task.StartedAt = &t
+	}
+	if record.FinishedAt != "" {
+		t := parseRFC3339OrZero(record.FinishedAt)
+		task.FinishedAt = &t
+	}
+	if record.Status == "completed" || record.RawJSON != "" {
+		task.Result = &speedtestResult{
+			SentMbps:     record.SentMbps,
+			ReceivedMbps: record.ReceivedMbps,
+			Retransmits:  record.Retransmits,
+		}
+		if strings.TrimSpace(record.RawJSON) != "" {
+			var raw map[string]any
+			if err := json.Unmarshal([]byte(record.RawJSON), &raw); err == nil {
+				task.Result.Raw = raw
+			}
+		}
+	}
+	return task
+}
+
+func parseRFC3339OrZero(value string) time.Time {
+	t, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
 }

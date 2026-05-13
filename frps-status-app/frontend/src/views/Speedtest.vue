@@ -46,7 +46,15 @@
       <section class="speed-panel">
         <div class="section-head">
           <div class="section-title">最近任务</div>
-          <span class="text-muted text-sm">{{ tasks.length }} 条</span>
+          <div class="history-tools">
+            <span class="text-muted text-sm">{{ tasks.length }} 条</span>
+            <label class="text-muted text-sm">保留
+              <input class="history-keep" type="number" min="0" max="500" v-model.number="keepLatest" />
+              条
+            </label>
+            <button class="btn btn-outline btn-sm" :disabled="running || historyCleaning" @click="cleanupHistory">清理旧记录</button>
+            <button class="btn btn-outline btn-sm" :disabled="running || historyCleaning || !tasks.length" @click="clearAllHistory">清空全部</button>
+          </div>
         </div>
         <div class="table-wrap">
           <table>
@@ -93,6 +101,8 @@ const targets = ref([])
 const tasks = ref([])
 const running = ref(false)
 const activeTaskId = ref('')
+const historyCleaning = ref(false)
+const keepLatest = ref(30)
 const form = reactive({
   target: '',
   direction: 'forward',
@@ -128,6 +138,34 @@ async function startTest() {
     startPolling()
   } catch (err) {
     emit('toast', { type: 'error', message: err.message || '创建测速任务失败' })
+  }
+}
+
+async function cleanupHistory() {
+  historyCleaning.value = true
+  try {
+    const keep = Math.max(0, Math.min(500, Math.floor(Number(keepLatest.value) || 0)))
+    keepLatest.value = keep
+    const result = await api.cleanupSpeedtests(keep)
+    emit('toast', { type: 'success', message: `已清理 ${Number(result.deleted || 0)} 条历史记录` })
+    await load()
+  } catch (err) {
+    emit('toast', { type: 'error', message: err.message || '清理历史失败' })
+  } finally {
+    historyCleaning.value = false
+  }
+}
+
+async function clearAllHistory() {
+  historyCleaning.value = true
+  try {
+    const result = await api.cleanupSpeedtests(0)
+    emit('toast', { type: 'success', message: `已清空 ${Number(result.deleted || 0)} 条测速记录` })
+    await load()
+  } catch (err) {
+    emit('toast', { type: 'error', message: err.message || '清空历史失败' })
+  } finally {
+    historyCleaning.value = false
   }
 }
 
@@ -213,6 +251,22 @@ onUnmounted(() => {
   padding: 16px;
 }
 
+.history-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-keep {
+  width: 72px;
+  height: 30px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
 .speed-form {
   display: grid;
   gap: 14px;
@@ -262,6 +316,11 @@ onUnmounted(() => {
 @media (max-width: 980px) {
   .speedtest-page {
     grid-template-columns: 1fr;
+  }
+  .history-tools {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, auto));
+    justify-content: end;
   }
 }
 </style>

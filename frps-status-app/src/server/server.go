@@ -44,9 +44,6 @@ type App struct {
 	mu               sync.RWMutex
 	latest           model.Snapshot
 	lastAutoPurgeDay string
-	speedtests       map[string]*speedtestTask
-	speedtestsMu     sync.Mutex
-	speedtestRunning bool
 	// storageOpsMu 串行「自动历史清理 + 磁盘空间检测/应急」与「手动存储清理」，避免 Purge/VACUUM/删日志并发冲突。
 	storageOpsMu sync.Mutex
 }
@@ -56,7 +53,7 @@ func New(cfg config.Config, st *store.Store, appcfg *appsettings.Manager, fc *fr
 	if _, err := rand.Read(secret); err != nil {
 		secret = []byte(cfg.StatusUser + ":" + cfg.StatusPassword + ":" + cfg.Listen)
 	}
-	return &App{cfg: cfg, store: st, appcfg: appcfg, frps: fc, alerts: alerting.New(st), secret: secret, speedtests: make(map[string]*speedtestTask)}
+	return &App{cfg: cfg, store: st, appcfg: appcfg, frps: fc, alerts: alerting.New(st), secret: secret}
 }
 
 func (a *App) Routes() http.Handler {

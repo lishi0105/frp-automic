@@ -548,6 +548,7 @@ frps-status-app/web/
 | POST       | `/api/db/purge`            | 清理旧数据                            |
 | GET        | `/api/speedtests`          | 查询测速目标和任务列表                |
 | POST       | `/api/speedtests`          | 创建异步测速任务                      |
+| DELETE     | `/api/speedtests`          | 清理测速历史（可传 `keep_latest`）    |
 | GET        | `/api/speedtests/{id}`     | 查询单个测速任务状态和结果            |
 
 除 `/api/login`、`/api/session`、`/api/user/forgot-password` 外，其余接口需要登录态。
