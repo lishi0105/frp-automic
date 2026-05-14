@@ -117,8 +117,8 @@ def prompt_frpc_transport_options() -> None:
     answer = prompt_input("是否开启 frp 代理压缩？仅输入 y 开启，其他输入不开启：")
     config.FRPC_USE_COMPRESSION = answer.strip().lower() == "y"
     print("  tcpMux 会复用 frpc 与 frps 之间的连接，可减少建连开销和文件描述符占用；该选项必须服务端和客户端一致。")
-    answer = prompt_input("是否开启 frp tcpMux？仅输入 y 开启，其他输入不开启：")
-    config.FRPC_TCP_MUX = answer.strip().lower() == "y"
+    answer = prompt_input("是否关闭 frp tcpMux？仅输入 n 关闭，其他输入默认开启：")
+    config.FRPC_TCP_MUX = answer.strip().lower() != "n"
 
     print("\n请选择 frpc 与 frps 的通信协议（frpc.transport.protocol）：")
     print("  tcp       默认协议，兼容性最好，适合大多数场景。")
