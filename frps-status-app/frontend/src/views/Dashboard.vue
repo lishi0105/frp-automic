@@ -117,14 +117,14 @@
             <div class="storage-donut-wrap">
               <div ref="storagePieEl" class="storage-donut"></div>
               <div v-if="storagePieCenterShow" class="storage-donut-center">
-                <span class="storage-donut-pct" :class="`storage-free-${storageFreeStatus}`">{{ storageFreePct }}%</span>
-                <span class="storage-donut-lbl">可用</span>
+                <span class="storage-donut-pct" :class="storageUsedTierClass">{{ storageUsedPct }}%</span>
+                <span class="storage-donut-lbl">已用</span>
               </div>
             </div>
             <div class="storage-meta">
               <div class="storage-stat total"><span>分区</span><b>{{ humanBytes(storageTotalBytes) }}</b></div>
-              <div class="storage-stat used"><span>已用</span><b>{{ humanBytes(storageUsedBytes) }}</b></div>
-              <div class="storage-stat free" :class="`storage-free-${storageFreeStatus}`"><span>可用</span><b>{{ humanBytes(storageFreeBytes) }}</b></div>
+              <div class="storage-stat used" :class="storageUsedTierClass"><span>已用</span><b>{{ humanBytes(storageUsedBytes) }}</b></div>
+              <div class="storage-stat free"><span>可用</span><b>{{ humanBytes(storageFreeBytes) }}</b></div>
             </div>
           </div>
         </section>
@@ -286,11 +286,6 @@ const storageUsedPct = computed(() => {
   if (!t) return 0
   return Math.round((storageUsedBytes.value / t) * 100)
 })
-const storageFreePct = computed(() => {
-  const t = storageTotalBytes.value
-  if (!t) return 0
-  return Math.max(0, Math.min(100, 100 - storageUsedPct.value))
-})
 const storagePieCenterShow = computed(() => {
   return storagePartition.value?.ok && storageTotalBytes.value > 0
 })
@@ -298,15 +293,8 @@ const storageHasData = computed(() => {
   return Boolean(storagePartition.value?.partition && storageTotalBytes.value > 0)
 })
 
-/** 可用空间占比：≥30% 充足、12%~29% 不富裕、<12% 紧张（与环形图配色一致） */
-function storageFreeStatusFromPct(pct) {
-  const p = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)))
-  if (p >= 45) return 'ok'
-  if (p >= 30) return 'warn'
-  return 'critical'
-}
-const STORAGE_FREE_RING_HEX = { ok: '#22c55e', warn: '#eab308', critical: '#dc2626' }
-const storageFreeStatus = computed(() => storageFreeStatusFromPct(storageFreePct.value))
+/** 与流量限额仪表盘一致：按已用占比 &lt;50% / 50%~90% / ≥90% 分档 */
+const storageUsedTierClass = computed(() => trafficRatioTierClass(storageUsedPct.value, true))
 
 function fmtMB(v) {
   if (v == null || Number.isNaN(Number(v))) return '-'
@@ -368,12 +356,7 @@ const trafficGaugePct = computed(() => {
   return 0
 })
 const trafficGaugeTierClass = computed(() => trafficRatioTierClass(trafficGaugePct.value, true))
-const trafficGaugeCenterSub = computed(() => {
-  const ax = trafficSingleLimitAxis.value
-  if (ax === 'in') return '入站占用'
-  if (ax === 'out') return '出站占用'
-  return '总量占用'
-})
+const trafficGaugeCenterSub = computed(() => '已用')
 const trafficGaugeLimitLabel = computed(() => {
   const ax = trafficSingleLimitAxis.value
   if (ax === 'in') return '入站限额'
@@ -813,9 +796,8 @@ function buildStoragePie() {
     return
   }
   const usedPct = Math.round((used / total) * 100)
-  const freePct = Math.max(0, Math.min(100, 100 - usedPct))
-  const tier = storageFreeStatusFromPct(freePct)
-  const ringColor = STORAGE_FREE_RING_HEX[tier]
+  const tierClass = trafficRatioTierClass(usedPct, true)
+  const ringColor = TRAFFIC_TIER_RING_HEX[tierClass] || '#22c55e'
   storageChart.setOption({
     backgroundColor: 'transparent',
     animation: true,
@@ -833,8 +815,8 @@ function buildStoragePie() {
         label: { show: false },
         emphasis: { disabled: true },
         data: [
-          { name: '已用', value: used, itemStyle: { color: '#cbd5e1' } },
-          { name: '可用', value: free, itemStyle: { color: ringColor } }
+          { name: '已用', value: used, itemStyle: { color: ringColor } },
+          { name: '可用', value: free, itemStyle: { color: '#cbd5e1' } }
         ]
       }
     ]
