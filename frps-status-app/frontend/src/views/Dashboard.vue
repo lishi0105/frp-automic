@@ -35,7 +35,7 @@
 
         <section class="summary-card throughput-card">
           <div class="summary-title">本月流量吞吐</div>
-          <div class="traffic-bars">
+          <div v-if="trafficLimitAxisCount !== 1" class="traffic-bars">
             <div class="traffic-line traffic-half traffic-in-row">
               <div class="traffic-label">
                 <span class="traffic-lbl">入站</span>
@@ -56,6 +56,21 @@
                 <b><span class="traffic-bytes">{{ humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }}</span><span class="traffic-ratio" :class="totalRatioTierClass"> ({{ totalPctText }})</span></b>
               </div>
               <div class="thin-progress"><div class="thin-progress-fill" :class="totalRatioTierClass" :style="{ width: totalPct + '%' }"></div></div>
+            </div>
+          </div>
+          <div v-else class="storage-body traffic-gauge-body">
+            <div class="storage-donut-wrap">
+              <div ref="trafficPieEl" class="storage-donut"></div>
+              <div class="storage-donut-center">
+                <span class="storage-donut-pct traffic-gauge-pct" :class="trafficGaugeTierClass">{{ trafficGaugePct }}%</span>
+                <span class="storage-donut-lbl">{{ trafficGaugeCenterSub }}</span>
+              </div>
+            </div>
+            <div class="storage-meta traffic-gauge-meta">
+              <div class="storage-stat total"><span>{{ trafficGaugeLimitLabel }}</span><b>{{ trafficGaugeLimitDisplay }}</b></div>
+              <div class="storage-stat used traffic-gauge-stat-in"><span>入站</span><b>{{ humanBytesKB(ifaceMonthInKB) }}</b></div>
+              <div class="storage-stat used traffic-gauge-stat-out"><span>出站</span><b>{{ humanBytesKB(ifaceMonthOutKB) }}</b></div>
+              <div class="storage-stat used traffic-gauge-stat-total"><span>总量</span><b>{{ humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }}</b></div>
             </div>
           </div>
         </section>
@@ -228,6 +243,7 @@ defineEmits(['refresh'])
 
 const chartEl = ref(null)
 const storagePieEl = ref(null)
+const trafficPieEl = ref(null)
 const logOpen = ref(false)
 const logLoading = ref(false)
 const logContent = ref('')
@@ -242,6 +258,8 @@ let logTimer = null
 let chart = null
 let storageChart = null
 let storageChartEl = null
+let trafficChart = null
+let trafficChartEl = null
 
 const storagePartition = ref(null)
 const storageApp = ref(null)
@@ -324,6 +342,51 @@ function trafficRatioTierClass(pct, hasLimit) {
 const inRatioTierClass = computed(() => trafficRatioTierClass(inPct.value, limitInGB.value > 0))
 const outRatioTierClass = computed(() => trafficRatioTierClass(outPct.value, limitOutGB.value > 0))
 const totalRatioTierClass = computed(() => trafficRatioTierClass(totalPct.value, limitTotalGB.value > 0))
+
+/** 入/出/总 中有几项配置了月度限额（GB > 0） */
+const trafficLimitAxisCount = computed(() => {
+  let n = 0
+  if (limitInGB.value > 0) n++
+  if (limitOutGB.value > 0) n++
+  if (limitTotalGB.value > 0) n++
+  return n
+})
+/** 仅恰好 1 项有限额时用环形仪表盘；0 项或 2 项及以上一律用条形进度，不用仪表盘 */
+const trafficThroughputDonutMode = computed(() => trafficLimitAxisCount.value === 1)
+const trafficSingleLimitAxis = computed(() => {
+  if (!trafficThroughputDonutMode.value) return null
+  if (limitInGB.value > 0) return 'in'
+  if (limitOutGB.value > 0) return 'out'
+  if (limitTotalGB.value > 0) return 'total'
+  return null
+})
+const trafficGaugePct = computed(() => {
+  const ax = trafficSingleLimitAxis.value
+  if (ax === 'in') return inPct.value
+  if (ax === 'out') return outPct.value
+  if (ax === 'total') return totalPct.value
+  return 0
+})
+const trafficGaugeTierClass = computed(() => trafficRatioTierClass(trafficGaugePct.value, true))
+const trafficGaugeCenterSub = computed(() => {
+  const ax = trafficSingleLimitAxis.value
+  if (ax === 'in') return '入站占用'
+  if (ax === 'out') return '出站占用'
+  return '总量占用'
+})
+const trafficGaugeLimitLabel = computed(() => {
+  const ax = trafficSingleLimitAxis.value
+  if (ax === 'in') return '入站限额'
+  if (ax === 'out') return '出站限额'
+  return '月度总限额'
+})
+const trafficGaugeLimitDisplay = computed(() => {
+  const ax = trafficSingleLimitAxis.value
+  const gb = ax === 'in' ? limitInGB.value : ax === 'out' ? limitOutGB.value : limitTotalGB.value
+  if (!gb || gb <= 0) return '-'
+  const n = Number(gb)
+  return `${Number.isInteger(n) ? n : n.toFixed(2)} GB`
+})
 const runDays = computed(() => {
   const raw = props.status?.settings?.deploy_date
   if (!raw) return '-'
@@ -628,6 +691,112 @@ watch(() => props.status?.generated_at, () => {
   loadStorageInfo()
 })
 
+const TRAFFIC_TIER_RING_HEX = {
+  'traffic-ratio-tier-low': '#22c55e',
+  'traffic-ratio-tier-mid': '#eab308',
+  'traffic-ratio-tier-high': '#dc2626'
+}
+
+function buildTrafficGaugePie() {
+  if (!trafficThroughputDonutMode.value) {
+    return
+  }
+  ensureTrafficChart()
+  if (!trafficChart) return
+  const ax = trafficSingleLimitAxis.value
+  if (!ax) return
+  const gb = 1024 ** 3
+  let used = 0
+  let remaining = 0
+  if (ax === 'in') {
+    const lim = limitInGB.value * gb
+    used = Math.min(ifaceMonthInKB.value * 1024, lim)
+    remaining = Math.max(0, lim - used)
+  } else if (ax === 'out') {
+    const lim = limitOutGB.value * gb
+    used = Math.min(ifaceMonthOutKB.value * 1024, lim)
+    remaining = Math.max(0, lim - used)
+  } else {
+    const lim = limitTotalGB.value * gb
+    used = Math.min((ifaceMonthInKB.value + ifaceMonthOutKB.value) * 1024, lim)
+    remaining = Math.max(0, lim - used)
+  }
+  if (used + remaining <= 0) {
+    trafficChart.clear()
+    return
+  }
+  const tierClass = trafficGaugeTierClass.value
+  const ringColor = TRAFFIC_TIER_RING_HEX[tierClass] || '#22c55e'
+  trafficChart.setOption({
+    backgroundColor: 'transparent',
+    animation: true,
+    tooltip: {
+      trigger: 'item',
+      formatter: (p) => `${p.marker}${p.name}<br/><b>${humanBytes(p.value)}</b>（${p.percent}%）`
+    },
+    series: [
+      {
+        type: 'pie',
+        radius: ['52%', '82%'],
+        center: ['50%', '50%'],
+        avoidLabelOverlap: false,
+        itemStyle: { borderRadius: 3, borderColor: '#fff', borderWidth: 2 },
+        label: { show: false },
+        emphasis: { disabled: true },
+        data: [
+          { name: '已用', value: used, itemStyle: { color: ringColor } },
+          { name: '剩余', value: remaining, itemStyle: { color: '#cbd5e1' } }
+        ]
+      }
+    ]
+  }, { notMerge: true })
+}
+
+function ensureTrafficChart() {
+  const el = trafficPieEl.value
+  if (!el) return
+  if (trafficChart && trafficChartEl === el) return
+  if (trafficChart) {
+    if (trafficChartEl) ro?.unobserve(trafficChartEl)
+    trafficChart.dispose()
+  }
+  trafficChart = echarts.init(el)
+  trafficChartEl = el
+  ro?.observe(el)
+}
+
+function disposeTrafficChart() {
+  if (trafficChart) {
+    if (trafficChartEl) ro?.unobserve(trafficChartEl)
+    trafficChart.dispose()
+  }
+  trafficChart = null
+  trafficChartEl = null
+}
+
+watch(
+  [
+    trafficThroughputDonutMode,
+    trafficSingleLimitAxis,
+    () => ifaceMonthInKB.value,
+    () => ifaceMonthOutKB.value,
+    limitInGB,
+    limitOutGB,
+    limitTotalGB,
+    trafficGaugePct
+  ],
+  async () => {
+    await nextTick()
+    if (!trafficThroughputDonutMode.value) {
+      disposeTrafficChart()
+      return
+    }
+    buildTrafficGaugePie()
+    trafficChart?.resize()
+  },
+  { flush: 'post' }
+)
+
 function buildStoragePie() {
   ensureStorageChart()
   if (!storageChart) return
@@ -711,6 +880,7 @@ const ro = typeof ResizeObserver !== 'undefined'
   ? new ResizeObserver(() => {
       chart?.resize()
       storageChart?.resize()
+      trafficChart?.resize()
     })
   : null
 
@@ -719,7 +889,7 @@ onMounted(async () => {
   chart = echarts.init(chartEl.value)
   ensureStorageChart()
   loadHostNetwork()
-  loadIfaceMonthSummary()
+  await loadIfaceMonthSummary()
   loadStorageInfo()
   ro?.observe(chartEl.value)
 })
@@ -731,6 +901,7 @@ onUnmounted(() => {
   storageChart?.dispose()
   storageChart = null
   storageChartEl = null
+  disposeTrafficChart()
 })
 </script>
 
@@ -1193,6 +1364,29 @@ onUnmounted(() => {
 }
 .throughput-card .thin-progress .thin-progress-fill.traffic-ratio-tier-high {
   background: linear-gradient(90deg, #dc2626, #ef4444);
+}
+/* 单限额时：环形仪表盘 + 右侧明细（配色与进度条档位一致） */
+.throughput-card .traffic-gauge-pct.traffic-ratio-tier-low {
+  color: #15803d;
+}
+.throughput-card .traffic-gauge-pct.traffic-ratio-tier-mid {
+  color: #b45309;
+}
+.throughput-card .traffic-gauge-pct.traffic-ratio-tier-high {
+  color: #b91c1c;
+}
+.throughput-card .traffic-gauge-stat-in span,
+.throughput-card .traffic-gauge-stat-in b {
+  color: #1d4ed8;
+}
+.throughput-card .traffic-gauge-stat-out span,
+.throughput-card .traffic-gauge-stat-out b {
+  color: #047857;
+}
+.throughput-card .traffic-gauge-stat-total span,
+.throughput-card .traffic-gauge-stat-total b {
+  color: #0f172a;
+  font-weight: 700;
 }
 .thin-progress,
 .wide-progress {
