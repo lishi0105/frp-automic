@@ -59,6 +59,10 @@ type PublicSettings struct {
 	LimitTotalGB                  float64 `json:"limit_total_gb"`
 	InitialInGB                   float64 `json:"initial_in_gb"`
 	InitialOutGB                  float64 `json:"initial_out_gb"`
+	TrafficCycleStartDay          int     `json:"traffic_cycle_start_day"`
+	TrafficCycleEffectiveStartDay int     `json:"traffic_cycle_effective_start_day"`
+	TrafficCycleFrom              string  `json:"traffic_cycle_from"`
+	TrafficCycleTo                string  `json:"traffic_cycle_to"`
 	DeployDate                    string  `json:"deploy_date"`
 	HistoryRetentionDays          int     `json:"history_retention_days"`
 	DiskFreeSpaceAlertThresholdMB uint64  `json:"disk_free_space_alert_threshold_mb"`

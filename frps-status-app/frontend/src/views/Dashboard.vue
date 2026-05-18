@@ -35,7 +35,8 @@
 
         <section class="summary-card throughput-card">
           <div class="summary-title">本月流量吞吐</div>
-          <div class="traffic-bars">
+          <div v-if="trafficCycleCustom" class="traffic-cycle-note">{{ trafficCycleFrom }} 至 {{ trafficCycleTo }}</div>
+          <div v-if="trafficLimitAxisCount !== 1" class="traffic-bars">
             <div class="traffic-line traffic-half traffic-in-row">
               <div class="traffic-label">
                 <span class="traffic-lbl">入站</span>
@@ -56,6 +57,50 @@
                 <b><span class="traffic-bytes">{{ humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }}</span><span class="traffic-ratio" :class="totalRatioTierClass"> ({{ totalPctText }})</span></b>
               </div>
               <div class="thin-progress"><div class="thin-progress-fill" :class="totalRatioTierClass" :style="{ width: totalPct + '%' }"></div></div>
+            </div>
+          </div>
+          <div v-else class="storage-body traffic-gauge-body">
+            <div class="storage-donut-wrap">
+              <div ref="trafficPieEl" class="storage-donut"></div>
+              <div class="storage-donut-center">
+                <span class="storage-donut-pct traffic-gauge-pct" :class="trafficGaugeTierClass">{{ trafficGaugePct }}%</span>
+                <span class="storage-donut-lbl">{{ trafficGaugeCenterSub }}</span>
+              </div>
+            </div>
+            <div class="storage-meta traffic-gauge-meta">
+              <div
+                class="storage-stat used"
+                :class="trafficSingleLimitAxis === 'in' ? ['traffic-gauge-stat-limited', trafficGaugeTierClass] : 'traffic-gauge-stat-in'"
+              >
+                <span>入站</span>
+                <div v-if="trafficSingleLimitAxis === 'in'" class="traffic-gauge-limited-stack">
+                  <b class="traffic-gauge-used-line">{{ trafficGaugeLimitedUsedDisplay }}</b>
+                  <b class="traffic-gauge-limit-line">{{ trafficGaugeLimitedLimitDisplay }}</b>
+                </div>
+                <b v-else>{{ humanBytesKB(ifaceMonthInKB) }}</b>
+              </div>
+              <div
+                class="storage-stat used"
+                :class="trafficSingleLimitAxis === 'out' ? ['traffic-gauge-stat-limited', trafficGaugeTierClass] : 'traffic-gauge-stat-out'"
+              >
+                <span>出站</span>
+                <div v-if="trafficSingleLimitAxis === 'out'" class="traffic-gauge-limited-stack">
+                  <b class="traffic-gauge-used-line">{{ trafficGaugeLimitedUsedDisplay }}</b>
+                  <b class="traffic-gauge-limit-line">{{ trafficGaugeLimitedLimitDisplay }}</b>
+                </div>
+                <b v-else>{{ humanBytesKB(ifaceMonthOutKB) }}</b>
+              </div>
+              <div
+                class="storage-stat used"
+                :class="trafficSingleLimitAxis === 'total' ? ['traffic-gauge-stat-limited', trafficGaugeTierClass] : 'traffic-gauge-stat-total'"
+              >
+                <span>总量</span>
+                <div v-if="trafficSingleLimitAxis === 'total'" class="traffic-gauge-limited-stack">
+                  <b class="traffic-gauge-used-line">{{ trafficGaugeLimitedUsedDisplay }}</b>
+                  <b class="traffic-gauge-limit-line">{{ trafficGaugeLimitedLimitDisplay }}</b>
+                </div>
+                <b v-else>{{ humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }}</b>
+              </div>
             </div>
           </div>
         </section>
@@ -102,14 +147,14 @@
             <div class="storage-donut-wrap">
               <div ref="storagePieEl" class="storage-donut"></div>
               <div v-if="storagePieCenterShow" class="storage-donut-center">
-                <span class="storage-donut-pct" :class="`storage-free-${storageFreeStatus}`">{{ storageFreePct }}%</span>
-                <span class="storage-donut-lbl">可用</span>
+                <span class="storage-donut-pct" :class="storageUsedTierClass">{{ storageUsedPct }}%</span>
+                <span class="storage-donut-lbl">已用</span>
               </div>
             </div>
             <div class="storage-meta">
               <div class="storage-stat total"><span>分区</span><b>{{ humanBytes(storageTotalBytes) }}</b></div>
-              <div class="storage-stat used"><span>已用</span><b>{{ humanBytes(storageUsedBytes) }}</b></div>
-              <div class="storage-stat free" :class="`storage-free-${storageFreeStatus}`"><span>可用</span><b>{{ humanBytes(storageFreeBytes) }}</b></div>
+              <div class="storage-stat used" :class="storageUsedTierClass"><span>已用</span><b>{{ humanBytes(storageUsedBytes) }}</b></div>
+              <div class="storage-stat free"><span>可用</span><b>{{ humanBytes(storageFreeBytes) }}</b></div>
             </div>
           </div>
         </section>
@@ -221,6 +266,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { humanBytes, percent } from '../utils/format.js'
+import { trafficCycleRangeFromSettings } from '../utils/trafficCycle.js'
 import { api } from '../api/index.js'
 
 const props = defineProps({ status: Object, daily: Array, loading: Boolean })
@@ -228,6 +274,7 @@ defineEmits(['refresh'])
 
 const chartEl = ref(null)
 const storagePieEl = ref(null)
+const trafficPieEl = ref(null)
 const logOpen = ref(false)
 const logLoading = ref(false)
 const logContent = ref('')
@@ -242,6 +289,8 @@ let logTimer = null
 let chart = null
 let storageChart = null
 let storageChartEl = null
+let trafficChart = null
+let trafficChartEl = null
 
 const storagePartition = ref(null)
 const storageApp = ref(null)
@@ -268,27 +317,12 @@ const storageUsedPct = computed(() => {
   if (!t) return 0
   return Math.round((storageUsedBytes.value / t) * 100)
 })
-const storageFreePct = computed(() => {
-  const t = storageTotalBytes.value
-  if (!t) return 0
-  return Math.max(0, Math.min(100, 100 - storageUsedPct.value))
-})
 const storagePieCenterShow = computed(() => {
   return storagePartition.value?.ok && storageTotalBytes.value > 0
 })
 const storageHasData = computed(() => {
   return Boolean(storagePartition.value?.partition && storageTotalBytes.value > 0)
 })
-
-/** 可用空间占比：≥30% 充足、12%~29% 不富裕、<12% 紧张（与环形图配色一致） */
-function storageFreeStatusFromPct(pct) {
-  const p = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)))
-  if (p >= 45) return 'ok'
-  if (p >= 30) return 'warn'
-  return 'critical'
-}
-const STORAGE_FREE_RING_HEX = { ok: '#22c55e', warn: '#eab308', critical: '#dc2626' }
-const storageFreeStatus = computed(() => storageFreeStatusFromPct(storageFreePct.value))
 
 function fmtMB(v) {
   if (v == null || Number.isNaN(Number(v))) return '-'
@@ -304,6 +338,10 @@ const bindLatency = computed(() => props.status?.frps?.bind?.latency_ms ?? '-')
 const dashOk = computed(() => props.status?.frps?.dashboard?.ok ?? false)
 const dashLatency = computed(() => props.status?.frps?.dashboard?.latency_ms ?? '-')
 
+const trafficCycleRange = computed(() => trafficCycleRangeFromSettings(props.status?.settings))
+const trafficCycleFrom = computed(() => props.status?.settings?.traffic_cycle_from || trafficCycleRange.value.from)
+const trafficCycleTo = computed(() => props.status?.settings?.traffic_cycle_to || trafficCycleRange.value.to)
+const trafficCycleCustom = computed(() => (props.status?.settings?.traffic_cycle_effective_start_day || trafficCycleRange.value.startDay) !== 1)
 const limitInGB = computed(() => props.status?.settings?.limit_in_gb || 0)
 const limitOutGB = computed(() => props.status?.settings?.limit_out_gb || 0)
 const limitTotalGB = computed(() => props.status?.settings?.limit_total_gb || 0)
@@ -321,9 +359,53 @@ function trafficRatioTierClass(pct, hasLimit) {
   if (pct < 90) return 'traffic-ratio-tier-mid'
   return 'traffic-ratio-tier-high'
 }
+/** 存储环形图与流量单限额环形图一致：中心与彩色弧均为「已用」占比，档位同 trafficRatioTierClass */
+const storageUsedTierClass = computed(() => trafficRatioTierClass(storageUsedPct.value, true))
 const inRatioTierClass = computed(() => trafficRatioTierClass(inPct.value, limitInGB.value > 0))
 const outRatioTierClass = computed(() => trafficRatioTierClass(outPct.value, limitOutGB.value > 0))
 const totalRatioTierClass = computed(() => trafficRatioTierClass(totalPct.value, limitTotalGB.value > 0))
+
+/** 入/出/总 中有几项配置了月度限额（GB > 0） */
+const trafficLimitAxisCount = computed(() => {
+  let n = 0
+  if (limitInGB.value > 0) n++
+  if (limitOutGB.value > 0) n++
+  if (limitTotalGB.value > 0) n++
+  return n
+})
+/** 仅恰好 1 项有限额时用环形仪表盘；0 项或 2 项及以上一律用条形进度，不用仪表盘 */
+const trafficThroughputDonutMode = computed(() => trafficLimitAxisCount.value === 1)
+const trafficSingleLimitAxis = computed(() => {
+  if (!trafficThroughputDonutMode.value) return null
+  if (limitInGB.value > 0) return 'in'
+  if (limitOutGB.value > 0) return 'out'
+  if (limitTotalGB.value > 0) return 'total'
+  return null
+})
+const trafficGaugePct = computed(() => {
+  const ax = trafficSingleLimitAxis.value
+  if (ax === 'in') return inPct.value
+  if (ax === 'out') return outPct.value
+  if (ax === 'total') return totalPct.value
+  return 0
+})
+const trafficGaugeTierClass = computed(() => trafficRatioTierClass(trafficGaugePct.value, true))
+const trafficGaugeCenterSub = computed(() => '已用')
+function trafficGaugeLimitedParts(ax) {
+  if (!ax) return { used: '-', limit: '-' }
+  const usedKB = ax === 'in'
+    ? ifaceMonthInKB.value
+    : ax === 'out'
+      ? ifaceMonthOutKB.value
+      : ifaceMonthInKB.value + ifaceMonthOutKB.value
+  const limitGB = ax === 'in' ? limitInGB.value : ax === 'out' ? limitOutGB.value : limitTotalGB.value
+  const usedText = humanBytes(Number(usedKB || 0) * 1024).replace(/\s+/g, '')
+  const n = Number(limitGB)
+  const limitText = `${Number.isInteger(n) ? n : n.toFixed(2)}GB`
+  return { used: usedText, limit: limitText }
+}
+const trafficGaugeLimitedUsedDisplay = computed(() => trafficGaugeLimitedParts(trafficSingleLimitAxis.value).used)
+const trafficGaugeLimitedLimitDisplay = computed(() => trafficGaugeLimitedParts(trafficSingleLimitAxis.value).limit)
 const runDays = computed(() => {
   const raw = props.status?.settings?.deploy_date
   if (!raw) return '-'
@@ -530,10 +612,9 @@ function isCertFailed(c) {
 function buildChart(daily) {
   if (!chart) return
   const rows = Array.isArray(daily) ? daily : []
-  const now = new Date()
-  const monthStart = formatLocalDate(new Date(now.getFullYear(), now.getMonth(), 1))
-  const today = formatLocalDate(now)
-  const monthRows = rows.filter(r => r.day >= monthStart && r.day <= today)
+  const cycleStart = trafficCycleFrom.value
+  const cycleEnd = trafficCycleTo.value
+  const monthRows = rows.filter(r => r.day >= cycleStart && r.day <= cycleEnd)
   if (!monthRows.length) {
     chart.clear()
     return
@@ -590,9 +671,8 @@ function humanBytesKB(kb) {
 }
 
 async function loadIfaceMonthSummary() {
-  const now = new Date()
-  const from = formatLocalDate(new Date(now.getFullYear(), now.getMonth(), 1))
-  const to = formatLocalDate(now)
+  const from = trafficCycleFrom.value
+  const to = trafficCycleTo.value
   try {
     const rows = await api.getDailyInterface({ from, to })
     let inKB = 0
@@ -622,11 +702,117 @@ async function loadHostNetwork() {
   }
 }
 
-watch(() => props.status?.generated_at, () => {
+watch(() => [props.status?.generated_at, trafficCycleFrom.value, trafficCycleTo.value], () => {
   loadHostNetwork()
   loadIfaceMonthSummary()
   loadStorageInfo()
 })
+
+const TRAFFIC_TIER_RING_HEX = {
+  'traffic-ratio-tier-low': '#22c55e',
+  'traffic-ratio-tier-mid': '#eab308',
+  'traffic-ratio-tier-high': '#dc2626'
+}
+
+function buildTrafficGaugePie() {
+  if (!trafficThroughputDonutMode.value) {
+    return
+  }
+  ensureTrafficChart()
+  if (!trafficChart) return
+  const ax = trafficSingleLimitAxis.value
+  if (!ax) return
+  const gb = 1024 ** 3
+  let used = 0
+  let remaining = 0
+  if (ax === 'in') {
+    const lim = limitInGB.value * gb
+    used = Math.min(ifaceMonthInKB.value * 1024, lim)
+    remaining = Math.max(0, lim - used)
+  } else if (ax === 'out') {
+    const lim = limitOutGB.value * gb
+    used = Math.min(ifaceMonthOutKB.value * 1024, lim)
+    remaining = Math.max(0, lim - used)
+  } else {
+    const lim = limitTotalGB.value * gb
+    used = Math.min((ifaceMonthInKB.value + ifaceMonthOutKB.value) * 1024, lim)
+    remaining = Math.max(0, lim - used)
+  }
+  if (used + remaining <= 0) {
+    trafficChart.clear()
+    return
+  }
+  const tierClass = trafficGaugeTierClass.value
+  const ringColor = TRAFFIC_TIER_RING_HEX[tierClass] || '#22c55e'
+  trafficChart.setOption({
+    backgroundColor: 'transparent',
+    animation: true,
+    tooltip: {
+      trigger: 'item',
+      formatter: (p) => `${p.marker}${p.name}<br/><b>${humanBytes(p.value)}</b>（${p.percent}%）`
+    },
+    series: [
+      {
+        type: 'pie',
+        radius: ['52%', '82%'],
+        center: ['50%', '50%'],
+        avoidLabelOverlap: false,
+        itemStyle: { borderRadius: 3, borderColor: '#fff', borderWidth: 2 },
+        label: { show: false },
+        emphasis: { disabled: true },
+        data: [
+          { name: '已用', value: used, itemStyle: { color: ringColor } },
+          { name: '剩余', value: remaining, itemStyle: { color: '#cbd5e1' } }
+        ]
+      }
+    ]
+  }, { notMerge: true })
+}
+
+function ensureTrafficChart() {
+  const el = trafficPieEl.value
+  if (!el) return
+  if (trafficChart && trafficChartEl === el) return
+  if (trafficChart) {
+    if (trafficChartEl) ro?.unobserve(trafficChartEl)
+    trafficChart.dispose()
+  }
+  trafficChart = echarts.init(el)
+  trafficChartEl = el
+  ro?.observe(el)
+}
+
+function disposeTrafficChart() {
+  if (trafficChart) {
+    if (trafficChartEl) ro?.unobserve(trafficChartEl)
+    trafficChart.dispose()
+  }
+  trafficChart = null
+  trafficChartEl = null
+}
+
+watch(
+  [
+    trafficThroughputDonutMode,
+    trafficSingleLimitAxis,
+    () => ifaceMonthInKB.value,
+    () => ifaceMonthOutKB.value,
+    limitInGB,
+    limitOutGB,
+    limitTotalGB,
+    trafficGaugePct
+  ],
+  async () => {
+    await nextTick()
+    if (!trafficThroughputDonutMode.value) {
+      disposeTrafficChart()
+      return
+    }
+    buildTrafficGaugePie()
+    trafficChart?.resize()
+  },
+  { flush: 'post' }
+)
 
 function buildStoragePie() {
   ensureStorageChart()
@@ -644,9 +830,8 @@ function buildStoragePie() {
     return
   }
   const usedPct = Math.round((used / total) * 100)
-  const freePct = Math.max(0, Math.min(100, 100 - usedPct))
-  const tier = storageFreeStatusFromPct(freePct)
-  const ringColor = STORAGE_FREE_RING_HEX[tier]
+  const tierClass = trafficRatioTierClass(usedPct, true)
+  const ringColor = TRAFFIC_TIER_RING_HEX[tierClass] || '#22c55e'
   storageChart.setOption({
     backgroundColor: 'transparent',
     animation: true,
@@ -664,8 +849,8 @@ function buildStoragePie() {
         label: { show: false },
         emphasis: { disabled: true },
         data: [
-          { name: '已用', value: used, itemStyle: { color: '#cbd5e1' } },
-          { name: '可用', value: free, itemStyle: { color: ringColor } }
+          { name: '已用', value: used, itemStyle: { color: ringColor } },
+          { name: '可用', value: free, itemStyle: { color: '#cbd5e1' } }
         ]
       }
     ]
@@ -711,6 +896,7 @@ const ro = typeof ResizeObserver !== 'undefined'
   ? new ResizeObserver(() => {
       chart?.resize()
       storageChart?.resize()
+      trafficChart?.resize()
     })
   : null
 
@@ -719,7 +905,7 @@ onMounted(async () => {
   chart = echarts.init(chartEl.value)
   ensureStorageChart()
   loadHostNetwork()
-  loadIfaceMonthSummary()
+  await loadIfaceMonthSummary()
   loadStorageInfo()
   ro?.observe(chartEl.value)
 })
@@ -731,6 +917,7 @@ onUnmounted(() => {
   storageChart?.dispose()
   storageChart = null
   storageChartEl = null
+  disposeTrafficChart()
 })
 </script>
 
@@ -858,13 +1045,13 @@ onUnmounted(() => {
   font-weight: 800;
   color: #0f172a;
 }
-.storage-donut-pct.storage-free-ok {
+.storage-card .storage-donut-pct.traffic-ratio-tier-low {
   color: #15803d;
 }
-.storage-donut-pct.storage-free-warn {
+.storage-card .storage-donut-pct.traffic-ratio-tier-mid {
   color: #b45309;
 }
-.storage-donut-pct.storage-free-critical {
+.storage-card .storage-donut-pct.traffic-ratio-tier-high {
   color: #b91c1c;
 }
 .storage-donut-lbl {
@@ -918,21 +1105,21 @@ onUnmounted(() => {
   border-color: transparent;
   background: transparent;
 }
+.storage-card .storage-stat.used.traffic-ratio-tier-low span,
+.storage-card .storage-stat.used.traffic-ratio-tier-low b {
+  color: #15803d;
+}
+.storage-card .storage-stat.used.traffic-ratio-tier-mid span,
+.storage-card .storage-stat.used.traffic-ratio-tier-mid b {
+  color: #b45309;
+}
+.storage-card .storage-stat.used.traffic-ratio-tier-high span,
+.storage-card .storage-stat.used.traffic-ratio-tier-high b {
+  color: #b91c1c;
+}
 .storage-stat.free {
   border-color: transparent;
   background: transparent;
-}
-.storage-stat.free.storage-free-ok span,
-.storage-stat.free.storage-free-ok b {
-  color: #15803d;
-}
-.storage-stat.free.storage-free-warn span,
-.storage-stat.free.storage-free-warn b {
-  color: #b45309;
-}
-.storage-stat.free.storage-free-critical span,
-.storage-stat.free.storage-free-critical b {
-  color: #b91c1c;
 }
 .storage-legend {
   display: flex;
@@ -1143,6 +1330,12 @@ onUnmounted(() => {
   font-weight: 500;
   white-space: nowrap;
 }
+.throughput-card .traffic-cycle-note {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 500;
+}
 /* 本月流量吞吐：仅字体颜色层级，不改布局尺寸 */
 .throughput-card .traffic-lbl {
   color: #64748b;
@@ -1193,6 +1386,65 @@ onUnmounted(() => {
 }
 .throughput-card .thin-progress .thin-progress-fill.traffic-ratio-tier-high {
   background: linear-gradient(90deg, #dc2626, #ef4444);
+}
+/* 单限额时：环形仪表盘 + 右侧明细（配色与进度条档位一致） */
+.throughput-card .traffic-gauge-pct.traffic-ratio-tier-low {
+  color: #15803d;
+}
+.throughput-card .traffic-gauge-pct.traffic-ratio-tier-mid {
+  color: #b45309;
+}
+.throughput-card .traffic-gauge-pct.traffic-ratio-tier-high {
+  color: #b91c1c;
+}
+.throughput-card .traffic-gauge-stat-in span,
+.throughput-card .traffic-gauge-stat-in b {
+  color: #1d4ed8;
+}
+.throughput-card .traffic-gauge-stat-out span,
+.throughput-card .traffic-gauge-stat-out b {
+  color: #047857;
+}
+.throughput-card .traffic-gauge-stat-total span,
+.throughput-card .traffic-gauge-stat-total b {
+  color: #0f172a;
+  font-weight: 700;
+}
+.throughput-card .traffic-gauge-stat-limited {
+  align-items: flex-start;
+}
+.throughput-card .traffic-gauge-limited-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.throughput-card .traffic-gauge-limited-stack b {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.throughput-card .traffic-gauge-used-line {
+  font-size: 13px;
+  font-weight: 700;
+}
+.throughput-card .traffic-gauge-limit-line {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.88;
+}
+.throughput-card .traffic-gauge-stat-limited.traffic-ratio-tier-low .traffic-gauge-limited-stack b {
+  color: #15803d;
+}
+.throughput-card .traffic-gauge-stat-limited.traffic-ratio-tier-mid .traffic-gauge-limited-stack b {
+  color: #b45309;
+}
+.throughput-card .traffic-gauge-stat-limited.traffic-ratio-tier-high .traffic-gauge-limited-stack b {
+  color: #b91c1c;
 }
 .thin-progress,
 .wide-progress {

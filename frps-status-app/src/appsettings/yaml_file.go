@@ -43,6 +43,9 @@ limit_total_gb: 0
 initial_in_gb: 0
 initial_out_gb: 0
 
+# --- 流量统计计费周期起始日（1～31）；0 表示按部署日期自动 ---
+traffic_cycle_start_day: 0
+
 # --- 历史流量与代理状态等数据的保留天数（1～365，默认 60）---
 history_retention_days: 60
 
@@ -256,6 +259,9 @@ limit_total_gb: %s
 initial_in_gb: %s
 initial_out_gb: %s
 
+# --- 流量统计计费周期起始日（1～31）；0 表示按部署日期自动 ---
+traffic_cycle_start_day: %d
+
 # --- 历史流量与代理状态等数据的保留天数（1～365，默认 60）---
 history_retention_days: %d
 
@@ -285,6 +291,7 @@ alert_cert_days: %d
 		formatFloat(s.LimitTotalGB),
 		formatFloat(s.InitialInGB),
 		formatFloat(s.InitialOutGB),
+		s.TrafficCycleStartDay,
 		s.HistoryRetentionDays,
 		s.DiskFreeSpaceAlertThresholdMB,
 		s.SMTPEnabled,

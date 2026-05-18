@@ -5,7 +5,7 @@
       <header class="policy-head">
         <div>
           <h3 id="policy-title">流量与告警策略</h3>
-          <p>统一配置流量阈值、限额规则与事件告警策略</p>
+          <p class="policy-sub">统一配置流量阈值、限额规则与事件告警策略 · 部署日期 <b>{{ form.deploy_date || '-' }}</b></p>
         </div>
         <button class="close-btn" type="button" @click="$emit('close')">×</button>
       </header>
@@ -54,23 +54,23 @@
         </div>
 
         <div class="group">
-          <h4>首月初始流量</h4>
+          <h4>计费周期与初始流量</h4>
           <div class="grid initial-grid">
+            <label>
+              <span>流量统计起始日</span>
+              <input v-model.number="form.traffic_cycle_start_day" type="number" min="0" max="31" step="1" />
+              <small>1-31；0 表示按部署日期自动生成</small>
+            </label>
             <label>
               <span>初始入站流量 (GB)</span>
               <input v-model.number="form.initial_in_gb" type="number" min="0" step="0.1" />
-              <small>仅部署月份计入统计</small>
+              <small>仅首个计费周期计入统计</small>
             </label>
             <label>
               <span>初始出站流量 (GB)</span>
               <input v-model.number="form.initial_out_gb" type="number" min="0" step="0.1" />
-              <small>次月自动不再叠加</small>
+              <small>下一周期自动不再叠加</small>
             </label>
-            <div class="deploy-note">
-              <span>部署日期</span>
-              <b>{{ form.deploy_date || '-' }}</b>
-              <small>根据数据库初始化日期自动生成</small>
-            </div>
           </div>
         </div>
 
@@ -134,6 +134,8 @@ function toggle(key) {
 .policy-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 18px 22px 12px; border-bottom: 1px solid #edf2fb; }
 .policy-head h3 { margin: 0; font-size: var(--fs-modal-title); line-height: var(--lh-title); font-weight: var(--fw-title); color: #0f172a; }
 .policy-head p { margin: 6px 0 0; color: #64748b; font-size: var(--fs-body); }
+.policy-sub b { color: #0f172a; font-weight: 650; }
+.policy-deploy-hint { color: #94a3b8; }
 .close-btn { width: 34px; height: 34px; border: 1px solid #d3deef; border-radius: 8px; background: #fff; color: #334155; font-size: 24px; line-height: 1; cursor: pointer; }
 .policy-body { padding: 16px 22px 14px; overflow-y: auto; display: grid; gap: 14px; }
 .group { border-top: 1px solid #edf2fb; padding-top: 14px; }
@@ -144,10 +146,6 @@ function toggle(key) {
 .grid span { color: #334155; font-size: var(--fs-body); font-weight: var(--fw-medium); }
 .grid input { height: 36px; border: 1px solid #d7e1ef; border-radius: 8px; padding: 0 12px; font-size: var(--fs-base); color: #0f172a; font-weight: var(--fw-medium); }
 .grid small { color: #64748b; font-size: var(--fs-caption); }
-.deploy-note { min-height: 36px; border: 1px solid #e5ecf8; border-radius: 8px; padding: 8px 10px; display: grid; gap: 4px; background: #f8fbff; }
-.deploy-note span { color: #334155; font-size: var(--fs-body); font-weight: var(--fw-medium); }
-.deploy-note b { color: #0f172a; font-size: var(--fs-base); }
-.deploy-note small { color: #64748b; font-size: var(--fs-caption); }
 .events { display: grid; gap: 10px; }
 .event-item { border: 1px solid #e5ecf8; border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .event-item b { display: block; font-size: var(--fs-base); color: #0f172a; }

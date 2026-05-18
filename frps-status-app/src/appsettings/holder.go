@@ -8,11 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"frps-status-app.local/status/src/billingcycle"
 	"frps-status-app.local/status/src/model"
 	"frps-status-app.local/status/src/store"
 )
 
-// state 为进程内可变应用配置（与 model.PublicSettings 对齐，并含 smtp_verified）。
+// state 为进程内可变应用配置（与 model.PublicSettings 对齐）。
 type state struct {
 	DeployDate                    string
 	ThresholdInGB                 float64
@@ -23,6 +24,7 @@ type state struct {
 	LimitTotalGB                  float64
 	InitialInGB                   float64
 	InitialOutGB                  float64
+	TrafficCycleStartDay          int
 	HistoryRetentionDays          int
 	DiskFreeSpaceAlertThresholdMB uint64
 	SMTPHost                      string
@@ -32,7 +34,6 @@ type state struct {
 	SMTPTo                        string
 	SMTPEnabled                   bool
 	SMTPAuthCode                  string
-	SMTPVerified                  bool
 	AlertProxyOffline             bool
 	AlertCertExpiry               bool
 	AlertCertDays                 int
@@ -63,6 +64,9 @@ func (s *state) normalize() {
 	if s.SMTPPort < 1 || s.SMTPPort > 65535 {
 		s.SMTPPort = 465
 	}
+	if s.TrafficCycleStartDay < 0 || s.TrafficCycleStartDay > 31 {
+		s.TrafficCycleStartDay = 0
+	}
 }
 
 func (s state) toPublic() model.PublicSettings {
@@ -76,6 +80,7 @@ func (s state) toPublic() model.PublicSettings {
 		LimitTotalGB:                  s.LimitTotalGB,
 		InitialInGB:                   s.InitialInGB,
 		InitialOutGB:                  s.InitialOutGB,
+		TrafficCycleStartDay:          s.TrafficCycleStartDay,
 		HistoryRetentionDays:          s.HistoryRetentionDays,
 		DiskFreeSpaceAlertThresholdMB: s.DiskFreeSpaceAlertThresholdMB,
 		SMTPHost:                      s.SMTPHost,
@@ -115,7 +120,7 @@ func parseDiskAlertThresholdMB(v string) uint64 {
 	return uint64(f + 0.5)
 }
 
-// Manager 线程安全的进程内应用配置（内置默认值，不写库、不写文件；重启后恢复默认）。
+// Manager 线程安全的进程内应用配置（从 /config/app-settings.yaml 加载）。
 // 部署日期 DeployDate 仅来自数据库 app_meta，与 DB 文件生命周期一致。
 type Manager struct {
 	mu   sync.RWMutex
@@ -142,26 +147,14 @@ func (m *Manager) PublicSettings() model.PublicSettings {
 	if strings.TrimSpace(out.DeployDate) == "" {
 		out.DeployDate = time.Now().Format("2006-01-02")
 	}
+	billingcycle.EnrichSettings(&out, time.Now())
 	return out
-}
-
-func (m *Manager) SMTPVerified() bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.data.SMTPVerified
 }
 
 func (m *Manager) SetDiskFreeSpaceAlertThresholdMB(mb uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.data.DiskFreeSpaceAlertThresholdMB = mb
-	m.data.normalize()
-}
-
-func (m *Manager) SetSMTPVerified(v bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.data.SMTPVerified = v
 	m.data.normalize()
 }
 
@@ -172,21 +165,27 @@ func (m *Manager) SetHistoryRetentionDays(days int) {
 	m.data.normalize()
 }
 
-// ApplyPOST 合并前端 POST 的字段，并更新进程内配置。
-func (m *Manager) ApplyPOST(in map[string]any) (smtpChanged bool) {
-	smtpKeys := map[string]bool{
-		"smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true,
-		"smtp_from": true, "smtp_to": true, "smtp_enabled": true,
+type smtpCredTuple struct {
+	host, user, auth, from, to string
+	port                       int
+	enabled                    bool
+}
+
+func snapSMTPCreds(d *state) smtpCredTuple {
+	return smtpCredTuple{
+		host: d.SMTPHost, user: d.SMTPUser, auth: d.SMTPAuthCode,
+		from: d.SMTPFrom, to: d.SMTPTo, port: d.SMTPPort, enabled: d.SMTPEnabled,
 	}
-	for k := range in {
-		if smtpKeys[k] {
-			smtpChanged = true
-			break
-		}
-	}
+}
+
+// ApplyPOST 合并前端 POST 或 YAML 解析的字段，并更新进程内配置。
+// 返回值 smtpCredChanged 表示 SMTP 连接参数（主机/端口/账号/授权码/收发件/开关）是否与合并前不同。
+func (m *Manager) ApplyPOST(in map[string]any) (smtpCredChanged bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	d := &m.data
+	before := snapSMTPCreds(d)
+
 	for key, value := range in {
 		s := fmt.Sprint(value)
 		switch key {
@@ -206,6 +205,8 @@ func (m *Manager) ApplyPOST(in map[string]any) (smtpChanged bool) {
 			d.InitialInGB = parseFloat(s)
 		case "initial_out_gb":
 			d.InitialOutGB = parseFloat(s)
+		case "traffic_cycle_start_day":
+			d.TrafficCycleStartDay = int(parseFloatDefault(s, 0))
 		case "history_retention_days":
 			d.HistoryRetentionDays = int(parseFloatDefault(s, 60))
 		case "disk_free_space_alert_threshold_mb":
@@ -233,9 +234,8 @@ func (m *Manager) ApplyPOST(in map[string]any) (smtpChanged bool) {
 		default:
 		}
 	}
-	if smtpChanged {
-		d.SMTPVerified = false
-	}
+	after := snapSMTPCreds(d)
+	smtpCredChanged = before != after
 	d.normalize()
-	return smtpChanged
+	return smtpCredChanged
 }

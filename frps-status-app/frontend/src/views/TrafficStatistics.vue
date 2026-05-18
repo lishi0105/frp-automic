@@ -29,7 +29,7 @@
         <div class="analytics-filter-grid traffic-filter-grid">
           <input class="form-input" type="date" v-model="startDate" />
           <input class="form-input" type="date" v-model="endDate" />
-          <button class="btn btn-outline btn-sm" @click="quickThisMonth">本月</button>
+          <button class="btn btn-outline btn-sm" @click="quickThisCycle">{{ cycleQuickLabel }}</button>
           <button class="btn btn-outline btn-sm" @click="fetchRows">查询</button>
         </div>
       </section>
@@ -86,6 +86,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { api } from '../api/index.js'
+import { trafficCycleRangeFromSettings } from '../utils/trafficCycle.js'
 
 const chartEl = ref(null)
 let chart = null
@@ -100,6 +101,13 @@ const sortDir = ref('desc')
 
 const startDate = ref('')
 const endDate = ref('')
+const cycleSettings = ref(null)
+
+const cycleQuickLabel = computed(() => {
+  const startDay = Number(cycleSettings.value?.traffic_cycle_effective_start_day) ||
+    trafficCycleRangeFromSettings(cycleSettings.value).startDay
+  return startDay === 1 ? '本月' : '本周期'
+})
 
 function formatDate(d) {
   const y = d.getFullYear()
@@ -108,10 +116,18 @@ function formatDate(d) {
   return `${y}-${m}-${day}`
 }
 
-function quickThisMonth() {
-  const now = new Date()
-  startDate.value = formatDate(new Date(now.getFullYear(), now.getMonth(), 1))
-  endDate.value = formatDate(now)
+function quickThisCycle() {
+  const range = trafficCycleRangeFromSettings(cycleSettings.value)
+  startDate.value = range.from
+  endDate.value = range.to
+}
+
+async function loadCycleSettings() {
+  try {
+    cycleSettings.value = await api.getSettings()
+  } catch {
+    cycleSettings.value = null
+  }
 }
 
 function humanBytesKB(kb) {
@@ -230,7 +246,8 @@ watch(filteredRows, () => { page.value = 1; buildChart() })
 const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => chart?.resize()) : null
 
 onMounted(async () => {
-  quickThisMonth()
+  await loadCycleSettings()
+  quickThisCycle()
   await fetchHostNetwork()
   await fetchRows()
   await nextTick()

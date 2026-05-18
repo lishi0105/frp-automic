@@ -134,6 +134,9 @@ func (c *Client) FetchProxies(ctx context.Context) ([]model.ProxyTraffic, error)
 			lastErr = err
 			continue
 		}
+		if len(items) == 0 {
+			continue
+		}
 		logger.Info("获取代理类型成功 类型=%s 数量=%d", typ, len(items))
 		all = append(all, items...)
 	}
