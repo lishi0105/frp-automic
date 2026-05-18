@@ -73,21 +73,33 @@
                 :class="trafficSingleLimitAxis === 'in' ? ['traffic-gauge-stat-limited', trafficGaugeTierClass] : 'traffic-gauge-stat-in'"
               >
                 <span>入站</span>
-                <b>{{ trafficSingleLimitAxis === 'in' ? trafficGaugeLimitedValueDisplay : humanBytesKB(ifaceMonthInKB) }}</b>
+                <div v-if="trafficSingleLimitAxis === 'in'" class="traffic-gauge-limited-stack">
+                  <b class="traffic-gauge-used-line">{{ trafficGaugeLimitedUsedDisplay }}</b>
+                  <b class="traffic-gauge-limit-line">{{ trafficGaugeLimitedLimitDisplay }}</b>
+                </div>
+                <b v-else>{{ humanBytesKB(ifaceMonthInKB) }}</b>
               </div>
               <div
                 class="storage-stat used"
                 :class="trafficSingleLimitAxis === 'out' ? ['traffic-gauge-stat-limited', trafficGaugeTierClass] : 'traffic-gauge-stat-out'"
               >
                 <span>出站</span>
-                <b>{{ trafficSingleLimitAxis === 'out' ? trafficGaugeLimitedValueDisplay : humanBytesKB(ifaceMonthOutKB) }}</b>
+                <div v-if="trafficSingleLimitAxis === 'out'" class="traffic-gauge-limited-stack">
+                  <b class="traffic-gauge-used-line">{{ trafficGaugeLimitedUsedDisplay }}</b>
+                  <b class="traffic-gauge-limit-line">{{ trafficGaugeLimitedLimitDisplay }}</b>
+                </div>
+                <b v-else>{{ humanBytesKB(ifaceMonthOutKB) }}</b>
               </div>
               <div
                 class="storage-stat used"
                 :class="trafficSingleLimitAxis === 'total' ? ['traffic-gauge-stat-limited', trafficGaugeTierClass] : 'traffic-gauge-stat-total'"
               >
                 <span>总量</span>
-                <b>{{ trafficSingleLimitAxis === 'total' ? trafficGaugeLimitedValueDisplay : humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }}</b>
+                <div v-if="trafficSingleLimitAxis === 'total'" class="traffic-gauge-limited-stack">
+                  <b class="traffic-gauge-used-line">{{ trafficGaugeLimitedUsedDisplay }}</b>
+                  <b class="traffic-gauge-limit-line">{{ trafficGaugeLimitedLimitDisplay }}</b>
+                </div>
+                <b v-else>{{ humanBytesKB(ifaceMonthInKB + ifaceMonthOutKB) }}</b>
               </div>
             </div>
           </div>
@@ -379,9 +391,8 @@ const trafficGaugePct = computed(() => {
 })
 const trafficGaugeTierClass = computed(() => trafficRatioTierClass(trafficGaugePct.value, true))
 const trafficGaugeCenterSub = computed(() => '已用')
-const trafficGaugeLimitedValueDisplay = computed(() => {
-  const ax = trafficSingleLimitAxis.value
-  if (!ax) return '-'
+function trafficGaugeLimitedParts(ax) {
+  if (!ax) return { used: '-', limit: '-' }
   const usedKB = ax === 'in'
     ? ifaceMonthInKB.value
     : ax === 'out'
@@ -391,8 +402,10 @@ const trafficGaugeLimitedValueDisplay = computed(() => {
   const usedText = humanBytes(Number(usedKB || 0) * 1024).replace(/\s+/g, '')
   const n = Number(limitGB)
   const limitText = `${Number.isInteger(n) ? n : n.toFixed(2)}GB`
-  return `${usedText}/${limitText}`
-})
+  return { used: usedText, limit: limitText }
+}
+const trafficGaugeLimitedUsedDisplay = computed(() => trafficGaugeLimitedParts(trafficSingleLimitAxis.value).used)
+const trafficGaugeLimitedLimitDisplay = computed(() => trafficGaugeLimitedParts(trafficSingleLimitAxis.value).limit)
 const runDays = computed(() => {
   const raw = props.status?.settings?.deploy_date
   if (!raw) return '-'
@@ -1397,21 +1410,40 @@ onUnmounted(() => {
   color: #0f172a;
   font-weight: 700;
 }
-.throughput-card .traffic-gauge-stat-limited span,
-.throughput-card .traffic-gauge-stat-limited b {
+.throughput-card .traffic-gauge-stat-limited {
+  align-items: flex-start;
+}
+.throughput-card .traffic-gauge-limited-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.throughput-card .traffic-gauge-limited-stack b {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.throughput-card .traffic-gauge-used-line {
   font-size: 13px;
   font-weight: 700;
 }
-.throughput-card .traffic-gauge-stat-limited.traffic-ratio-tier-low span,
-.throughput-card .traffic-gauge-stat-limited.traffic-ratio-tier-low b {
+.throughput-card .traffic-gauge-limit-line {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.88;
+}
+.throughput-card .traffic-gauge-stat-limited.traffic-ratio-tier-low .traffic-gauge-limited-stack b {
   color: #15803d;
 }
-.throughput-card .traffic-gauge-stat-limited.traffic-ratio-tier-mid span,
-.throughput-card .traffic-gauge-stat-limited.traffic-ratio-tier-mid b {
+.throughput-card .traffic-gauge-stat-limited.traffic-ratio-tier-mid .traffic-gauge-limited-stack b {
   color: #b45309;
 }
-.throughput-card .traffic-gauge-stat-limited.traffic-ratio-tier-high span,
-.throughput-card .traffic-gauge-stat-limited.traffic-ratio-tier-high b {
+.throughput-card .traffic-gauge-stat-limited.traffic-ratio-tier-high .traffic-gauge-limited-stack b {
   color: #b91c1c;
 }
 .thin-progress,
