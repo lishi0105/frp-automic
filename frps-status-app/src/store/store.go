@@ -547,6 +547,12 @@ func (s *Store) MonthTotalForProxy(name, typ, month string) (uint64, uint64, err
 	return uint64(clampZero(in)), uint64(clampZero(out)), logStoreErr("query month total for proxy "+typ+"/"+name, err)
 }
 
+func (s *Store) TotalForProxyBetween(name, typ, fromDay, toDay string) (uint64, uint64, error) {
+	var in, out int64
+	err := s.db.QueryRow(`SELECT COALESCE(SUM(in_bytes),0), COALESCE(SUM(out_bytes),0) FROM daily_traffic WHERE proxy_name=? AND proxy_type=? AND day >= ? AND day <= ?`, name, typ, fromDay, toDay).Scan(&in, &out)
+	return uint64(clampZero(in)), uint64(clampZero(out)), logStoreErr("query proxy totals between "+fromDay+" and "+toDay+" "+typ+"/"+name, err)
+}
+
 func (s *Store) GetEventState(key string) (EventState, error) {
 	var st EventState
 	var active int
@@ -911,6 +917,12 @@ func (s *Store) MonthInterfaceTotals(month string) (uint64, uint64, error) {
 	var rxKB, txKB int64
 	err := s.db.QueryRow(`SELECT COALESCE(SUM(rx_kb),0), COALESCE(SUM(tx_kb),0) FROM daily_iface_traffic WHERE day LIKE ?`, month+"-%").Scan(&rxKB, &txKB)
 	return uint64(clampZero(rxKB)) * 1024, uint64(clampZero(txKB)) * 1024, logStoreErr("query month iface totals "+month, err)
+}
+
+func (s *Store) InterfaceTotalsBetween(fromDay, toDay string) (uint64, uint64, error) {
+	var rxKB, txKB int64
+	err := s.db.QueryRow(`SELECT COALESCE(SUM(rx_kb),0), COALESCE(SUM(tx_kb),0) FROM daily_iface_traffic WHERE day >= ? AND day <= ?`, fromDay, toDay).Scan(&rxKB, &txKB)
+	return uint64(clampZero(rxKB)) * 1024, uint64(clampZero(txKB)) * 1024, logStoreErr("query iface totals between "+fromDay+" and "+toDay, err)
 }
 
 func deltaCounter(old, current uint64) uint64 {

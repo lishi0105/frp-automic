@@ -177,6 +177,7 @@ const form = reactive({
   limit_total_gb: 0,
   initial_in_gb: 0,
   initial_out_gb: 0,
+  traffic_cycle_start_day: 0,
   deploy_date: '',
   alert_proxy_offline: 'false',
   alert_cert_expiry: 'false',
@@ -219,6 +220,7 @@ function fillForm(s) {
   form.limit_total_gb = s.limit_total_gb || 0
   form.initial_in_gb = s.initial_in_gb || 0
   form.initial_out_gb = s.initial_out_gb || 0
+  form.traffic_cycle_start_day = Number(s.traffic_cycle_start_day) || 0
   form.deploy_date = s.deploy_date || ''
   form.alert_proxy_offline = s.alert_proxy_offline ? 'true' : 'false'
   form.alert_cert_expiry = s.alert_cert_expiry ? 'true' : 'false'
@@ -361,6 +363,7 @@ async function savePolicy() {
       limit_total_gb: form.limit_total_gb,
       initial_in_gb: form.initial_in_gb,
       initial_out_gb: form.initial_out_gb,
+      traffic_cycle_start_day: form.traffic_cycle_start_day,
       alert_proxy_offline: form.alert_proxy_offline,
       alert_cert_expiry: form.alert_cert_expiry,
       alert_cert_days: form.alert_cert_days

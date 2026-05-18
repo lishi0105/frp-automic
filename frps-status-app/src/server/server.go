@@ -140,16 +140,17 @@ func (a *App) Refresh(ctx context.Context) error {
 	} else {
 		logger.Warn("获取 FRPS 代理列表失败: %v", fetchErr)
 	}
-	month := time.Now().Format("2006-01")
+	settings := a.appcfg.PublicSettings()
+	cycleFrom := settings.TrafficCycleFrom
+	cycleTo := settings.TrafficCycleTo
 	for i := range proxies {
-		in, out, _ := a.store.MonthTotalForProxy(proxies[i].Name, proxies[i].Type, month)
+		in, out, _ := a.store.TotalForProxyBetween(proxies[i].Name, proxies[i].Type, cycleFrom, cycleTo)
 		proxies[i].MonthIn = in
 		proxies[i].MonthOut = out
 	}
-	settings := a.appcfg.PublicSettings()
 	a.collectInterfaceTraffic()
-	monthIn, monthOut, _ := a.store.MonthInterfaceTotals(month)
-	monthIn, monthOut = applyInitialTrafficToMonth(settings, month, monthIn, monthOut)
+	monthIn, monthOut, _ := a.store.InterfaceTotalsBetween(cycleFrom, cycleTo)
+	monthIn, monthOut = applyInitialTrafficToCycle(settings, cycleFrom, cycleTo, monthIn, monthOut)
 	certs := frps.Certificates(a.cfg.CertDir, a.cfg.Domains)
 	inferProxyCertificateDomains(proxies, certs)
 	if fetchErr == nil {
@@ -174,7 +175,7 @@ func (a *App) Refresh(ctx context.Context) error {
 		ProxyFetchError: proxyFetchError,
 		Proxies:         proxies,
 		Certificates:    certs,
-		Traffic:         monitor.BuildTrafficResult(settings, month, monthIn, monthOut),
+		Traffic:         monitor.BuildTrafficResult(settings, cycleFrom, monthIn, monthOut),
 		CertThreshold:   certThreshold,
 	})
 	a.syncTrafficWarnings(settings, monthIn, monthOut)
@@ -1218,8 +1219,8 @@ func compareUint64(a, b uint64) int {
 	}
 }
 
-func applyInitialTrafficToMonth(settings model.PublicSettings, month string, inBytes, outBytes uint64) (uint64, uint64) {
-	if !initialTrafficApplies(settings, month) {
+func applyInitialTrafficToCycle(settings model.PublicSettings, cycleFrom, cycleTo string, inBytes, outBytes uint64) (uint64, uint64) {
+	if !initialTrafficApplies(settings, cycleFrom, cycleTo) {
 		return inBytes, outBytes
 	}
 	return inBytes + mail.GBToBytes(settings.InitialInGB), outBytes + mail.GBToBytes(settings.InitialOutGB)
@@ -1268,9 +1269,12 @@ func applyInitialTrafficToDailyRows(settings model.PublicSettings, rows []map[st
 	return rows
 }
 
-func initialTrafficApplies(settings model.PublicSettings, month string) bool {
+func initialTrafficApplies(settings model.PublicSettings, cycleFrom, cycleTo string) bool {
 	deployDay := strings.TrimSpace(settings.DeployDate)
-	return len(deployDay) >= 7 && deployDay[:7] == month && (settings.InitialInGB > 0 || settings.InitialOutGB > 0)
+	if len(deployDay) != 10 || (settings.InitialInGB <= 0 && settings.InitialOutGB <= 0) {
+		return false
+	}
+	return deployDay >= cycleFrom && deployDay <= cycleTo
 }
 
 func dateInRange(day, fromDay, toDay string) bool {
@@ -1399,7 +1403,7 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		allowed := map[string]bool{"threshold_in_gb": true, "threshold_out_gb": true, "threshold_total_gb": true, "limit_in_gb": true, "limit_out_gb": true, "limit_total_gb": true, "initial_in_gb": true, "initial_out_gb": true, "history_retention_days": true, "disk_free_space_alert_threshold_mb": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true, "alert_proxy_offline": true, "alert_cert_expiry": true, "alert_cert_days": true}
+		allowed := map[string]bool{"threshold_in_gb": true, "threshold_out_gb": true, "threshold_total_gb": true, "limit_in_gb": true, "limit_out_gb": true, "limit_total_gb": true, "initial_in_gb": true, "initial_out_gb": true, "traffic_cycle_start_day": true, "history_retention_days": true, "disk_free_space_alert_threshold_mb": true, "smtp_host": true, "smtp_port": true, "smtp_user": true, "smtp_auth_code": true, "smtp_from": true, "smtp_to": true, "smtp_enabled": true, "alert_proxy_offline": true, "alert_cert_expiry": true, "alert_cert_days": true}
 		filtered := make(map[string]any)
 		for key, value := range in {
 			if !allowed[key] {
@@ -1408,18 +1412,20 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 			}
 			filtered[key] = value
 		}
-		smtpChanged := a.appcfg.ApplyPOST(filtered)
+		smtpCredChanged := a.appcfg.ApplyPOST(filtered)
 		if err := appsettings.SaveAppSettings(a.appcfg); err != nil {
 			logger.Error("设置写入配置文件失败 路径=%s 错误=%v", appsettings.AppSettingsYAMLPath, err)
 			http.Error(w, "settings saved in memory but failed to write config file: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if smtpChanged {
-			logger.Info("SMTP 配置已变更，验证状态已重置")
+		if smtpCredChanged {
+			logger.Info("SMTP 连接参数已变更，已更新数据库中的 SMTP 相关告警")
 		}
 		settings := a.appcfg.PublicSettings()
-		a.syncSMTPWarnings(settings)
-		logger.Info("设置已保存 项数=%d SMTP已变更=%t", len(in), smtpChanged)
+		if smtpCredChanged {
+			a.applySMTPWarningsAfterSMTPCredChange(settings)
+		}
+		logger.Info("设置已保存 项数=%d SMTP连接参数已变更=%t", len(in), smtpCredChanged)
 		writeJSON(w, settings)
 	default:
 		logger.Warn("设置请求被拒绝：请求方法不允许 方法=%s", r.Method)
@@ -1439,9 +1445,8 @@ func (a *App) handleTestEmail(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
-	a.appcfg.SetSMTPVerified(true)
-	settings = a.appcfg.PublicSettings()
-	a.syncSMTPWarnings(settings)
+	_ = a.store.ClearWarning("smtp_not_verified")
+	_ = a.store.ClearWarning("smtp_not_configured")
 	logger.Info("测试邮件已发送 收件人=%s", settings.SMTPTo)
 	writeJSON(w, map[string]any{"ok": true})
 }
@@ -1629,26 +1634,34 @@ func validateUsername(username string) error {
 
 func (a *App) InitWarnings() {
 	settings := a.appcfg.PublicSettings()
-	a.syncSMTPWarnings(settings)
+	a.applySMTPWarningsOnStartup(settings)
 	a.syncRecoveryEmailWarning()
 }
 
-func (a *App) syncSMTPWarnings(settings model.PublicSettings) {
-	configured := settings.SMTPHost != "" && settings.SMTPFrom != "" &&
+func smtpFullyConfigured(settings model.PublicSettings) bool {
+	return settings.SMTPHost != "" && settings.SMTPFrom != "" &&
 		settings.SMTPTo != "" && settings.SMTPAuthCode != ""
-	verified := a.appcfg.SMTPVerified()
-	if !configured {
+}
+
+// applySMTPWarningsOnStartup 启动时仅根据「是否已配齐 SMTP」维护未配置告警；不根据任何内存标志追加「未验证」行（消除后不应因重启再现）。
+func (a *App) applySMTPWarningsOnStartup(settings model.PublicSettings) {
+	if !smtpFullyConfigured(settings) {
 		_ = a.store.SetWarning("smtp_not_configured", "SMTP 邮件未配置，将无法收到任何告警通知")
 		_ = a.store.ClearWarning("smtp_not_verified")
 		return
 	}
-	if !verified {
-		_ = a.store.SetWarning("smtp_not_configured", "SMTP 邮件尚未验证，请在“配置邮件”中发送测试邮件完成验证")
-		_ = a.store.SetWarning("smtp_not_verified", "SMTP 邮件配置未验证，请发送测试邮件确认配置正确")
+	_ = a.store.ClearWarning("smtp_not_configured")
+}
+
+// applySMTPWarningsAfterSMTPCredChange 在 SMTP 连接参数（主机/端口/账号/授权码/收发件/开关）实际变更后写入告警表：未配齐则写 smtp_not_configured；配齐则清该项并写入 smtp_not_verified 要求重新测试。
+func (a *App) applySMTPWarningsAfterSMTPCredChange(settings model.PublicSettings) {
+	if !smtpFullyConfigured(settings) {
+		_ = a.store.SetWarning("smtp_not_configured", "SMTP 邮件未配置，将无法收到任何告警通知")
+		_ = a.store.ClearWarning("smtp_not_verified")
 		return
 	}
 	_ = a.store.ClearWarning("smtp_not_configured")
-	_ = a.store.ClearWarning("smtp_not_verified")
+	_ = a.store.SetWarning("smtp_not_verified", "SMTP 邮件配置未验证，请发送测试邮件确认配置正确")
 }
 
 func (a *App) syncRecoveryEmailWarning() {

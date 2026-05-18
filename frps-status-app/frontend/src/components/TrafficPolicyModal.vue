@@ -54,17 +54,22 @@
         </div>
 
         <div class="group">
-          <h4>首月初始流量</h4>
+          <h4>计费周期与初始流量</h4>
           <div class="grid initial-grid">
+            <label>
+              <span>流量统计起始日</span>
+              <input v-model.number="form.traffic_cycle_start_day" type="number" min="0" max="31" step="1" />
+              <small>1-31；0 表示按部署日期自动（如 5 号购机则每月 5 日起算）</small>
+            </label>
             <label>
               <span>初始入站流量 (GB)</span>
               <input v-model.number="form.initial_in_gb" type="number" min="0" step="0.1" />
-              <small>仅部署月份计入统计</small>
+              <small>仅首个计费周期计入统计</small>
             </label>
             <label>
               <span>初始出站流量 (GB)</span>
               <input v-model.number="form.initial_out_gb" type="number" min="0" step="0.1" />
-              <small>次月自动不再叠加</small>
+              <small>下一周期自动不再叠加</small>
             </label>
             <div class="deploy-note">
               <span>部署日期</span>
