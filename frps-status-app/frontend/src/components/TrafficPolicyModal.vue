@@ -5,8 +5,7 @@
       <header class="policy-head">
         <div>
           <h3 id="policy-title">流量与告警策略</h3>
-          <p>统一配置流量阈值、限额规则与事件告警策略</p>
-          <p class="policy-deploy-date">部署日期 <b>{{ form.deploy_date || '-' }}</b><span>（数据库初始化日期，自动生成）</span></p>
+          <p class="policy-sub">统一配置流量阈值、限额规则与事件告警策略 · 部署日期 <b>{{ form.deploy_date || '-' }}</b></p>
         </div>
         <button class="close-btn" type="button" @click="$emit('close')">×</button>
       </header>
@@ -135,9 +134,8 @@ function toggle(key) {
 .policy-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 18px 22px 12px; border-bottom: 1px solid #edf2fb; }
 .policy-head h3 { margin: 0; font-size: var(--fs-modal-title); line-height: var(--lh-title); font-weight: var(--fw-title); color: #0f172a; }
 .policy-head p { margin: 6px 0 0; color: #64748b; font-size: var(--fs-body); }
-.policy-deploy-date { margin-top: 8px !important; font-size: var(--fs-caption) !important; }
-.policy-deploy-date b { color: #0f172a; font-weight: 650; }
-.policy-deploy-date span { color: #94a3b8; margin-left: 4px; }
+.policy-sub b { color: #0f172a; font-weight: 650; }
+.policy-deploy-hint { color: #94a3b8; }
 .close-btn { width: 34px; height: 34px; border: 1px solid #d3deef; border-radius: 8px; background: #fff; color: #334155; font-size: 24px; line-height: 1; cursor: pointer; }
 .policy-body { padding: 16px 22px 14px; overflow-y: auto; display: grid; gap: 14px; }
 .group { border-top: 1px solid #edf2fb; padding-top: 14px; }
