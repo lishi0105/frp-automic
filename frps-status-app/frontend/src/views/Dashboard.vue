@@ -266,7 +266,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { humanBytes, percent } from '../utils/format.js'
-import { trafficCycleRangeFromSettings } from '../utils/trafficCycle.js'
+import { trafficCycleRangeFromSettings, topProxiesFromDaily } from '../utils/trafficCycle.js'
 import { api } from '../api/index.js'
 
 const props = defineProps({ status: Object, daily: Array, loading: Boolean })
@@ -425,12 +425,19 @@ const httpProxyCount = computed(() => proxies.value.filter(p => String(p.type ||
 const currentProxyConnections = computed(() => proxies.value.reduce((sum, p) => sum + Number(p.cur_conns || 0), 0))
 
 const topProxies = computed(() => {
-  const fromBackend = props.status?.dashboard?.top_proxies
-  if (Array.isArray(fromBackend) && fromBackend.length) return fromBackend
-  return [...proxies.value]
+  const from = trafficCycleFrom.value
+  const to = trafficCycleTo.value
+  const fromDaily = topProxiesFromDaily(props.daily, from, to, 5)
+  if (fromDaily.some(p => p.total > 0)) return fromDaily
+  const fromProxies = [...proxies.value]
     .map(p => ({ name: p.name, type: p.type, month_in: Number(p.month_in || 0), month_out: Number(p.month_out || 0), total: Number(p.month_in || 0) + Number(p.month_out || 0) }))
+    .filter(p => p.total > 0)
     .sort((a, b) => b.total - a.total)
     .slice(0, 5)
+  if (fromProxies.length) return fromProxies
+  const fromBackend = props.status?.dashboard?.top_proxies
+  if (Array.isArray(fromBackend) && fromBackend.length) return fromBackend
+  return topProxiesFromDaily(props.daily, from, to, 5)
 })
 
 const logLevelOptions = [

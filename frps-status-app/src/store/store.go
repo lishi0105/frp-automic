@@ -516,6 +516,13 @@ func (s *Store) RecordTraffic(proxies []model.ProxyTraffic) error {
 			if err != nil {
 				return logStoreErr("insert proxy counter "+p.Type+"/"+p.Name, err)
 			}
+			if p.CurrentIn > 0 || p.CurrentOut > 0 {
+				_, err = tx.Exec(`INSERT INTO daily_traffic(id,day,proxy_name,proxy_type,in_bytes,out_bytes,peak_conns) VALUES(?,?,?,?,?,?,?)
+ON CONFLICT(day,proxy_name,proxy_type) DO UPDATE SET in_bytes=in_bytes+excluded.in_bytes,out_bytes=out_bytes+excluded.out_bytes,peak_conns=MAX(daily_traffic.peak_conns,excluded.peak_conns)`, uuid.NewString(), day, p.Name, p.Type, p.CurrentIn, p.CurrentOut, p.CurConns)
+				if err != nil {
+					return logStoreErr("seed daily traffic "+p.Type+"/"+p.Name, err)
+				}
+			}
 			continue
 		}
 		if err != nil {
@@ -551,6 +558,34 @@ func (s *Store) TotalForProxyBetween(name, typ, fromDay, toDay string) (uint64, 
 	var in, out int64
 	err := s.db.QueryRow(`SELECT COALESCE(SUM(in_bytes),0), COALESCE(SUM(out_bytes),0) FROM daily_traffic WHERE proxy_name=? AND proxy_type=? AND day >= ? AND day <= ?`, name, typ, fromDay, toDay).Scan(&in, &out)
 	return uint64(clampZero(in)), uint64(clampZero(out)), logStoreErr("query proxy totals between "+fromDay+" and "+toDay+" "+typ+"/"+name, err)
+}
+
+func (s *Store) TopProxiesBetween(fromDay, toDay string, limit int) ([]model.DashboardTopProxy, error) {
+	if limit <= 0 {
+		limit = 5
+	}
+	rows, err := s.db.Query(`SELECT proxy_name, proxy_type, COALESCE(SUM(in_bytes),0), COALESCE(SUM(out_bytes),0)
+FROM daily_traffic WHERE day >= ? AND day <= ?
+GROUP BY proxy_name, proxy_type
+ORDER BY (COALESCE(SUM(in_bytes),0)+COALESCE(SUM(out_bytes),0)) DESC, proxy_name
+LIMIT ?`, fromDay, toDay, limit)
+	if err != nil {
+		return nil, logStoreErr("query top proxies between "+fromDay+" and "+toDay, err)
+	}
+	defer rows.Close()
+	var out []model.DashboardTopProxy
+	for rows.Next() {
+		var name, typ string
+		var in, outBytes int64
+		if err := rows.Scan(&name, &typ, &in, &outBytes); err != nil {
+			return nil, logStoreErr("scan top proxy row", err)
+		}
+		inU, outU := uint64(clampZero(in)), uint64(clampZero(outBytes))
+		out = append(out, model.DashboardTopProxy{
+			Name: name, Type: typ, MonthIn: inU, MonthOut: outU, Total: inU + outU,
+		})
+	}
+	return out, nil
 }
 
 func (s *Store) GetEventState(key string) (EventState, error) {
