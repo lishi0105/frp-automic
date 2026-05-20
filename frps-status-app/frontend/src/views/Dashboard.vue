@@ -1709,7 +1709,7 @@ onUnmounted(() => {
   padding: 8px 8px;
   border-bottom: 1px solid #dfe7f1;
   font-size: 13px;
-  text-align: left;
+  text-align: center;
 }
 .top5-table th {
   position: sticky;
@@ -1725,9 +1725,9 @@ onUnmounted(() => {
   background: #f8fafc;
 }
 .top5-table .col-rank { width: 8%; }
-.top5-table .col-name { width: 22%; overflow: hidden; }
-.top5-table .col-num { width: 20%; text-align: right !important; white-space: nowrap; }
-.top5-table .col-num-total { width: 28%; }
+.top5-table .col-name { width: 25%; overflow: hidden; }
+.top5-table .col-num { width: 19%; white-space: nowrap; }
+.top5-table .col-num-total { width: 26%; }
 .top5-table .col-rank b,
 .top5-table .col-num b {
   color: #0f172a;
