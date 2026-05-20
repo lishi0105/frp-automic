@@ -1724,9 +1724,9 @@ onUnmounted(() => {
 .top5-table tbody tr:hover td {
   background: #f8fafc;
 }
-.top5-table .col-rank { width: 9%; }
-.top5-table .col-name { width: 19%; }
-.top5-table .col-num { width: 24%; text-align: right !important; white-space: nowrap; }
+.col-rank { width: 54px; }
+.col-name { width: auto; }
+.col-num { width: 88px; text-align: right !important; }
 .top5-table .col-rank b,
 .top5-table .col-num b {
   color: #0f172a;
@@ -1734,7 +1734,7 @@ onUnmounted(() => {
 }
 .top5-table .col-name code {
   display: block;
-  max-width: 100%;
+  width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
