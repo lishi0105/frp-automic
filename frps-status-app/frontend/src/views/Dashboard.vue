@@ -173,7 +173,7 @@
             <table class="top5-table">
               <thead>
                 <tr>
-                  <th class="col-rank">排名</th><th class="col-name">代理名称</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num">总流量</th>
+                  <th class="col-rank">No.</th><th class="col-name">代理名称</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num col-num-total">总流量</th>
                 </tr>
               </thead>
               <tbody>
@@ -183,7 +183,7 @@
                   <td class="col-name"><code>{{ p.name }}</code></td>
                   <td class="col-num">{{ humanBytes(p.month_in) }}</td>
                   <td class="col-num">{{ humanBytes(p.month_out) }}</td>
-                  <td class="col-num"><b>{{ humanBytes((p.total != null ? p.total : (p.month_in + p.month_out))) }}</b></td>
+                  <td class="col-num col-num-total"><b>{{ humanBytes((p.total != null ? p.total : (p.month_in + p.month_out))) }}</b></td>
                 </tr>
               </tbody>
             </table>
@@ -1709,7 +1709,7 @@ onUnmounted(() => {
   padding: 8px 8px;
   border-bottom: 1px solid #dfe7f1;
   font-size: 13px;
-  text-align: left;
+  text-align: center;
 }
 .top5-table th {
   position: sticky;
@@ -1724,21 +1724,24 @@ onUnmounted(() => {
 .top5-table tbody tr:hover td {
   background: #f8fafc;
 }
-.col-rank { width: 54px; }
-.col-name { width: auto; }
-.col-num { width: 88px; text-align: right !important; }
+.top5-table .col-rank { width: 8%; }
+.top5-table .col-name { width: 25%; overflow: hidden; }
+.top5-table .col-num { width: 19%; white-space: nowrap; }
+.top5-table .col-num-total { width: 26%; }
 .top5-table .col-rank b,
 .top5-table .col-num b {
   color: #0f172a;
   font-size: 13px;
 }
 .top5-table .col-name code {
-  display: block;
-  width: 120px;
+  display: inline-block;
+  max-width: 100%;
+  box-sizing: border-box;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 4px 9px;
+  vertical-align: middle;
+  padding: 3px 8px;
   border: 0;
   border-radius: 5px;
   background: linear-gradient(90deg, #f1f5f9, #eef2f7);
