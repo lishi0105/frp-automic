@@ -145,6 +145,9 @@ func (a *App) Refresh(ctx context.Context) error {
 	cycleTo := settings.TrafficCycleTo
 	for i := range proxies {
 		in, out, _ := a.store.TotalForProxyBetween(proxies[i].Name, proxies[i].Type, cycleFrom, cycleTo)
+		if in == 0 && out == 0 && (proxies[i].CurrentIn > 0 || proxies[i].CurrentOut > 0) {
+			in, out = proxies[i].CurrentIn, proxies[i].CurrentOut
+		}
 		proxies[i].MonthIn = in
 		proxies[i].MonthOut = out
 	}
@@ -192,7 +195,7 @@ func (a *App) Refresh(ctx context.Context) error {
 		Proxies:      proxies,
 		MonthTotals:  map[string]uint64{"in": monthIn, "out": monthOut},
 		Dashboard: model.DashboardSummary{
-			TopProxies:  buildTopProxies(proxies, 5),
+			TopProxies:  a.dashboardTopProxies(proxies, cycleFrom, cycleTo, 5),
 			Certificate: summarizeCertificates(certs),
 		},
 		Settings: settings,
@@ -296,6 +299,22 @@ func aliasMatchKeys(alias string) []string {
 		keys = append(keys, underscore)
 	}
 	return keys
+}
+
+func (a *App) dashboardTopProxies(proxies []model.ProxyTraffic, fromDay, toDay string, limit int) []model.DashboardTopProxy {
+	if items, err := a.store.TopProxiesBetween(fromDay, toDay, limit); err == nil && len(items) > 0 && topProxiesHaveTraffic(items) {
+		return items
+	}
+	return buildTopProxies(proxies, limit)
+}
+
+func topProxiesHaveTraffic(items []model.DashboardTopProxy) bool {
+	for _, it := range items {
+		if it.Total > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func buildTopProxies(proxies []model.ProxyTraffic, limit int) []model.DashboardTopProxy {
