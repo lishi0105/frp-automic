@@ -173,7 +173,7 @@
             <table class="top5-table">
               <thead>
                 <tr>
-                  <th class="col-rank">排名</th><th class="col-name">代理名称</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num col-num-total">总流量</th>
+                  <th class="col-rank">No.</th><th class="col-name">代理名称</th><th class="col-num">入站</th><th class="col-num">出站</th><th class="col-num col-num-total">总流量</th>
                 </tr>
               </thead>
               <tbody>
@@ -1725,9 +1725,9 @@ onUnmounted(() => {
   background: #f8fafc;
 }
 .top5-table .col-rank { width: 8%; }
-.top5-table .col-name { width: 16%; overflow: hidden; }
-.top5-table .col-num { width: 22%; text-align: right !important; white-space: nowrap; }
-.top5-table .col-num-total { width: 32%; }
+.top5-table .col-name { width: 22%; overflow: hidden; }
+.top5-table .col-num { width: 20%; text-align: right !important; white-space: nowrap; }
+.top5-table .col-num-total { width: 28%; }
 .top5-table .col-rank b,
 .top5-table .col-num b {
   color: #0f172a;
