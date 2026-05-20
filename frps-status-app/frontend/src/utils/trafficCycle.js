@@ -56,3 +56,20 @@ export function trafficCycleRangeFromSettings(settings, now = new Date()) {
     to: formatTrafficCycleDate(to)
   }
 }
+
+/** 从每日代理流量明细聚合 Top N（计费周期内） */
+export function topProxiesFromDaily(daily, from, to, limit = 5) {
+  const agg = new Map()
+  for (const r of daily || []) {
+    if (!r?.day || r.day < from || r.day > to) continue
+    const key = `${r.name}\0${r.type || ''}`
+    const cur = agg.get(key) || { name: r.name, type: r.type || '', month_in: 0, month_out: 0 }
+    cur.month_in += Number(r.in || 0)
+    cur.month_out += Number(r.out || 0)
+    agg.set(key, cur)
+  }
+  return [...agg.values()]
+    .map(p => ({ ...p, total: p.month_in + p.month_out }))
+    .sort((a, b) => b.total - a.total || String(a.name).localeCompare(String(b.name)))
+    .slice(0, limit)
+}

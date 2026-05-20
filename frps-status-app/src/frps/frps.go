@@ -178,6 +178,7 @@ func (c *Client) fetchProxyType(ctx context.Context, typ string) ([]model.ProxyT
 		logger.Error("解析 FRPS 面板响应失败 地址=%s 错误=%v", url, err)
 		return nil, err
 	}
+	raw = unwrapDashboardPayload(raw)
 	var out []model.ProxyTraffic
 	for _, obj := range extractObjects(raw) {
 		// Merge nested info objects (proxyInfo, conf, config) into the top-level map
@@ -201,8 +202,8 @@ func (c *Client) fetchProxyType(ctx context.Context, typ string) ([]model.ProxyT
 			Domains:    domainValues(obj),
 			Online:     boolValue(obj, "online", "status"),
 			CurConns:   int64(uintValue(obj, "curConns", "cur_conns")),
-			CurrentIn:  uintValue(obj, "totalTrafficIn", "trafficIn", "todayTrafficIn", "in"),
-			CurrentOut: uintValue(obj, "totalTrafficOut", "trafficOut", "todayTrafficOut", "out"),
+			CurrentIn:  trafficBytes(obj, true),
+			CurrentOut: trafficBytes(obj, false),
 		})
 	}
 	return out, nil
@@ -246,6 +247,40 @@ func domainValues(m map[string]any) []string {
 		out = append(out, d)
 	}
 	return out
+}
+
+// unwrapDashboardPayload 解析 FRPS GeneralResponse（Msg 字段为 JSON 字符串）或直接 JSON 体。
+func unwrapDashboardPayload(raw any) any {
+	m, ok := raw.(map[string]any)
+	if !ok {
+		return raw
+	}
+	for _, key := range []string{"Msg", "msg"} {
+		if s, ok := m[key].(string); ok && strings.TrimSpace(s) != "" {
+			var inner any
+			if err := json.Unmarshal([]byte(s), &inner); err == nil {
+				return inner
+			}
+		}
+	}
+	return raw
+}
+
+func trafficBytes(m map[string]any, inbound bool) uint64 {
+	var keys []string
+	if inbound {
+		keys = []string{"todayTrafficIn", "today_traffic_in", "totalTrafficIn", "total_traffic_in", "trafficIn", "traffic_in", "in"}
+	} else {
+		keys = []string{"todayTrafficOut", "today_traffic_out", "totalTrafficOut", "total_traffic_out", "trafficOut", "traffic_out", "out"}
+	}
+	for _, nestKey := range []string{"traffic", "stats", "proxyInfo", "info"} {
+		if nested, ok := m[nestKey].(map[string]any); ok {
+			if v := uintValue(nested, keys...); v > 0 {
+				return v
+			}
+		}
+	}
+	return uintValue(m, keys...)
 }
 
 func extractObjects(v any) []map[string]any {
@@ -298,14 +333,23 @@ func boolValue(m map[string]any, keys ...string) bool {
 
 func uintValue(m map[string]any, keys ...string) uint64 {
 	for _, key := range keys {
-		switch v := m[key].(type) {
+		v, exists := m[key]
+		if !exists {
+			continue
+		}
+		switch n := v.(type) {
 		case float64:
-			if v > 0 {
-				return uint64(v)
+			if n > 0 {
+				return uint64(n)
+			}
+		case json.Number:
+			if i, err := n.Int64(); err == nil && i > 0 {
+				return uint64(i)
 			}
 		case string:
-			n, _ := strconv.ParseUint(v, 10, 64)
-			return n
+			if parsed, err := strconv.ParseUint(strings.TrimSpace(n), 10, 64); err == nil && parsed > 0 {
+				return parsed
+			}
 		}
 	}
 	return 0
