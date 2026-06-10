@@ -139,6 +139,7 @@ def issue_certs(ctx: DeployContext) -> None:
 
 def docker_compose_up_initial() -> None:
     run(["docker", "compose", "up", "-d", "--remove-orphans", "frps", "nginx"], cwd=BASE_DIR)
+    run(["docker", "compose", "restart", "nginx"], cwd=BASE_DIR)
     time.sleep(2)
     ret = capture(["docker", "compose", "ps", "nginx"], cwd=BASE_DIR, check=False)
     if ret.returncode != 0:
