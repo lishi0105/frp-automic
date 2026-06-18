@@ -40,7 +40,12 @@ def ensure_dirs() -> None:
 
 
 def generate_default_nginx_conf() -> None:
-    conf = """# 拒绝未匹配的主机名（Host），避免请求落到第一个默认虚拟主机。
+    conf = """map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}
+
+# 拒绝未匹配的主机名（Host），避免请求落到第一个默认虚拟主机。
 server {
     listen 80 default_server;
     server_name _;
@@ -351,7 +356,7 @@ server {{
         proxy_set_header X-Forwarded-Proto https;
 
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_set_header Connection $connection_upgrade;
     }}
 }}
 """
@@ -403,7 +408,7 @@ server {{
         proxy_set_header X-Forwarded-Proto https;
 
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_set_header Connection $connection_upgrade;
 
         proxy_read_timeout 3600s;
         proxy_send_timeout 3600s;

@@ -196,7 +196,7 @@ https://emby.<你的根域名>
 https://emby.example.com
 ```
 
-HTTP 模式默认通过 Nginx 提供 HTTPS 入口，更适合 Web 服务、管理后台、媒体服务等场景。
+HTTP 模式默认通过 Nginx 提供 HTTPS 入口，更适合 Web 服务、管理后台、媒体服务等场景。通过 WebSocket 访问的服务也使用 `mode: "http"`，脚本生成的 Nginx 配置会保留 `Upgrade` 头并使用 HTTP/1.1 反代。
 
 ### 3.2 TCP 服务
 
@@ -261,7 +261,7 @@ https://frps.<你的根域名>
 | ------------------ | -------- | ------------------------------------------------------------ |
 | `alias`            | 是       | 服务别名，也是子域名前缀，例如 `emby` 对应 `https://emby.example.com` |
 | `comment`          | 否       | 服务备注，用于配置说明和列表展示                             |
-| `mode`             | 否       | 服务模式，`http` 或 `tcp`，默认 `http`                       |
+| `mode`             | 否       | 服务模式，`http` 或 `tcp`，默认 `http`；WebSocket 服务也使用 `http` |
 | `tunnel`           | 否       | 是否通过 frp 穿透，默认 `true`                               |
 | `port`             | 是       | frps 侧端口，也就是公网 TCP 端口或 frpc 的 `remotePort`      |
 | `local_port`       | 否       | 内网真实服务端口，不填时等于 `port`                          |
